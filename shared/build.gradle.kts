@@ -28,6 +28,8 @@ kotlin {
                 implementation(compose.material)
                 @OptIn(org.jetbrains.compose.ExperimentalComposeLibrary::class)
                 implementation(compose.components.resources)
+                implementation("com.google.zxing:core:3.5.2")
+                implementation("com.google.zxing:javase:3.5.2")
             }
         }
         val androidMain by getting {
