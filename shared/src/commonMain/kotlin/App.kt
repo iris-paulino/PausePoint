@@ -77,7 +77,7 @@ fun App() {
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes }
 
 private data class TrackedApp(
     val name: String,
@@ -339,6 +339,7 @@ private fun AppRoot() {
                 route = Route.Pause
             },
             onOpenDurationSetting = { route = Route.DurationSetting },
+            onOpenSettings = { route = Route.Settings },
             onRemoveTrackedApp = { appName ->
                 // Remove from tracked list (robust name matching)
                 trackedApps = trackedApps.filterNot { tracked ->
@@ -354,6 +355,13 @@ private fun AppRoot() {
                     if (matches) app.copy(isSelected = false) else app
                 }
             }
+        )
+        Route.Settings -> SettingsScreen(
+            onBack = { route = Route.Dashboard },
+            onOpenSavedQrCodes = { route = Route.SavedQrCodes }
+        )
+        Route.SavedQrCodes -> SavedQrCodesScreen(
+            onBack = { route = Route.Settings }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -480,6 +488,7 @@ private fun DashboardScreen(
     onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
+    onOpenSettings: () -> Unit,
     onRemoveTrackedApp: (String) -> Unit
 ) {
     DashboardContent(
@@ -494,6 +503,7 @@ private fun DashboardScreen(
         onScanQrCode = onScanQrCode,
         onOpenPause = onOpenPause,
         onOpenDurationSetting = onOpenDurationSetting,
+        onOpenSettings = onOpenSettings,
         onRemoveTrackedApp = onRemoveTrackedApp
     )
 }
@@ -1113,6 +1123,7 @@ private fun DashboardContent(
     onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
+    onOpenSettings: () -> Unit,
     onRemoveTrackedApp: (String) -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
@@ -1144,7 +1155,7 @@ private fun DashboardContent(
             Row {
                 Text("☀", fontSize = 24.sp, color = Color(0xFFD1D5DB))
                 Spacer(Modifier.width(16.dp))
-                Text("⚙", fontSize = 24.sp, color = Color(0xFFD1D5DB))
+                Text("⚙", fontSize = 24.sp, color = Color(0xFFD1D5DB), modifier = Modifier.clickable { onOpenSettings() })
             }
         }
         
@@ -1330,75 +1341,7 @@ private fun DashboardContent(
         
         Spacer(Modifier.height(24.dp))
         
-        // Saved QR Codes Card
-        if (savedQrCodes.isNotEmpty()) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                backgroundColor = Color(0xFF2C2C2C),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Your Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                    
-                    Spacer(Modifier.height(12.dp))
-                    
-                    Text(
-                        "You have ${savedQrCodes.size} QR code${if (savedQrCodes.size == 1) "" else "s"} ready for scanning. Print and place them around your home!",
-                        fontSize = 14.sp,
-                        color = Color(0xFFD1D5DB),
-                        lineHeight = 20.sp
-                    )
-                    
-                    Spacer(Modifier.height(16.dp))
-                    
-                    // List of saved QR codes
-                    savedQrCodes.take(3).forEach { qrCode ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text("▦", color = Color(0xFF4CAF50), fontSize = 12.sp)
-                            Spacer(Modifier.width(8.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    qrCode.message,
-                                    color = Color.White,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    "Created ${formatDate(qrCode.createdAt)}",
-                                    color = Color(0xFFD1D5DB),
-                                    fontSize = 12.sp
-                                )
-                            }
-                            if (qrCode.isActive) {
-                                Text("✓", color = Color(0xFF4CAF50), fontSize = 12.sp)
-                            }
-                        }
-                    }
-                    
-                    if (savedQrCodes.size > 3) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "... and ${savedQrCodes.size - 3} more",
-                            color = Color(0xFFD1D5DB),
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-            }
-            
-            Spacer(Modifier.height(24.dp))
-        }
+        // Saved QR Codes card removed from Dashboard; now lives in Settings
         
         // App Usage Card
         Card(
@@ -1528,6 +1471,154 @@ private fun DashboardContent(
             backgroundColor = Color(0xFF1A1A1A),
             contentColor = Color.White
         )
+    }
+}
+
+@Composable
+private fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenSavedQrCodes: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Customize your digital wellness experience", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Notifications", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Push Notifications — Get notified when you reach time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("App Behavior", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Strict Mode — Make it harder to bypass time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(4.dp))
+                Text("Show Usage Statistics — Display daily usage on dashboard", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenSavedQrCodes() },
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Manage, share, and protect your QR codes", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Appearance", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Theme — Switch between light and dark mode", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Danger Zone", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF5252))
+                Spacer(Modifier.height(8.dp))
+                Text("Reset All Data — This cannot be undone", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SavedQrCodesScreen(
+    onBack: () -> Unit
+) {
+    val storage = remember { createAppStorage() }
+    var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
+    LaunchedEffect(Unit) { savedQrCodes = storage.getSavedQrCodes() }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text("Saved QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Manage your QR codes", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        if (savedQrCodes.isEmpty()) {
+            Card(modifier = Modifier.fillMaxWidth(), backgroundColor = Color(0xFF2C2C2C), shape = RoundedCornerShape(16.dp)) {
+                Text("No saved QR codes yet", color = Color(0xFFD1D5DB), modifier = Modifier.padding(24.dp))
+            }
+            return@Column
+        }
+
+        savedQrCodes.forEach { qrCode ->
+            Spacer(Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth(), backgroundColor = Color(0xFF2C2C2C), shape = RoundedCornerShape(12.dp)) {
+                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("▦", color = Color(0xFF4CAF50), fontSize = 16.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(qrCode.message, color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text("Created ${formatDate(qrCode.createdAt)}", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                    }
+                    if (qrCode.isActive) Text("✓", color = Color(0xFF4CAF50), fontSize = 12.sp)
+                }
+            }
+        }
     }
 }
 
