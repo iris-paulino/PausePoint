@@ -9,7 +9,7 @@ fun MainViewController() = ComposeUIViewController { App() }
 actual fun saveQrPdf(qrText: String, message: String): String {
     // In a real iOS implementation, you would use PDFKit to create a PDF
     // and save it to the Documents directory or share it via UIActivityViewController
-    return "Documents/pausepoint_qr_${System.currentTimeMillis()}.pdf"
+    return "Documents/pausepoint_qr_${kotlin.random.Random.nextLong()}.pdf"
 }
 
 actual fun startUsageTracking(

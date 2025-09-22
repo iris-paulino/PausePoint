@@ -47,7 +47,7 @@ private fun generateQrCodeMatrix(text: String, size: Int): BitMatrix? {
     }
 }
 
-private fun drawQrCode(drawScope: DrawScope, bitMatrix: BitMatrix, size: Int) {
+private fun drawQrCode(drawScope: DrawScope, bitMatrix: BitMatrix, @Suppress("UNUSED_PARAMETER") size: Int) {
     val canvasSize = drawScope.size.minDimension
     val cellSize = canvasSize / bitMatrix.width
     
