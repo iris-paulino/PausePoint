@@ -1641,44 +1641,171 @@ private fun SavedQrCodesScreen(
     onBack: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
-    LaunchedEffect(Unit) { savedQrCodes = storage.getSavedQrCodes() }
+    var isLoading by remember { mutableStateOf(true) }
+
+    fun refreshList() {
+        coroutineScope.launch {
+            isLoading = true
+            savedQrCodes = try { storage.getSavedQrCodes() } catch (_: Exception) { emptyList() }
+            isLoading = false
+        }
+    }
+
+    LaunchedEffect(Unit) { refreshList() }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
             .padding(24.dp)
-            .verticalScroll(rememberScrollState())
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text("Saved QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Manage your QR codes", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("Saved QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("View and reprint your previously generated QR codes", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                }
             }
-        }
-        Spacer(Modifier.height(24.dp))
-
-        if (savedQrCodes.isEmpty()) {
-            Card(modifier = Modifier.fillMaxWidth(), backgroundColor = Color(0xFF2C2C2C), shape = RoundedCornerShape(16.dp)) {
-                Text("No saved QR codes yet", color = Color(0xFFD1D5DB), modifier = Modifier.padding(24.dp))
-            }
-            return@Column
-        }
-
-        savedQrCodes.forEach { qrCode ->
-            Spacer(Modifier.height(8.dp))
-            Card(modifier = Modifier.fillMaxWidth(), backgroundColor = Color(0xFF2C2C2C), shape = RoundedCornerShape(12.dp)) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("▦", color = Color(0xFF4CAF50), fontSize = 16.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(qrCode.message, color = Color.White, fontWeight = FontWeight.SemiBold)
-                        Text("Created ${formatDate(qrCode.createdAt)}", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+            // Print all
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        savedQrCodes.forEach { code ->
+                            try { saveQrPdf(qrText = code.qrText, message = code.message) } catch (_: Exception) {}
+                        }
                     }
-                    if (qrCode.isActive) Text("✓", color = Color(0xFF4CAF50), fontSize = 12.sp)
+                },
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                shape = RoundedCornerShape(10.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Text("⇩", color = Color.White)
+                Spacer(Modifier.width(8.dp))
+                Text("Print All", color = Color.White, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Loading...", color = Color.White)
+                }
+            }
+            savedQrCodes.isEmpty() -> {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = Color(0xFF2C2C2C),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Text("No saved QR codes yet", color = Color(0xFFD1D5DB), modifier = Modifier.padding(24.dp))
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp)
+                ) {
+                    items(savedQrCodes) { qrCode ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            backgroundColor = Color(0xFF222625),
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(qrCode.message, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 18.sp)
+                                    Row {
+                                        Text(
+                                            "↻",
+                                            color = Color(0xFFD1D5DB),
+                                            modifier = Modifier.clickable {
+                                                coroutineScope.launch {
+                                                    try { storage.removeQrCode(qrCode.id) } catch (_: Exception) {}
+                                                    val newCode = SavedQrCode(
+                                                        id = "pause-${kotlin.random.Random.nextLong()}",
+                                                        qrText = "QR:${qrCode.message}:v${kotlin.random.Random.nextInt(1, 1_000_000)}",
+                                                        message = qrCode.message,
+                                                        createdAt = getCurrentTimeMillis(),
+                                                        isActive = true
+                                                    )
+                                                    try { storage.saveQrCode(newCode) } catch (_: Exception) {}
+                                                    refreshList()
+                                                }
+                                            }
+                                        )
+                                        Spacer(Modifier.width(16.dp))
+                                        Text(
+                                            "🗑",
+                                            color = Color(0xFFFF5252),
+                                            modifier = Modifier.clickable {
+                                                coroutineScope.launch {
+                                                    try { storage.removeQrCode(qrCode.id) } catch (_: Exception) {}
+                                                    refreshList()
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(96.dp)
+                                            .background(Color.White, RoundedCornerShape(8.dp)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        QrCodeDisplay(text = qrCode.qrText, modifier = Modifier.fillMaxSize())
+                                    }
+                                    Spacer(Modifier.width(16.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text("QR Code ID", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                                        }
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(qrCode.id, color = Color.White, fontSize = 14.sp)
+                                        Spacer(Modifier.height(8.dp))
+                                        Text("Generated ${formatDate(qrCode.createdAt)}", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                                    }
+                                }
+
+                                Spacer(Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            try { saveQrPdf(qrText = qrCode.qrText, message = qrCode.message) } catch (_: Exception) {}
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp)
+                                ) {
+                                    Text("⇩", color = Color.White)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Download This QR Code", color = Color.White, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
