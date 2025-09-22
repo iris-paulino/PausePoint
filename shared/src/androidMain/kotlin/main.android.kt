@@ -9,6 +9,11 @@ import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.Image
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.FileOutputStream
 
@@ -52,6 +57,16 @@ private fun generateQrCodeBitmap(text: String, size: Int): Bitmap? {
         bitmap
     } catch (e: Exception) {
         null
+    }
+}
+
+// Actual QR code display on Android
+@Composable
+actual fun QrCodeDisplay(text: String, modifier: Modifier) {
+    val sizePx = with(LocalDensity.current) { 200.dp.roundToPx() }
+    val bmp = generateQrCodeBitmap(text, sizePx)
+    if (bmp != null) {
+        Image(bmp.asImageBitmap(), contentDescription = "QR", modifier = modifier)
     }
 }
 
@@ -126,5 +141,14 @@ actual fun showBlockingOverlay(message: String) {
 
 actual fun scanQrAndDismiss(expectedMessage: String): Boolean {
     // TODO: Implement using ML Kit barcode scanning or CameraX; return whether QR matches.
+    // This function should:
+    // 1. Open camera for QR scanning
+    // 2. Scan QR code and get the text
+    // 3. Validate the scanned text against saved QR codes using storage.validateQrCode()
+    // 4. Return true if valid QR code is found and matches expected message
     return false
+}
+
+actual fun getCurrentTimeMillis(): Long {
+    return System.currentTimeMillis()
 }

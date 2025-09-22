@@ -26,5 +26,15 @@ actual fun showBlockingOverlay(message: String) {
 
 actual fun scanQrAndDismiss(expectedMessage: String): Boolean {
     // Could use AVFoundation barcode scanning via interop. Placeholder.
+    // This function should:
+    // 1. Open camera for QR scanning using AVFoundation
+    // 2. Scan QR code and get the text
+    // 3. Validate the scanned text against saved QR codes using storage.validateQrCode()
+    // 4. Return true if valid QR code is found and matches expected message
     return false
+}
+
+actual fun getCurrentTimeMillis(): Long {
+    // Simple implementation - in a real app you'd use proper iOS time APIs
+    return kotlin.random.Random.nextLong(1000000000000L, 2000000000000L)
 }
