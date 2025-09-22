@@ -208,53 +208,66 @@ private fun AppRoot() {
                     // Debug: Print the number of apps found
                     println("DEBUG: Found ${installedApps.size} installed apps")
                     if (installedApps.isNotEmpty()) {
-                        // Define default apps that should be selected by default
-                        val defaultAppNames = listOf("Instagram", "TikTok", "Snapchat", "Chrome", "YouTube")
-                        
                         availableApps = installedApps.map { installedApp ->
-                            // Check if this app should be selected by default
-                            val isDefaultApp = defaultAppNames.any { defaultName -> 
-                                installedApp.appName.contains(defaultName, ignoreCase = true) || 
-                                defaultName.contains(installedApp.appName, ignoreCase = true)
+                            // Selection strictly mirrors current tracked apps
+                            val isTracked = trackedApps.any { tracked ->
+                                tracked.name.equals(installedApp.appName, ignoreCase = true) ||
+                                tracked.name.contains(installedApp.appName, ignoreCase = true) ||
+                                installedApp.appName.contains(tracked.name, ignoreCase = true)
                             }
-                            
                             AvailableApp(
                                 name = installedApp.appName,
                                 category = installedApp.category,
                                 icon = installedApp.icon,
                                 packageName = installedApp.packageName,
-                                isSelected = isDefaultApp
+                                isSelected = isTracked
                             )
                         }
                         println("DEBUG: Loaded ${availableApps.size} apps for selection")
                     } else {
                         // If no apps are detected, provide some common fallback apps
                         println("DEBUG: No apps detected, using fallback apps")
-                        availableApps = listOf(
-                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android", true),
-                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically", true),
+                        val fallback = listOf(
+                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
+                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
                             AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
                             AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube", true),
-                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android", true),
+                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
+                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
                             AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
                             AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
                         )
+                        availableApps = fallback.map { app ->
+                            val isTracked = trackedApps.any { tracked ->
+                                tracked.name.equals(app.name, ignoreCase = true) ||
+                                tracked.name.contains(app.name, ignoreCase = true) ||
+                                app.name.contains(tracked.name, ignoreCase = true)
+                            }
+                            app.copy(isSelected = isTracked)
+                        }
                     }
                 } catch (e: Exception) {
                     // If loading fails, provide fallback apps
                     println("DEBUG: Exception occurred while loading apps: ${e.message}")
                     e.printStackTrace()
-                    availableApps = listOf(
-                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android", true),
-                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically", true),
+                    val fallback = listOf(
+                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
+                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
                         AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
                         AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube", true),
-                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android", true),
+                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
+                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
                         AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
                         AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
                     )
+                    availableApps = fallback.map { app ->
+                        val isTracked = trackedApps.any { tracked ->
+                            tracked.name.equals(app.name, ignoreCase = true) ||
+                            tracked.name.contains(app.name, ignoreCase = true) ||
+                            app.name.contains(tracked.name, ignoreCase = true)
+                        }
+                        app.copy(isSelected = isTracked)
+                    }
                 } finally {
                     isLoadingApps = false
                 }
@@ -325,7 +338,22 @@ private fun AppRoot() {
             onOpenPause = {
                 route = Route.Pause
             },
-            onOpenDurationSetting = { route = Route.DurationSetting }
+            onOpenDurationSetting = { route = Route.DurationSetting },
+            onRemoveTrackedApp = { appName ->
+                // Remove from tracked list (robust name matching)
+                trackedApps = trackedApps.filterNot { tracked ->
+                    tracked.name.equals(appName, ignoreCase = true) ||
+                    tracked.name.contains(appName, ignoreCase = true) ||
+                    appName.contains(tracked.name, ignoreCase = true)
+                }
+                // Also toggle off in available apps list so AppSelection reflects it
+                availableApps = availableApps.map { app ->
+                    val matches = app.name.equals(appName, ignoreCase = true) ||
+                        app.name.contains(appName, ignoreCase = true) ||
+                        appName.contains(app.name, ignoreCase = true)
+                    if (matches) app.copy(isSelected = false) else app
+                }
+            }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -451,7 +479,8 @@ private fun DashboardScreen(
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
-    onOpenDurationSetting: () -> Unit
+    onOpenDurationSetting: () -> Unit,
+    onRemoveTrackedApp: (String) -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
@@ -464,7 +493,8 @@ private fun DashboardScreen(
         onOpenAppSelection = onOpenAppSelection,
         onScanQrCode = onScanQrCode,
         onOpenPause = onOpenPause,
-        onOpenDurationSetting = onOpenDurationSetting
+        onOpenDurationSetting = onOpenDurationSetting,
+        onRemoveTrackedApp = onRemoveTrackedApp
     )
 }
 
@@ -1082,7 +1112,8 @@ private fun DashboardContent(
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
-    onOpenDurationSetting: () -> Unit
+    onOpenDurationSetting: () -> Unit,
+    onRemoveTrackedApp: (String) -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
@@ -1398,6 +1429,16 @@ private fun DashboardContent(
                 
                 Spacer(Modifier.height(16.dp))
                 
+                // Empty state when no apps are selected
+                if (trackedApps.isEmpty()) {
+                    Text(
+                        "No apps selected. Add apps to track",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 14.sp,
+                        modifier = Modifier.clickable { onOpenAppSelection() }
+                    )
+                }
+
                 trackedApps.forEach { app ->
                     Column(
                         modifier = Modifier
@@ -1413,9 +1454,12 @@ private fun DashboardContent(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("0m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
-                                Text("✏", color = Color(0xFFFF5252), fontSize = 12.sp)
-                                Spacer(Modifier.width(4.dp))
-                                Text("🗑", color = Color(0xFFFF5252), fontSize = 12.sp)
+                                Text(
+                                    "🗑",
+                                    color = Color(0xFFFF5252),
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.clickable { onRemoveTrackedApp(app.name) }
+                                )
                             }
                         }
                         Spacer(Modifier.height(4.dp))
