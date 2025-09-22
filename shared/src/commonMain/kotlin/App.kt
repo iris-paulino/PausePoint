@@ -106,7 +106,8 @@ private fun AppRoot() {
             onQrCreated = { id ->
                 qrId = id
                 route = Route.Dashboard
-            }
+            },
+            onClose = { route = Route.Dashboard }
         )
         Route.Dashboard -> DashboardScreen(
             qrId = qrId,
@@ -152,7 +153,8 @@ private fun OnboardingFlow(onGenerateQr: () -> Unit) {
 private fun QrGeneratorScreen(
     message: String,
     onMessageChange: (String) -> Unit,
-    onQrCreated: (String) -> Unit
+    onQrCreated: (String) -> Unit,
+    onClose: () -> Unit
 ) {
     QrGeneratorContent(
         message = message,
@@ -165,9 +167,10 @@ private fun QrGeneratorScreen(
         },
         onGenerate = {
             // Create a simple unique id
-            val id = "pause-${System.currentTimeMillis()}"
+            val id = "pause-${kotlin.random.Random.nextLong()}"
             onQrCreated(id)
-        }
+        },
+        onClose = onClose
     )
 }
 
@@ -354,7 +357,8 @@ private fun QrGeneratorContent(
     message: String,
     onMessageChange: (String) -> Unit,
     onDownloadPdf: (String) -> Unit,
-    onGenerate: () -> Unit
+    onGenerate: () -> Unit,
+    onClose: () -> Unit
 ) {
     var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
     var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
@@ -373,7 +377,12 @@ private fun QrGeneratorContent(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("←", fontSize = 24.sp, color = Color.White)
+            Text(
+                text = "×",
+                fontSize = 24.sp,
+                color = Color.White,
+                modifier = Modifier.clickable { onClose() }
+            )
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
@@ -431,7 +440,7 @@ private fun QrGeneratorContent(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("ID: pause-${System.currentTimeMillis().toString().takeLast(6)}...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                        Text("ID: pause-${kotlin.random.Random.nextLong().toString().takeLast(6)}...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                         Spacer(Modifier.width(8.dp))
                         Text("⧉", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                     }
