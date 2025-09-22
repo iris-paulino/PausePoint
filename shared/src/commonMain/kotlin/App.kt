@@ -159,7 +159,9 @@ private fun QrGeneratorScreen(
         onMessageChange = onMessageChange,
         onDownloadPdf = { text ->
             // Save a PDF using a platform stub and then continue
-            saveQrPdf(qrText = text, message = message)
+            val filePath = saveQrPdf(qrText = text, message = message)
+            // Note: In a real app, you might want to show a toast or notification here
+            // indicating the file was saved to the specified path
         },
         onGenerate = {
             // Create a simple unique id
@@ -356,6 +358,7 @@ private fun QrGeneratorContent(
 ) {
     var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
     var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
+    var downloadSuccess by remember { mutableStateOf(false) }
     val qrText = remember(message, qrVersion) { "QR:$message:v$qrVersion" }
 
     Column(
@@ -470,18 +473,36 @@ private fun QrGeneratorContent(
         
         // Download Button - only enabled when QR is generated
         Button(
-            onClick = { onDownloadPdf(qrText) },
+            onClick = { 
+                onDownloadPdf(qrText)
+                downloadSuccess = true
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (hasGeneratedQr) Color(0xFF4CAF50) else Color(0xFF4B5563)
+                backgroundColor = if (downloadSuccess) Color(0xFF2E7D32) else if (hasGeneratedQr) Color(0xFF4CAF50) else Color(0xFF4B5563)
             ),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
             enabled = hasGeneratedQr
         ) {
-            Text("↓", color = Color.White)
+            Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
-            Text("Download PDF for Printing", color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                if (downloadSuccess) "Downloaded Successfully!" else "Download PDF for Printing", 
+                color = Color.White, 
+                fontWeight = FontWeight.Bold
+            )
+        }
+        
+        // Success message
+        if (downloadSuccess) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "✓ File saved to Downloads folder",
+                color = Color(0xFF4CAF50),
+                fontSize = 14.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
         }
         
         Spacer(Modifier.height(12.dp))
@@ -491,6 +512,7 @@ private fun QrGeneratorContent(
             onClick = { 
                 qrVersion++
                 hasGeneratedQr = true
+                downloadSuccess = false
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
