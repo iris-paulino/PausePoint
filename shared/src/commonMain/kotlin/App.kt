@@ -354,8 +354,8 @@ private fun QrGeneratorContent(
     onDownloadPdf: (String) -> Unit,
     onGenerate: () -> Unit
 ) {
-    var qrVersion by remember { mutableStateOf(0) } // Start at 0 so no QR shows initially
-    var hasGeneratedQr by remember { mutableStateOf(false) }
+    var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
+    var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
     val qrText = remember(message, qrVersion) { "QR:$message:v$qrVersion" }
 
     Column(
