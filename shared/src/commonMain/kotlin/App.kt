@@ -100,6 +100,7 @@ private fun AppRoot() {
     var route by remember { mutableStateOf<Route?>(null) } // Start with null to show loading
     var qrMessage by remember { mutableStateOf("Take a mindful pause") }
     var qrId by remember { mutableStateOf<String?>(null) }
+    var showNotificationDialog by remember { mutableStateOf(false) }
     var trackedApps by remember {
         mutableStateOf(
             listOf(
@@ -232,6 +233,13 @@ private fun AppRoot() {
                     // No saved selection: set up defaults
                     setupDefaultApps()
                 }
+                
+                // Check if notifications are disabled and show permission dialog
+                val notificationsEnabled = withTimeoutOrNull(3000) { storage.getNotificationsEnabled() } ?: true
+                if (!notificationsEnabled) {
+                    showNotificationDialog = true
+                }
+                
                 route = Route.Dashboard
             } else {
                 // If onboarding is not completed, show onboarding
@@ -501,6 +509,67 @@ private fun AppRoot() {
                 }
             },
             onClose = { route = Route.Dashboard }
+        )
+    }
+    
+    // Notification Permission Dialog
+    if (showNotificationDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showNotificationDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🔔", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Enable Notifications?",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "Stay informed about your app usage limits and take mindful breaks when needed.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "You can change this setting anytime in Settings.",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        coroutineScope.launch {
+                            try { storage.saveNotificationsEnabled(true) } catch (_: Exception) {}
+                        }
+                        showNotificationDialog = false 
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Enable", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showNotificationDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Not Now", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
         )
     }
 }
