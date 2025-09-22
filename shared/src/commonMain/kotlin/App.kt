@@ -171,8 +171,8 @@ private fun OnboardingFlow(onGenerateQr: () -> Unit) {
                 description = "Print QR codes and place them around your home. When time is up, you'll need to physically walk to scan them."
             ),
             OnboardingPage(
-                title = "Accountability Partners",
-                description = "Add trusted contacts as accountability partners. They can generate QR codes to help you unlock apps."
+                title = "Pause Partners",
+                description = "Add trusted contacts as pause partners. They can generate QR codes to help you unlock apps."
             ),
             OnboardingPage(
                 title = "Create Your First QR Code",
@@ -735,7 +735,7 @@ private fun QrGeneratorContent(
         }
     }
     
-    // Accountability Partners Dialog
+    // Pause Partners Dialog
     if (showAccountabilityDialog) {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showAccountabilityDialog = false },
@@ -746,7 +746,7 @@ private fun QrGeneratorContent(
                     Text("👥", fontSize = 24.sp)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Coming Soon: Accountability Partners",
+                        "Coming Soon: Pause Partners",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -762,7 +762,7 @@ private fun QrGeneratorContent(
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "Your accountability partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
+                        "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
                         color = Color.White,
                         fontSize = 14.sp
                     )
