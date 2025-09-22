@@ -415,7 +415,8 @@ private fun AppRoot() {
             onOpenSavedQrCodes = { route = Route.SavedQrCodes }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
-            onBack = { route = Route.Settings }
+            onBack = { route = Route.Settings },
+            onOpenQrGenerator = { route = Route.QrGenerator }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -1638,7 +1639,8 @@ private fun SettingsScreen(
 
 @Composable
 private fun SavedQrCodesScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onOpenQrGenerator: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -1664,7 +1666,7 @@ private fun SavedQrCodesScreen(
         // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1674,23 +1676,6 @@ private fun SavedQrCodesScreen(
                     Text("Saved QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("View and reprint your previously generated QR codes", fontSize = 14.sp, color = Color(0xFFD1D5DB))
                 }
-            }
-            // Print all
-            Button(
-                onClick = {
-                    coroutineScope.launch {
-                        savedQrCodes.forEach { code ->
-                            try { saveQrPdf(qrText = code.qrText, message = code.message) } catch (_: Exception) {}
-                        }
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                shape = RoundedCornerShape(10.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-            ) {
-                Text("⇩", color = Color.White)
-                Spacer(Modifier.width(8.dp))
-                Text("Print All", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
 
@@ -1709,6 +1694,18 @@ private fun SavedQrCodesScreen(
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     Text("No saved QR codes yet", color = Color(0xFFD1D5DB), modifier = Modifier.padding(24.dp))
+                }
+                Spacer(Modifier.height(16.dp))
+                Button(
+                    onClick = { onOpenQrGenerator() },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Text("＋", color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add New", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
             else -> {
@@ -1804,6 +1801,20 @@ private fun SavedQrCodesScreen(
                                     Text("Download This QR Code", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
+                        }
+                    }
+                    item {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { onOpenQrGenerator() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(vertical = 14.dp)
+                        ) {
+                            Text("＋", color = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add New", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
