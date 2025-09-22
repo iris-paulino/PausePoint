@@ -89,6 +89,7 @@ private data class AvailableApp(
     val name: String,
     val category: String,
     val icon: String,
+    val packageName: String,
     val isSelected: Boolean = false
 )
 
@@ -107,24 +108,13 @@ private fun AppRoot() {
         )
     }
     
-    var availableApps by remember {
-        mutableStateOf(
-            listOf(
-                AvailableApp("Instagram", "Social media", "📷"),
-                AvailableApp("TikTok", "Social media", "🎵"),
-                AvailableApp("Facebook", "Social media", "📘"),
-                AvailableApp("Twitter", "Social media", "🐦"),
-                AvailableApp("YouTube", "Social media", "📺"),
-                AvailableApp("Snapchat", "Social media", "👻"),
-                AvailableApp("Reddit", "Social media", "🤖"),
-                AvailableApp("LinkedIn", "Social media", "💼")
-            )
-        )
-    }
+    var availableApps by remember { mutableStateOf<List<AvailableApp>>(emptyList()) }
+    var isLoadingApps by remember { mutableStateOf(false) }
     
     var timeLimitMinutes by remember { mutableStateOf(15) }
     
     val storage = remember { createAppStorage() }
+    val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
     
     // Check onboarding completion status on app start
@@ -139,6 +129,62 @@ private fun AppRoot() {
         } catch (e: Exception) {
             // If storage fails, default to onboarding
             route = Route.Onboarding
+        }
+    }
+    
+    // Load installed apps when navigating to AppSelection
+    LaunchedEffect(route) {
+        if (route == Route.AppSelection && !isLoadingApps) {
+            // Reset apps when navigating to AppSelection to ensure fresh load
+            if (availableApps.isEmpty()) {
+                isLoadingApps = true
+                try {
+                    val installedApps = installedAppsProvider.getInstalledApps()
+                    // Debug: Print the number of apps found
+                    println("DEBUG: Found ${installedApps.size} installed apps")
+                    if (installedApps.isNotEmpty()) {
+                        availableApps = installedApps.map { installedApp ->
+                            AvailableApp(
+                                name = installedApp.appName,
+                                category = installedApp.category,
+                                icon = installedApp.icon,
+                                packageName = installedApp.packageName,
+                                isSelected = false
+                            )
+                        }
+                        println("DEBUG: Loaded ${availableApps.size} apps for selection")
+                    } else {
+                        // If no apps are detected, provide some common fallback apps
+                        println("DEBUG: No apps detected, using fallback apps")
+                        availableApps = listOf(
+                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
+                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
+                            AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
+                            AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
+                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
+                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
+                            AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
+                            AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
+                        )
+                    }
+                } catch (e: Exception) {
+                    // If loading fails, provide fallback apps
+                    println("DEBUG: Exception occurred while loading apps: ${e.message}")
+                    e.printStackTrace()
+                    availableApps = listOf(
+                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
+                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
+                        AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
+                        AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
+                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
+                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
+                        AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
+                        AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
+                    )
+                } finally {
+                    isLoadingApps = false
+                }
+            }
         }
     }
 
@@ -184,9 +230,10 @@ private fun AppRoot() {
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
-            onAppToggle = { appName ->
+            isLoading = isLoadingApps,
+            onAppToggle = { packageName ->
                 availableApps = availableApps.map { app ->
-                    if (app.name == appName) app.copy(isSelected = !app.isSelected) else app
+                    if (app.packageName == packageName) app.copy(isSelected = !app.isSelected) else app
                 }
             },
             onContinue = { 
@@ -1060,11 +1107,26 @@ private fun DashboardContent(
 @Composable
 private fun AppSelectionScreen(
     availableApps: List<AvailableApp>,
+    isLoading: Boolean,
     onAppToggle: (String) -> Unit,
     onContinue: () -> Unit,
     onBack: () -> Unit
 ) {
     val selectedCount = availableApps.count { it.isSelected }
+    
+    // Show loading state if apps are being loaded
+    if (isLoading || availableApps.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Loading...", color = Color.White, fontSize = 18.sp)
+                Text("Scanning for installed apps...", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+        return
+    }
     
     Column(
         modifier = Modifier
@@ -1125,7 +1187,7 @@ private fun AppSelectionScreen(
             items(availableApps) { app ->
                 AppSelectionItem(
                     app = app,
-                    onToggle = { onAppToggle(app.name) }
+                    onToggle = { onAppToggle(app.packageName) }
                 )
             }
         }
