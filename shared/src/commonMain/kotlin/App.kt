@@ -142,7 +142,8 @@ private fun OnboardingFlow(onGenerateQr: () -> Unit) {
                 primaryCta = "Get Started"
             )
         ),
-        onDone = onGenerateQr
+        onDone = onGenerateQr,
+        onSkip = onGenerateQr
     )
 }
 
@@ -212,75 +213,43 @@ private data class OnboardingPage(
 @Composable
 private fun OnboardingPager(
     pages: List<OnboardingPage>,
-    onDone: () -> Unit
+    onDone: () -> Unit,
+    onSkip: () -> Unit
 ) {
     var index by remember { mutableStateOf(0) }
     var offsetX by remember { mutableStateOf(0f) }
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
-            .padding(24.dp)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
+        // Progress indicators at top
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center
         ) {
-            // Progress indicators at top
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                repeat(pages.size) { i ->
-                    Box(
-                        modifier = Modifier
-                            .width(if (i == index) 24.dp else 8.dp)
-                            .height(8.dp)
-                            .background(
-                                if (i == index) Color(0xFF6EE7B7) else Color(0xFF4B5563),
-                                RoundedCornerShape(4.dp)
-                            )
-                    )
-                    if (i < pages.lastIndex) Spacer(Modifier.width(8.dp))
-                }
-            }
-
-            // Empty space for centering
-            Spacer(Modifier.weight(1f))
-
-            // Action buttons at bottom
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Button(
-                    onClick = {
-                        if (index < pages.lastIndex) index++ else onDone()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6EE7B7)),
-                    contentPadding = PaddingValues(vertical = 16.dp),
-                    shape = RoundedCornerShape(12.dp)
-                ) { 
-                    Text(
-                        pages[index].primaryCta,
-                        color = Color(0xFF1A1A1A),
-                        fontWeight = FontWeight.Bold
-                    ) 
-                }
-                Spacer(Modifier.height(16.dp))
-                Text(
-                    text = "Skip",
+            repeat(pages.size) { i ->
+                Box(
                     modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .clickable { onDone() },
-                    color = Color(0xFFD1D5DB)
+                        .width(if (i == index) 24.dp else 8.dp)
+                        .height(8.dp)
+                        .background(
+                            if (i == index) Color(0xFF6EE7B7) else Color(0xFF4B5563),
+                            RoundedCornerShape(4.dp)
+                        )
                 )
+                if (i < pages.lastIndex) Spacer(Modifier.width(8.dp))
             }
         }
 
-        // Centered swipeable content area
+        // Swipeable content area (centered)
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragEnd = {
@@ -347,6 +316,33 @@ private fun OnboardingPager(
                     )
                 }
             }
+        }
+
+        // Action buttons at bottom
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = {
+                    if (index < pages.lastIndex) index++ else onDone()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6EE7B7)),
+                contentPadding = PaddingValues(vertical = 16.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) { 
+                Text(
+                    pages[index].primaryCta,
+                    color = Color(0xFF1A1A1A),
+                    fontWeight = FontWeight.Bold
+                ) 
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = "Skip",
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .clickable { onSkip() },
+                color = Color(0xFFD1D5DB)
+            )
         }
     }
 }
