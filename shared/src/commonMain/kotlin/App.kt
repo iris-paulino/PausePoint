@@ -166,7 +166,7 @@ private fun AppRoot() {
             onMessageChange = { qrMessage = it },
             onQrCreated = { id ->
                 qrId = id
-                route = Route.Dashboard
+                route = Route.AppSelection
             },
             onClose = { route = Route.Dashboard }
         )
@@ -604,7 +604,7 @@ private fun QrGeneratorContent(
             Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                if (downloadSuccess) "Continue to Dashboard" else "Download PDF for Printing", 
+                if (downloadSuccess) "Add Apps to Track" else "Download PDF for Printing", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
