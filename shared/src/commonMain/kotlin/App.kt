@@ -117,6 +117,41 @@ private fun AppRoot() {
     val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
     
+    // Function to set up default apps
+    suspend fun setupDefaultApps() {
+        isLoadingApps = true
+        try {
+            val installedApps = installedAppsProvider.getInstalledApps()
+            println("DEBUG: Found ${installedApps.size} installed apps")
+            
+            // Define default apps to track
+            val defaultAppNames = listOf("Instagram", "TikTok", "Snapchat", "Chrome", "YouTube")
+            
+            // Filter to only include installed default apps
+            val defaultTrackedApps = installedApps
+                .filter { app -> defaultAppNames.any { defaultName -> 
+                    app.appName.contains(defaultName, ignoreCase = true) || 
+                    defaultName.contains(app.appName, ignoreCase = true)
+                }}
+                .map { app -> TrackedApp(app.appName, 0, 15) } // 15 minutes default
+            
+            trackedApps = defaultTrackedApps
+            println("DEBUG: Set up ${trackedApps.size} default tracked apps")
+            
+        } catch (e: Exception) {
+            println("DEBUG: Exception occurred while loading apps: ${e.message}")
+            e.printStackTrace()
+            // Fallback to some default apps even if detection fails
+            trackedApps = listOf(
+                TrackedApp("Instagram", 0, 15),
+                TrackedApp("TikTok", 0, 15),
+                TrackedApp("Snapchat", 0, 15)
+            )
+        } finally {
+            isLoadingApps = false
+        }
+    }
+    
     // Check onboarding completion status on app start
     LaunchedEffect(Unit) {
         try {
@@ -125,7 +160,14 @@ private fun AppRoot() {
                 storage.isOnboardingCompleted()
             } ?: false // Default to false if timeout occurs
             
-            route = if (isOnboardingCompleted) Route.Dashboard else Route.Onboarding
+            if (isOnboardingCompleted) {
+                // If onboarding is completed, set up default apps and go to dashboard
+                setupDefaultApps()
+                route = Route.Dashboard
+            } else {
+                // If onboarding is not completed, show onboarding
+                route = Route.Onboarding
+            }
         } catch (e: Exception) {
             // If storage fails, default to onboarding
             route = Route.Onboarding
@@ -205,8 +247,9 @@ private fun AppRoot() {
             onGenerateQr = { 
                 coroutineScope.launch {
                     storage.setOnboardingCompleted(true)
+                    setupDefaultApps()
+                    route = Route.QrGenerator
                 }
-                route = Route.QrGenerator 
             }
         )
         Route.QrGenerator -> QrGeneratorScreen(
@@ -257,32 +300,6 @@ private fun AppRoot() {
     }
 }
 
-@Composable
-private fun OnboardingFlow(onGenerateQr: () -> Unit) {
-    OnboardingPager(
-        pages = listOf(
-            OnboardingPage(
-                title = "Take Mindful Breaks",
-                description = "Set limits on your app usage and take meaningful pauses when you reach them."
-            ),
-            OnboardingPage(
-                title = "Walk to Unlock Apps",
-                description = "Print QR codes and place them around your home. When time is up, you'll need to physically walk to scan them."
-            ),
-            OnboardingPage(
-                title = "Pause Partners",
-                description = "Add trusted contacts as pause partners. They can generate QR codes to help you unlock apps."
-            ),
-            OnboardingPage(
-                title = "Create Your First QR Code",
-                description = "Generate your first QR code to get started. You can print it and place it somewhere in your home.",
-                primaryCta = "Get Started"
-            )
-        ),
-        onDone = onGenerateQr,
-        onSkip = onGenerateQr
-    )
-}
 
 // QR generator screen
 @Composable
@@ -344,6 +361,29 @@ expect fun scanQrAndDismiss(expectedMessage: String): Boolean
 
 // UI implementations for onboarding, QR, and dashboard live in this file for brevity
 // Lightweight, dependency-free visuals only
+
+@Composable
+private fun OnboardingFlow(onGenerateQr: () -> Unit) {
+    OnboardingPager(
+        pages = listOf(
+            OnboardingPage(
+                title = "Take Mindful Breaks",
+                description = "Set limits on your app usage and take meaningful pauses when you reach them."
+            ),
+            OnboardingPage(
+                title = "Walk to Unlock Apps",
+                description = "Print QR codes and place them around your home. When time is up, you'll need to physically walk to scan them."
+            ),
+            OnboardingPage(
+                title = "Pause Partners",
+                description = "Add trusted contacts as pause partners. They can generate QR codes to help you unlock apps.",
+                primaryCta = "Get Started"
+            )
+        ),
+        onDone = onGenerateQr,
+        onSkip = onGenerateQr
+    )
+}
 
 @Immutable
 private data class OnboardingPage(
@@ -902,8 +942,8 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("PausePoint", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Friday, Sep 19", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("PausePal", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
                 Text("☀", fontSize = 24.sp, color = Color(0xFFD1D5DB))
@@ -953,9 +993,9 @@ private fun DashboardContent(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("0m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("until combined limit is reached", fontSize = 14.sp, color = Color.White)
-                        Text("All apps share a 15m total limit", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("15m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("minutes of app time remaining today", fontSize = 14.sp, color = Color.White)
+                        Text("Daily limit: 15 minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
                 
@@ -967,28 +1007,87 @@ private fun DashboardContent(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("2", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                        Text("0", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
                         Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("1h 35m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                        Text("0h 0m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF9800))
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
                 
                 Spacer(Modifier.height(16.dp))
                 
-                // Pause tracking button
+                // Start tracking button
                 Button(
                     onClick = onPauseTracking,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF3A3A3A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
-                    Text("⏸", color = Color.White)
+                    Text("▶", color = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Pause Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Ready to Walk Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Ready to Walk for Your Apps?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                Text(
+                    "Print your personal QR codes and place them around your home. When your time limit is reached, you'll need to walk to scan one - encouraging healthy movement breaks!",
+                    fontSize = 14.sp,
+                    color = Color(0xFFD1D5DB),
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Button(
+                        onClick = onOpenQrGenerator,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Text("▦", color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generate & Print QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                    
+                    Button(
+                        onClick = { },
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Text("👥", color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Add Partners", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                 }
             }
         }
@@ -1037,7 +1136,7 @@ private fun DashboardContent(
                         ) {
                             Text(app.name, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("${app.minutesUsed}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                                Text("0m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Text("✏", color = Color(0xFFFF5252), fontSize = 12.sp)
                                 Spacer(Modifier.width(4.dp))
@@ -1059,44 +1158,6 @@ private fun DashboardContent(
                                     .background(Color(0xFF4CAF50), RoundedCornerShape(8.dp))
                             )
                         }
-                    }
-                }
-            }
-        }
-        
-        Spacer(Modifier.height(24.dp))
-        
-        // Quick Actions Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp)
-            ) {
-                Text("Quick Actions", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(Modifier.height(16.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    Button(
-                        onClick = onOpenQrGenerator,
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("▦", color = Color.White)
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Button(
-                        onClick = { },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text("👥", color = Color.White)
                     }
                 }
             }
