@@ -1,4 +1,36 @@
 import androidx.compose.ui.window.ComposeUIViewController
+import platform.AVFoundation.AVCaptureDevice
+import platform.AVFoundation.AVCaptureDeviceDiscoverySession
+import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
+import platform.AVFoundation.AVMediaTypeVideo
+import platform.AVFoundation.AVCaptureSession
+import platform.AVFoundation.AVCaptureVideoDataOutput
+import platform.AVFoundation.AVCaptureVideoPreviewLayer
+import platform.AVFoundation.AVCaptureDeviceInput
+import platform.CoreGraphics.CGRectMake
+import platform.UIKit.UIViewController
+import platform.UIKit.UIView
+import platform.QuartzCore.CALayer
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.useContents
+import platform.CoreImage.CIDetector
+import platform.CoreImage.CIFeature
+import platform.CoreImage.CIImage
+import platform.CoreImage.CIDetectorAccuracy
+import platform.CoreImage.CIDetectorTypeQRCode
+import platform.Foundation.NSData
+import platform.UIKit.UIScreen
+import platform.CoreGraphics.CGImageRef
+import platform.CoreVideo.CVImageBufferRef
+import platform.CoreVideo.CVPixelBufferGetBaseAddress
+import platform.CoreVideo.CVPixelBufferLockBaseAddress
+import platform.CoreVideo.CVPixelBufferUnlockBaseAddress
+import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.reinterpret
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 actual fun getPlatformName(): String = "iOS"
 
@@ -24,14 +56,19 @@ actual fun showBlockingOverlay(message: String) {
     // Could present a full-screen Compose VC from the root.
 }
 
-actual fun scanQrAndDismiss(expectedMessage: String): Boolean {
-    // Could use AVFoundation barcode scanning via interop. Placeholder.
-    // This function should:
-    // 1. Open camera for QR scanning using AVFoundation
-    // 2. Scan QR code and get the text
-    // 3. Validate the scanned text against saved QR codes using storage.validateQrCode()
-    // 4. Return true if valid QR code is found and matches expected message
-    return false
+actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
+    // Minimal modal scanner using AVFoundation + CoreImage QR detector
+    return suspendCancellableCoroutine { cont ->
+        val controller = SimpleQrScannerController { qrText ->
+            val storage = createAppStorage()
+            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+                val match = if (qrText != null) storage.validateQrCode(qrText) else null
+                cont.resume(match != null && match.message == expectedMessage)
+            }
+        }
+        val root = UIKitRootProvider.currentRootController()
+        root?.presentViewController(controller, true, null)
+    }
 }
 
 actual fun getCurrentTimeMillis(): Long {

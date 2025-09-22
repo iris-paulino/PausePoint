@@ -3,6 +3,7 @@
 
     <!-- Permissions for querying installed applications -->
     <uses-permission android:name="android.permission.GET_TASKS" />
+    <uses-permission android:name="android.permission.CAMERA" />
     
     <!-- Queries for specific app categories instead of QUERY_ALL_PACKAGES -->
     <queries>
@@ -30,6 +31,11 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".QrScanActivity"
+            android:exported="false"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
     </application>
 
 </manifest>

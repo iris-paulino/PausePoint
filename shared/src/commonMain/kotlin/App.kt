@@ -77,7 +77,7 @@ fun App() {
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause }
 
 private data class TrackedApp(
     val name: String,
@@ -298,6 +298,9 @@ private fun AppRoot() {
                         // and allow app usage to continue
                     }
                 }
+            },
+            onOpenPause = {
+                route = Route.Pause
             }
         )
         Route.AppSelection -> AppSelectionScreen(
@@ -343,6 +346,17 @@ private fun AppRoot() {
                 route = Route.Dashboard
             },
             onBack = { route = Route.AppSelection }
+        )
+        Route.Pause -> PauseScreen(
+            appName = trackedApps.firstOrNull()?.name ?: "Instagram",
+            durationText = "1h 15m",
+            onScanQr = {
+                coroutineScope.launch {
+                    val ok = scanQrAndDismiss(qrMessage)
+                    if (ok) route = Route.Dashboard
+                }
+            },
+            onClose = { route = Route.Dashboard }
         )
     }
 }
@@ -399,7 +413,8 @@ private fun DashboardScreen(
     onPauseTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
-    onScanQrCode: () -> Unit
+    onScanQrCode: () -> Unit,
+    onOpenPause: () -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
@@ -408,7 +423,8 @@ private fun DashboardScreen(
         onPauseTracking = onPauseTracking,
         onOpenQrGenerator = onOpenQrGenerator,
         onOpenAppSelection = onOpenAppSelection,
-        onScanQrCode = onScanQrCode
+        onScanQrCode = onScanQrCode,
+        onOpenPause = onOpenPause
     )
 }
 
@@ -422,7 +438,7 @@ expect fun startUsageTracking(
     onLimitReached: () -> Unit
 )
 expect fun showBlockingOverlay(message: String)
-expect fun scanQrAndDismiss(expectedMessage: String): Boolean
+expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 
 // Enhanced QR scanning function that validates against saved QR codes
@@ -1022,7 +1038,8 @@ private fun DashboardContent(
     onPauseTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
-    onScanQrCode: () -> Unit
+    onScanQrCode: () -> Unit,
+    onOpenPause: () -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
@@ -1134,6 +1151,20 @@ private fun DashboardContent(
                     Text("▶", color = Color.White)
                     Spacer(Modifier.width(8.dp))
                     Text("Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Button(
+                    onClick = onOpenPause,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF43A047)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(vertical = 14.dp)
+                ) {
+                    Text("⏸", color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Simulate Limit Reached (Open Pause Screen)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
         }
@@ -1399,6 +1430,98 @@ private fun DashboardContent(
             backgroundColor = Color(0xFF1A1A1A),
             contentColor = Color.White
         )
+    }
+}
+
+@Composable
+private fun PauseScreen(
+    appName: String,
+    durationText: String,
+    onScanQr: () -> Unit,
+    onClose: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF0F1111)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Card-like container
+            Card(
+                backgroundColor = Color(0xFF16201B),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "✦",
+                        color = Color(0xFF6EE7B7),
+                        fontSize = 24.sp
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Time for a Pause",
+                        color = Color.White,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row {
+                        Text("You've used ", color = Color(0xFFD1D5DB))
+                        Text(appName, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(" for", color = Color(0xFFD1D5DB))
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = durationText,
+                        color = Color(0xFF6EE7B7),
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "Choose how you'd like to take your mindful break",
+                        color = Color(0xFFBFC7C2),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                onClick = onScanQr,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF34D399)),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                Text("▣", color = Color(0xFF063B2D))
+                Spacer(Modifier.width(8.dp))
+                Column(horizontalAlignment = Alignment.Start) {
+                    Text("Scan My QR Code", color = Color(0xFF063B2D), fontWeight = FontWeight.Bold)
+                    Text("Get up and scan your printed QR code", color = Color(0xFF0B5E47), fontSize = 12.sp)
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "× Dismiss",
+                color = Color(0xFFBFC7C2),
+                modifier = Modifier.clickable { onClose() }
+            )
+        }
     }
 }
 

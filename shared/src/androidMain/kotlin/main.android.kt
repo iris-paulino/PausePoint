@@ -16,6 +16,11 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import java.io.File
 import java.io.FileOutputStream
+import android.app.Activity
+import android.content.Intent
+import java.lang.ref.WeakReference
+import kotlin.coroutines.resume
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 actual fun getPlatformName(): String = "Android"
 
@@ -139,14 +144,34 @@ actual fun showBlockingOverlay(message: String) {
     // TODO: Implement using Activity/Window overlay or a full-screen Activity with FLAG_SHOW_WHEN_LOCKED.
 }
 
-actual fun scanQrAndDismiss(expectedMessage: String): Boolean {
-    // TODO: Implement using ML Kit barcode scanning or CameraX; return whether QR matches.
-    // This function should:
-    // 1. Open camera for QR scanning
-    // 2. Scan QR code and get the text
-    // 3. Validate the scanned text against saved QR codes using storage.validateQrCode()
-    // 4. Return true if valid QR code is found and matches expected message
-    return false
+actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
+    // Launch a small activity that wraps ZXing scanner and await result
+    val activity = currentActivityRef?.get() ?: return false
+    val scanned = suspendCancellableCoroutine<String?> { cont ->
+        QrResultHolder.continuation = cont
+        @Suppress("DEPRECATION")
+        activity.startActivityForResult(Intent(activity, com.myapplication.QrScanActivity::class.java), QR_REQUEST_CODE)
+    }
+    val storage = createAppStorage()
+    val match = scanned?.let { storage.validateQrCode(it) }
+    return match != null && match.message == expectedMessage
+}
+
+private const val QR_REQUEST_CODE = 9001
+
+private var currentActivityRef: WeakReference<Activity>? = null
+fun registerCurrentActivity(activity: Activity) { currentActivityRef = WeakReference(activity) }
+
+object QrResultHolder {
+    var continuation: kotlinx.coroutines.CancellableContinuation<String?>? = null
+}
+
+fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+    if (requestCode == QR_REQUEST_CODE) {
+        val text = if (resultCode == Activity.RESULT_OK) data?.getStringExtra("qr_text") else null
+        QrResultHolder.continuation?.resume(text)
+        QrResultHolder.continuation = null
+    }
 }
 
 actual fun getCurrentTimeMillis(): Long {
