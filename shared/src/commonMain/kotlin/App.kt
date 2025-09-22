@@ -296,6 +296,18 @@ private fun AppRoot() {
                 availableApps = availableApps.map { app ->
                     if (app.packageName == packageName) app.copy(isSelected = !app.isSelected) else app
                 }
+                
+                // Immediately update trackedApps to reflect changes on dashboard
+                val selectedApps = availableApps.filter { it.isSelected }
+                trackedApps = selectedApps.map { app ->
+                    // Try to preserve existing usage data if app was already tracked
+                    val existingApp = trackedApps.find { it.name == app.name }
+                    TrackedApp(
+                        name = app.name,
+                        minutesUsed = existingApp?.minutesUsed ?: 0,
+                        limitMinutes = existingApp?.limitMinutes ?: timeLimitMinutes
+                    )
+                }
             },
             onContinue = { 
                 route = Route.DurationSetting 
@@ -309,7 +321,13 @@ private fun AppRoot() {
                 // Convert selected apps to tracked apps with the chosen time limit
                 val selectedApps = availableApps.filter { it.isSelected }
                 trackedApps = selectedApps.map { app ->
-                    TrackedApp(app.name, 0, timeLimitMinutes)
+                    // Try to preserve existing usage data if app was already tracked
+                    val existingApp = trackedApps.find { it.name == app.name }
+                    TrackedApp(
+                        name = app.name,
+                        minutesUsed = existingApp?.minutesUsed ?: 0,
+                        limitMinutes = timeLimitMinutes
+                    )
                 }
                 route = Route.Dashboard
             },
