@@ -1128,12 +1128,14 @@ private fun DashboardContent(
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
+    var savedQrLoaded by remember { mutableStateOf(false) }
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
     
     // Load saved QR codes when component mounts
     LaunchedEffect(Unit) {
         savedQrCodes = storage.getSavedQrCodes()
+        savedQrLoaded = true
     }
     Column(
         modifier = Modifier
@@ -1196,6 +1198,7 @@ private fun DashboardContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(Color(0xFF388E3C), RoundedCornerShape(12.dp))
+                        .clickable { onOpenDurationSetting() }
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1267,74 +1270,63 @@ private fun DashboardContent(
         
         Spacer(Modifier.height(24.dp))
         
-        // Ready to Walk Card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp)
+        // Ready to Walk Card (show only if no saved QR codes after load)
+        if (savedQrLoaded && savedQrCodes.isEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = Color(0xFF2C2C2C),
+                shape = RoundedCornerShape(16.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ready to Walk for Your Apps?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-                
-                Spacer(Modifier.height(12.dp))
-                
-                Text(
-                    "Print your personal QR codes and place them around your home. When your time limit is reached, you'll need to walk to scan one - encouraging healthy movement breaks!",
-                    fontSize = 14.sp,
-                    color = Color(0xFFD1D5DB),
-                    lineHeight = 20.sp
-                )
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Button(
-                        onClick = onOpenQrGenerator,
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
-                    ) {
-                        Text("▦", color = Color.White)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
                         Spacer(Modifier.width(8.dp))
-                        Text("Generate QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Ready to Walk for Your Apps?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     
-                    Button(
-                        onClick = { showAccountabilityDialog = true },
-                        modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+                    Spacer(Modifier.height(12.dp))
+                    
+                    Text(
+                        "Print your personal QR codes and place them around your home. When your time limit is reached, you'll need to walk to scan one - encouraging healthy movement breaks!",
+                        fontSize = 14.sp,
+                        color = Color(0xFFD1D5DB),
+                        lineHeight = 20.sp
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text("👥", color = Color.White)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Add Partners", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Button(
+                            onClick = onOpenQrGenerator,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text("▦", color = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Generate QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                        
+                        Button(
+                            onClick = { showAccountabilityDialog = true },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text("👥", color = Color.White)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add Partners", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
                     }
-                }
-                
-                Spacer(Modifier.height(12.dp))
-                
-                // Scan QR Code button for unblocking apps
-                Button(
-                    onClick = onScanQrCode,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(vertical = 12.dp)
-                ) {
-                    Text("📷", color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Scan QR Code to Unblock Apps", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    
+                    // Removed scan action button per requirements
                 }
             }
         }
@@ -2091,7 +2083,7 @@ private fun DurationSettingScreen(
             shape = RoundedCornerShape(12.dp)
         ) {
             Text(
-                "All selected apps will be blocked after $timeLimitMinutes minutes of combined use.",
+                "All selected apps will be blocked after $timeLimitMinutes minutes of combined use. You have to walk and scan your saved QR codes to unblock them.",
                 modifier = Modifier.padding(16.dp),
                 color = Color.White,
                 fontSize = 14.sp
