@@ -540,8 +540,14 @@ private fun QrGeneratorContent(
         // Download Button - only enabled when QR is generated
         Button(
             onClick = { 
-                onDownloadPdf(qrText)
-                downloadSuccess = true
+                if (downloadSuccess) {
+                    // If already downloaded, navigate to dashboard
+                    onGenerate()
+                } else {
+                    // Download PDF first
+                    onDownloadPdf(qrText)
+                    downloadSuccess = true
+                }
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
@@ -554,7 +560,7 @@ private fun QrGeneratorContent(
             Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                if (downloadSuccess) "Downloaded Successfully!" else "Download PDF for Printing", 
+                if (downloadSuccess) "Continue to Dashboard" else "Download PDF for Printing", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
@@ -569,24 +575,6 @@ private fun QrGeneratorContent(
                 fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
-        }
-        
-        Spacer(Modifier.height(24.dp))
-        
-        // Continue to Dashboard Button - only enabled when QR is generated
-        Button(
-            onClick = onGenerate,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (hasGeneratedQr) Color(0xFF4CAF50) else Color(0xFF4B5563)
-            ),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            enabled = hasGeneratedQr
-        ) {
-            Text("✓", color = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text("Continue to Dashboard", color = Color.White, fontWeight = FontWeight.Bold)
         }
         
         Spacer(Modifier.height(12.dp))
