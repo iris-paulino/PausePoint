@@ -124,7 +124,7 @@ private fun AppRoot() {
             val installedApps = installedAppsProvider.getInstalledApps()
             println("DEBUG: Found ${installedApps.size} installed apps")
             
-            // Define default apps to track
+            // Define default apps to track (same list as in AppSelection)
             val defaultAppNames = listOf("Instagram", "TikTok", "Snapchat", "Chrome", "YouTube")
             
             // Filter to only include installed default apps
@@ -145,7 +145,9 @@ private fun AppRoot() {
             trackedApps = listOf(
                 TrackedApp("Instagram", 0, 15),
                 TrackedApp("TikTok", 0, 15),
-                TrackedApp("Snapchat", 0, 15)
+                TrackedApp("Snapchat", 0, 15),
+                TrackedApp("Chrome", 0, 15),
+                TrackedApp("YouTube", 0, 15)
             )
         } finally {
             isLoadingApps = false
@@ -185,13 +187,22 @@ private fun AppRoot() {
                     // Debug: Print the number of apps found
                     println("DEBUG: Found ${installedApps.size} installed apps")
                     if (installedApps.isNotEmpty()) {
+                        // Define default apps that should be selected by default
+                        val defaultAppNames = listOf("Instagram", "TikTok", "Snapchat", "Chrome", "YouTube")
+                        
                         availableApps = installedApps.map { installedApp ->
+                            // Check if this app should be selected by default
+                            val isDefaultApp = defaultAppNames.any { defaultName -> 
+                                installedApp.appName.contains(defaultName, ignoreCase = true) || 
+                                defaultName.contains(installedApp.appName, ignoreCase = true)
+                            }
+                            
                             AvailableApp(
                                 name = installedApp.appName,
                                 category = installedApp.category,
                                 icon = installedApp.icon,
                                 packageName = installedApp.packageName,
-                                isSelected = false
+                                isSelected = isDefaultApp
                             )
                         }
                         println("DEBUG: Loaded ${availableApps.size} apps for selection")
@@ -199,12 +210,12 @@ private fun AppRoot() {
                         // If no apps are detected, provide some common fallback apps
                         println("DEBUG: No apps detected, using fallback apps")
                         availableApps = listOf(
-                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
-                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
+                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android", true),
+                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically", true),
                             AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
                             AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
-                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
+                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube", true),
+                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android", true),
                             AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
                             AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
                         )
@@ -214,12 +225,12 @@ private fun AppRoot() {
                     println("DEBUG: Exception occurred while loading apps: ${e.message}")
                     e.printStackTrace()
                     availableApps = listOf(
-                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
-                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
+                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android", true),
+                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically", true),
                         AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
                         AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
-                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
+                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube", true),
+                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android", true),
                         AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
                         AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
                     )
