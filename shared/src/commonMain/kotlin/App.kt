@@ -17,6 +17,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -75,12 +77,19 @@ fun App() {
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection }
 
 private data class TrackedApp(
     val name: String,
     val minutesUsed: Int,
     val limitMinutes: Int
+)
+
+private data class AvailableApp(
+    val name: String,
+    val category: String,
+    val icon: String,
+    val isSelected: Boolean = false
 )
 
 @Composable
@@ -94,6 +103,21 @@ private fun AppRoot() {
                 TrackedApp("Instagram", 45, 60),
                 TrackedApp("TikTok", 32, 45),
                 TrackedApp("Facebook", 18, 30)
+            )
+        )
+    }
+    
+    var availableApps by remember {
+        mutableStateOf(
+            listOf(
+                AvailableApp("Instagram", "Social media", "📷"),
+                AvailableApp("TikTok", "Social media", "🎵"),
+                AvailableApp("Facebook", "Social media", "📘"),
+                AvailableApp("Twitter", "Social media", "🐦"),
+                AvailableApp("YouTube", "Social media", "📺"),
+                AvailableApp("Snapchat", "Social media", "👻"),
+                AvailableApp("Reddit", "Social media", "🤖"),
+                AvailableApp("LinkedIn", "Social media", "💼")
             )
         )
     }
@@ -153,7 +177,25 @@ private fun AppRoot() {
             onPauseTracking = {
                 // Placeholder: would toggle background tracking in platform layer
             },
-            onOpenQrGenerator = { route = Route.QrGenerator }
+            onOpenQrGenerator = { route = Route.QrGenerator },
+            onOpenAppSelection = { route = Route.AppSelection }
+        )
+        Route.AppSelection -> AppSelectionScreen(
+            availableApps = availableApps,
+            onAppToggle = { appName ->
+                availableApps = availableApps.map { app ->
+                    if (app.name == appName) app.copy(isSelected = !app.isSelected) else app
+                }
+            },
+            onContinue = { 
+                // Convert selected apps to tracked apps
+                val selectedApps = availableApps.filter { it.isSelected }
+                trackedApps = selectedApps.map { app ->
+                    TrackedApp(app.name, 0, 60) // Default 60 minute limit
+                }
+                route = Route.Dashboard 
+            },
+            onBack = { route = Route.Dashboard }
         )
     }
 }
@@ -218,14 +260,16 @@ private fun DashboardScreen(
     message: String,
     trackedApps: List<TrackedApp>,
     onPauseTracking: () -> Unit,
-    onOpenQrGenerator: () -> Unit
+    onOpenQrGenerator: () -> Unit,
+    onOpenAppSelection: () -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
         message = message,
         trackedApps = trackedApps,
         onPauseTracking = onPauseTracking,
-        onOpenQrGenerator = onOpenQrGenerator
+        onOpenQrGenerator = onOpenQrGenerator,
+        onOpenAppSelection = onOpenAppSelection
     )
 }
 
@@ -784,7 +828,8 @@ private fun DashboardContent(
     message: String,
     trackedApps: List<TrackedApp>,
     onPauseTracking: () -> Unit,
-    onOpenQrGenerator: () -> Unit
+    onOpenQrGenerator: () -> Unit,
+    onOpenAppSelection: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -912,7 +957,12 @@ private fun DashboardContent(
                         Spacer(Modifier.width(8.dp))
                         Text("App Usage", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
-                    Text("+", fontSize = 24.sp, color = Color.White)
+                    Text(
+                        text = "+", 
+                        fontSize = 24.sp, 
+                        color = Color.White,
+                        modifier = Modifier.clickable { onOpenAppSelection() }
+                    )
                 }
                 
                 Spacer(Modifier.height(16.dp))
@@ -992,6 +1042,167 @@ private fun DashboardContent(
                         Text("👥", color = Color.White)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppSelectionScreen(
+    availableApps: List<AvailableApp>,
+    onAppToggle: (String) -> Unit,
+    onContinue: () -> Unit,
+    onBack: () -> Unit
+) {
+    val selectedCount = availableApps.count { it.isSelected }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .padding(24.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "←",
+                fontSize = 24.sp,
+                color = Color.White,
+                modifier = Modifier.clickable { onBack() }
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    "Select Apps to Track",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "Choose which apps you'd like to set limits for.",
+                    fontSize = 14.sp,
+                    color = Color(0xFFD1D5DB)
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Selection count
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("📱", fontSize = 16.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "$selectedCount apps selected",
+                fontSize = 16.sp,
+                color = Color(0xFFD1D5DB)
+            )
+        }
+        
+        Spacer(Modifier.height(16.dp))
+        
+        // Apps list
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(availableApps) { app ->
+                AppSelectionItem(
+                    app = app,
+                    onToggle = { onAppToggle(app.name) }
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Continue button
+        Button(
+            onClick = onContinue,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            Text(
+                "Continue with $selectedCount apps",
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppSelectionItem(
+    app: AvailableApp,
+    onToggle: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF2C2C2C),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // App icon
+            Text(
+                text = app.icon,
+                fontSize = 24.sp,
+                modifier = Modifier.size(40.dp)
+            )
+            
+            Spacer(Modifier.width(16.dp))
+            
+            // App info
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = app.name,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White
+                )
+                Text(
+                    text = app.category,
+                    fontSize = 12.sp,
+                    color = Color(0xFFD1D5DB)
+                )
+            }
+            
+            // Toggle switch
+            Box(
+                modifier = Modifier
+                    .size(48.dp, 28.dp)
+                    .background(
+                        color = if (app.isSelected) Color(0xFF4CAF50) else Color(0xFF4B5563),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+                    .clickable { onToggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(24.dp, 24.dp)
+                        .background(
+                            color = Color.White,
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .offset(
+                            x = if (app.isSelected) 10.dp else (-10).dp
+                        )
+                )
             }
         }
     }
