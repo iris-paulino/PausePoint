@@ -400,6 +400,7 @@ private fun QrGeneratorContent(
     var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
     var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
     var downloadSuccess by remember { mutableStateOf(false) }
+    var showAccountabilityDialog by remember { mutableStateOf(false) }
     val qrText = remember(message, qrVersion) { "QR:$message:v$qrVersion" }
 
     Column(
@@ -481,6 +482,25 @@ private fun QrGeneratorContent(
                         Spacer(Modifier.width(8.dp))
                         Text("⧉", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                     }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // Generate New QR Code Button inside the card
+                    Button(
+                        onClick = { 
+                            qrVersion++
+                            hasGeneratedQr = true
+                            downloadSuccess = false
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1A1A1A)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
+                    ) {
+                        Text("↻", color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generate New QR Code", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -551,26 +571,7 @@ private fun QrGeneratorContent(
             )
         }
         
-        Spacer(Modifier.height(12.dp))
-        
-        // Generate New Button
-        Button(
-            onClick = { 
-                qrVersion++
-                hasGeneratedQr = true
-                downloadSuccess = false
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            Text("↻", color = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text("Generate New QR Code", color = Color.White, fontWeight = FontWeight.Bold)
-        }
-        
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(24.dp))
         
         // Continue to Dashboard Button - only enabled when QR is generated
         Button(
@@ -587,6 +588,205 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(8.dp))
             Text("Continue to Dashboard", color = Color.White, fontWeight = FontWeight.Bold)
         }
+        
+        Spacer(Modifier.height(12.dp))
+        
+        // Don't have a printer? Button
+        Button(
+            onClick = { showAccountabilityDialog = true },
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            Text("?", color = Color.White)
+            Spacer(Modifier.width(8.dp))
+            Text("Don't have a printer?", color = Color.White, fontWeight = FontWeight.Bold)
+        }
+        
+        Spacer(Modifier.height(32.dp))
+        
+        // How Physical Movement Unlocks Work Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text(
+                    "How Physical Movement Unlocks Work:",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Step 1
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "1.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Download and print this QR code",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                // Step 2
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "2.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Place it somewhere you need to walk to (kitchen, bedroom, upstairs, etc.)",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                // Step 3
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "3.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "When your app time limit is reached, you'll need to physically get up and scan this code to unlock your apps",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                // Step 4
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "4.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "This forces you to move your body and step away from your phone, creating a natural pause",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                // Step 5
+                Row(
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Text(
+                        "5.",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50),
+                        modifier = Modifier.width(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "The physical effort makes you consider if you really need more screen time",
+                        fontSize = 16.sp,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+    
+    // Accountability Partners Dialog
+    if (showAccountabilityDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showAccountabilityDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("👥", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Coming Soon: Accountability Partners",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Your accountability partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "This adds a social element to your digital wellness journey!",
+                        color = Color(0xFF4CAF50),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showAccountabilityDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
     }
 }
 
