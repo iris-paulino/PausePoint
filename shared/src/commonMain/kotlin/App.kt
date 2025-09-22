@@ -1817,6 +1817,28 @@ private fun SavedQrCodesScreen(
                             Text("Add New", color = Color.White, fontWeight = FontWeight.Bold)
                         }
                     }
+                    if (savedQrCodes.size > 1) {
+                        item {
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        savedQrCodes.forEach { code ->
+                                            try { saveQrPdf(qrText = code.qrText, message = code.message) } catch (_: Exception) {}
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(vertical = 14.dp)
+                            ) {
+                                Text("⇩", color = Color.White)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Download all", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
             }
         }
