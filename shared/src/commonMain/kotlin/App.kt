@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.material.Switch
+import androidx.compose.material.SwitchDefaults
 
 @Composable
 fun App() {
@@ -1543,6 +1545,8 @@ private fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSavedQrCodes: () -> Unit
 ) {
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1568,8 +1572,36 @@ private fun SettingsScreen(
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
+            var notificationsEnabled by remember { mutableStateOf(true) }
+            LaunchedEffect(Unit) {
+                try {
+                    notificationsEnabled = storage.getNotificationsEnabled()
+                } catch (_: Exception) { notificationsEnabled = true }
+            }
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Notifications", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Notifications", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            notificationsEnabled = enabled
+                            // Persist change
+                            coroutineScope.launch {
+                                try { storage.saveNotificationsEnabled(enabled) } catch (_: Exception) {}
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFFA4C19A),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Text("Push Notifications — Get notified when you reach time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
