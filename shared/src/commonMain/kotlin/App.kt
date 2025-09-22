@@ -244,11 +244,18 @@ private fun AppRoot() {
             }
         }
         Route.Onboarding -> OnboardingFlow(
-            onGenerateQr = { 
+            onGetStarted = { 
                 coroutineScope.launch {
                     storage.setOnboardingCompleted(true)
                     setupDefaultApps()
-                    route = Route.QrGenerator
+                    route = Route.Dashboard
+                }
+            },
+            onSkip = {
+                coroutineScope.launch {
+                    storage.setOnboardingCompleted(true)
+                    setupDefaultApps()
+                    route = Route.Dashboard
                 }
             }
         )
@@ -363,7 +370,10 @@ expect fun scanQrAndDismiss(expectedMessage: String): Boolean
 // Lightweight, dependency-free visuals only
 
 @Composable
-private fun OnboardingFlow(onGenerateQr: () -> Unit) {
+private fun OnboardingFlow(
+    onGetStarted: () -> Unit,
+    onSkip: () -> Unit
+) {
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
@@ -380,8 +390,8 @@ private fun OnboardingFlow(onGenerateQr: () -> Unit) {
                 primaryCta = "Get Started"
             )
         ),
-        onDone = onGenerateQr,
-        onSkip = onGenerateQr
+        onDone = onGetStarted,
+        onSkip = onSkip
     )
 }
 
@@ -518,14 +528,17 @@ private fun OnboardingPager(
                     fontWeight = FontWeight.Bold
                 ) 
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "Skip",
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .clickable { onSkip() },
-                color = Color(0xFFD1D5DB)
-            )
+            // Only show Skip button if not on the last page
+            if (index < pages.lastIndex) {
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Skip",
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clickable { onSkip() },
+                    color = Color(0xFFD1D5DB)
+                )
+            }
         }
     }
 }
@@ -895,13 +908,6 @@ private fun QrGeneratorContent(
                         color = Color.White,
                         fontSize = 14.sp
                     )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "This adds a social element to your digital wellness journey!",
-                        color = Color(0xFF4CAF50),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             },
             confirmButton = {
@@ -928,6 +934,7 @@ private fun DashboardContent(
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit
 ) {
+    var showAccountabilityDialog by remember { mutableStateOf(false) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1074,11 +1081,11 @@ private fun DashboardContent(
                     ) {
                         Text("▦", color = Color.White)
                         Spacer(Modifier.width(8.dp))
-                        Text("Generate & Print QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Generate QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     
                     Button(
-                        onClick = { },
+                        onClick = { showAccountabilityDialog = true },
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
                         shape = RoundedCornerShape(12.dp),
@@ -1162,6 +1169,53 @@ private fun DashboardContent(
                 }
             }
         }
+    }
+    
+    // Pause Partners Dialog
+    if (showAccountabilityDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showAccountabilityDialog = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("👥", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Coming Soon: Pause Partners",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showAccountabilityDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
     }
 }
 
