@@ -324,7 +324,8 @@ private fun AppRoot() {
             },
             onOpenPause = {
                 route = Route.Pause
-            }
+            },
+            onOpenDurationSetting = { route = Route.DurationSetting }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -346,8 +347,18 @@ private fun AppRoot() {
                     )
                 }
             },
-            onContinue = { 
-                route = Route.DurationSetting 
+            onContinue = {
+                // Ensure dashboard reflects the current selections even if user didn't toggle
+                val selectedApps = availableApps.filter { it.isSelected }
+                trackedApps = selectedApps.map { app ->
+                    val existingApp = trackedApps.find { it.name == app.name }
+                    TrackedApp(
+                        name = app.name,
+                        minutesUsed = existingApp?.minutesUsed ?: 0,
+                        limitMinutes = existingApp?.limitMinutes ?: timeLimitMinutes
+                    )
+                }
+                route = Route.Dashboard
             },
             onBack = { route = Route.Dashboard }
         )
@@ -368,7 +379,7 @@ private fun AppRoot() {
                 }
                 route = Route.Dashboard
             },
-            onBack = { route = Route.AppSelection }
+            onBack = { route = Route.Dashboard }
         )
         Route.Pause -> PauseScreen(
             appName = trackedApps.firstOrNull()?.name ?: "Instagram",
@@ -439,7 +450,8 @@ private fun DashboardScreen(
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
-    onOpenPause: () -> Unit
+    onOpenPause: () -> Unit,
+    onOpenDurationSetting: () -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
@@ -451,7 +463,8 @@ private fun DashboardScreen(
         onOpenQrGenerator = onOpenQrGenerator,
         onOpenAppSelection = onOpenAppSelection,
         onScanQrCode = onScanQrCode,
-        onOpenPause = onOpenPause
+        onOpenPause = onOpenPause,
+        onOpenDurationSetting = onOpenDurationSetting
     )
 }
 
@@ -1068,7 +1081,8 @@ private fun DashboardContent(
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
-    onOpenPause: () -> Unit
+    onOpenPause: () -> Unit,
+    onOpenDurationSetting: () -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
@@ -1147,8 +1161,17 @@ private fun DashboardContent(
                         val minutesUsed = trackedApps.maxOfOrNull { it.minutesUsed } ?: 0
                         val remaining = (timeLimitMinutes - minutesUsed).coerceAtLeast(0)
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("minutes of app time remaining today", fontSize = 14.sp, color = Color.White)
-                        Text("Daily limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                text = "✏",
+                                fontSize = 12.sp,
+                                color = Color(0xFFD1D5DB),
+                                modifier = Modifier.clickable { onOpenDurationSetting() }
+                            )
+                        }
                     }
                 }
                 
@@ -1646,7 +1669,7 @@ private fun AppSelectionScreen(
         
         Spacer(Modifier.height(24.dp))
         
-        // Continue button
+        // Done button
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
@@ -1655,7 +1678,7 @@ private fun AppSelectionScreen(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             Text(
-                "Continue",
+                "Done",
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
@@ -1951,7 +1974,7 @@ private fun DurationSettingScreen(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             Text(
-                "Complete Setup",
+                "Done",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
