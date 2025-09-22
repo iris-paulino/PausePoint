@@ -287,7 +287,18 @@ private fun AppRoot() {
                 // Placeholder: would toggle background tracking in platform layer
             },
             onOpenQrGenerator = { route = Route.QrGenerator },
-            onOpenAppSelection = { route = Route.AppSelection }
+            onOpenAppSelection = { route = Route.AppSelection },
+            onScanQrCode = {
+                // Trigger QR code scanning to unblock apps
+                coroutineScope.launch {
+                    val isValid = scanQrAndDismiss(qrMessage)
+                    if (isValid) {
+                        // QR code is valid, unblock apps
+                        // In a real implementation, this would dismiss the blocking overlay
+                        // and allow app usage to continue
+                    }
+                }
+            }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -345,12 +356,28 @@ private fun QrGeneratorScreen(
     onQrCreated: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
+    
     QrGeneratorContent(
         message = message,
         onMessageChange = onMessageChange,
         onDownloadPdf = { text ->
             // Save a PDF using a platform stub and then continue
             val filePath = saveQrPdf(qrText = text, message = message)
+            
+            // Save the QR code to storage for later validation
+            coroutineScope.launch {
+                val qrCode = SavedQrCode(
+                    id = "pause-${kotlin.random.Random.nextLong()}",
+                    qrText = text,
+                    message = message,
+                    createdAt = getCurrentTimeMillis(),
+                    isActive = true
+                )
+                storage.saveQrCode(qrCode)
+            }
+            
             // Note: In a real app, you might want to show a toast or notification here
             // indicating the file was saved to the specified path
         },
@@ -371,7 +398,8 @@ private fun DashboardScreen(
     trackedApps: List<TrackedApp>,
     onPauseTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
-    onOpenAppSelection: () -> Unit
+    onOpenAppSelection: () -> Unit,
+    onScanQrCode: () -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
@@ -379,7 +407,8 @@ private fun DashboardScreen(
         trackedApps = trackedApps,
         onPauseTracking = onPauseTracking,
         onOpenQrGenerator = onOpenQrGenerator,
-        onOpenAppSelection = onOpenAppSelection
+        onOpenAppSelection = onOpenAppSelection,
+        onScanQrCode = onScanQrCode
     )
 }
 
@@ -394,6 +423,37 @@ expect fun startUsageTracking(
 )
 expect fun showBlockingOverlay(message: String)
 expect fun scanQrAndDismiss(expectedMessage: String): Boolean
+expect fun getCurrentTimeMillis(): Long
+
+// Enhanced QR scanning function that validates against saved QR codes
+suspend fun scanQrAndValidate(storage: AppStorage): Boolean {
+    // This would be called from platform-specific implementations
+    // For now, we'll implement a simple validation flow
+    return false // Placeholder - will be implemented in platform layers
+}
+
+// Simple date formatting function
+private fun formatDate(timestamp: Long): String {
+    // Simple date formatting - just show relative time for now
+    val now = getCurrentTimeMillis()
+    val diff = now - timestamp
+    val days = diff / (24 * 60 * 60 * 1000)
+    
+    return when {
+        days == 0L -> "Today"
+        days == 1L -> "Yesterday"
+        days < 7L -> "$days days ago"
+        days < 30L -> "${days / 7} weeks ago"
+        else -> "${days / 30} months ago"
+    }
+}
+
+// Expect actual QR code display. Implemented per platform.
+@Composable
+expect fun QrCodeDisplay(
+    text: String,
+    modifier: Modifier = Modifier
+)
 
 // UI implementations for onboarding, QR, and dashboard live in this file for brevity
 // Lightweight, dependency-free visuals only
@@ -961,9 +1021,18 @@ private fun DashboardContent(
     trackedApps: List<TrackedApp>,
     onPauseTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
-    onOpenAppSelection: () -> Unit
+    onOpenAppSelection: () -> Unit,
+    onScanQrCode: () -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
+    var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Load saved QR codes when component mounts
+    LaunchedEffect(Unit) {
+        savedQrCodes = storage.getSavedQrCodes()
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -1125,10 +1194,95 @@ private fun DashboardContent(
                         Text("Add Partners", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
+                
+                Spacer(Modifier.height(12.dp))
+                
+                // Scan QR Code button for unblocking apps
+                Button(
+                    onClick = onScanQrCode,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(vertical = 12.dp)
+                ) {
+                    Text("📷", color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Scan QR Code to Unblock Apps", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
             }
         }
         
         Spacer(Modifier.height(24.dp))
+        
+        // Saved QR Codes Card
+        if (savedQrCodes.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = Color(0xFF2C2C2C),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Your Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    
+                    Spacer(Modifier.height(12.dp))
+                    
+                    Text(
+                        "You have ${savedQrCodes.size} QR code${if (savedQrCodes.size == 1) "" else "s"} ready for scanning. Print and place them around your home!",
+                        fontSize = 14.sp,
+                        color = Color(0xFFD1D5DB),
+                        lineHeight = 20.sp
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // List of saved QR codes
+                    savedQrCodes.take(3).forEach { qrCode ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("▦", color = Color(0xFF4CAF50), fontSize = 12.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    qrCode.message,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "Created ${formatDate(qrCode.createdAt)}",
+                                    color = Color(0xFFD1D5DB),
+                                    fontSize = 12.sp
+                                )
+                            }
+                            if (qrCode.isActive) {
+                                Text("✓", color = Color(0xFF4CAF50), fontSize = 12.sp)
+                            }
+                        }
+                    }
+                    
+                    if (savedQrCodes.size > 3) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            "... and ${savedQrCodes.size - 3} more",
+                            color = Color(0xFFD1D5DB),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+            
+            Spacer(Modifier.height(24.dp))
+        }
         
         // App Usage Card
         Card(
