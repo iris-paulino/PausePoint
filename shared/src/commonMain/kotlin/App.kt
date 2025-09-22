@@ -59,7 +59,7 @@ fun App() {
         colors = androidx.compose.material.MaterialTheme.colors.copy(
             background = Color(0xFF1A1A1A),
             surface = Color(0xFF2C2C2C),
-            primary = Color(0xFF4CAF50),
+            primary = Color(0xFFA4C19A),
             onBackground = Color.White,
             onSurface = Color.White,
             onPrimary = Color.White
@@ -687,7 +687,7 @@ private fun OnboardingPager(
                         .width(if (i == index) 24.dp else 8.dp)
                         .height(8.dp)
                         .background(
-                            if (i == index) Color(0xFF6EE7B7) else Color(0xFF4B5563),
+                            if (i == index) Color(0xFFA4C19A) else Color(0xFF4B5563),
                             RoundedCornerShape(4.dp)
                         )
                 )
@@ -775,7 +775,7 @@ private fun OnboardingPager(
                     if (index < pages.lastIndex) index++ else onDone()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6EE7B7)),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                 contentPadding = PaddingValues(vertical = 16.dp),
                 shape = RoundedCornerShape(12.dp)
             ) { 
@@ -883,7 +883,7 @@ private fun QrGeneratorContent(
                 
                 if (hasGeneratedQr) {
                     Spacer(Modifier.height(12.dp))
-                    Text(message, color = Color(0xFF4CAF50), fontSize = 16.sp)
+                    Text(message, color = Color(0xFFA4C19A), fontSize = 16.sp)
                     
                     Spacer(Modifier.height(8.dp))
                     Row(
@@ -936,10 +936,10 @@ private fun QrGeneratorContent(
                     onValueChange = onMessageChange,
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        focusedBorderColor = Color(0xFF4CAF50),
+                        focusedBorderColor = Color(0xFFA4C19A),
                         unfocusedBorderColor = Color(0xFF4B5563),
                         textColor = Color.White,
-                        cursorColor = Color(0xFF4CAF50)
+                        cursorColor = Color(0xFFA4C19A)
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
@@ -962,7 +962,7 @@ private fun QrGeneratorContent(
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (downloadSuccess) Color(0xFF2E7D32) else if (hasGeneratedQr) Color(0xFF4CAF50) else Color(0xFF4B5563)
+                backgroundColor = if (downloadSuccess) Color(0xFF0B5E47) else if (hasGeneratedQr) Color(0xFFA4C19A) else Color(0xFF4B5563)
             ),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
@@ -982,7 +982,7 @@ private fun QrGeneratorContent(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "✓ File saved to Downloads folder",
-                color = Color(0xFF4CAF50),
+                color = Color(0xFF6EE7B7),
                 fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -1031,7 +1031,7 @@ private fun QrGeneratorContent(
                         "1.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
+                        color = Color(0xFF6EE7B7),
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1053,7 +1053,7 @@ private fun QrGeneratorContent(
                         "2.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
+                        color = Color(0xFF6EE7B7),
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1075,7 +1075,7 @@ private fun QrGeneratorContent(
                         "3.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
+                        color = Color(0xFF6EE7B7),
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1097,7 +1097,7 @@ private fun QrGeneratorContent(
                         "4.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
+                        color = Color(0xFF6EE7B7),
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1119,7 +1119,7 @@ private fun QrGeneratorContent(
                         "5.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50),
+                        color = Color(0xFF6EE7B7),
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1250,13 +1250,13 @@ private fun DashboardContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🕐", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                        Text("🕐", fontSize = 16.sp, color = Color(0xFFA4C19A))
                         Spacer(Modifier.width(8.dp))
                         Text("Current Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFF4CAF50), RoundedCornerShape(12.dp))
+                            .background(Color(0xFFA4C19A), RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Text("Apps Available", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -1269,7 +1269,7 @@ private fun DashboardContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF388E3C), RoundedCornerShape(12.dp))
+                        .background(Color(0xFFA5C29B), RoundedCornerShape(12.dp))
                         .clickable { onOpenDurationSetting() }
                         .padding(24.dp),
                     contentAlignment = Alignment.Center
@@ -1300,11 +1300,11 @@ private fun DashboardContent(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("0", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                        Text("0", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA4C19A))
                         Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("0h 0m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF9800))
+                        Text("0h 0m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
@@ -1315,7 +1315,7 @@ private fun DashboardContent(
                 Button(
                     onClick = onToggleTracking,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFFA4C19A)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
@@ -1329,7 +1329,7 @@ private fun DashboardContent(
                 Button(
                     onClick = onOpenPause,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF43A047)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
@@ -1353,7 +1353,7 @@ private fun DashboardContent(
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("▦", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                        Text("▦", fontSize = 16.sp, color = Color(0xFF6EE7B7))
                         Spacer(Modifier.width(8.dp))
                         Text("Ready to Walk for Your Apps?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
@@ -1376,7 +1376,7 @@ private fun DashboardContent(
                         Button(
                             onClick = onOpenQrGenerator,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
@@ -1422,7 +1422,7 @@ private fun DashboardContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("📊", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                        Text("📊", fontSize = 16.sp, color = Color(0xFFA4C19A))
                         Spacer(Modifier.width(8.dp))
                         Text("App Usage", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
@@ -1699,7 +1699,7 @@ private fun SavedQrCodesScreen(
                 Button(
                     onClick = { onOpenQrGenerator() },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
@@ -1808,7 +1808,7 @@ private fun SavedQrCodesScreen(
                         Button(
                             onClick = { onOpenQrGenerator() },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 14.dp)
                         ) {
@@ -1918,11 +1918,11 @@ private fun PauseScreen(
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                Text("▣", color = Color(0xFF063B2D))
+                Text("▣", color = Color(0xFF1A1A1A))
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.Start) {
-                    Text("Scan My QR Code", color = Color(0xFF063B2D), fontWeight = FontWeight.Bold)
-                    Text("Get up and scan your printed QR code", color = Color(0xFF0B5E47), fontSize = 12.sp)
+                    Text("Scan My QR Code", color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
+                    Text("Get up and scan your printed QR code", color = Color(0xFFBFC7C2), fontSize = 12.sp)
                 }
             }
 
@@ -2191,7 +2191,7 @@ private fun DurationSettingScreen(
                         text = timeLimitMinutes.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50)
+                        color = Color(0xFFA4C19A)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -2285,7 +2285,7 @@ private fun DurationSettingScreen(
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 backgroundColor = if (timeLimitMinutes == minutes) 
-                                    Color(0xFF4CAF50) else Color(0xFF2C2C2C)
+                                    Color(0xFFA4C19A) else Color(0xFF2C2C2C)
                             ),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(vertical = 12.dp)
@@ -2327,7 +2327,7 @@ private fun DurationSettingScreen(
         Button(
             onClick = onCompleteSetup,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
