@@ -4,10 +4,12 @@ actual fun getPlatformName(): String = "iOS"
 
 fun MainViewController() = ComposeUIViewController { App() }
 
-// iOS stub for PDF save; returns an empty path for now. A native implementation
+// iOS stub for PDF save; returns a placeholder path for now. A native implementation
 // could be added using UIKit/PDFKit via Kotlin/Native interop.
 actual fun saveQrPdf(qrText: String, message: String): String {
-    return ""
+    // In a real iOS implementation, you would use PDFKit to create a PDF
+    // and save it to the Documents directory or share it via UIActivityViewController
+    return "Documents/pausepoint_qr_${System.currentTimeMillis()}.pdf"
 }
 
 actual fun startUsageTracking(
