@@ -117,6 +117,27 @@ private fun AppRoot() {
     val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
     
+    var isTracking by remember { mutableStateOf(false) }
+    var elapsedSeconds by remember { mutableStateOf(0) }
+
+    // Drive a simple combined-usage timer while tracking is active
+    LaunchedEffect(isTracking) {
+        if (!isTracking) return@LaunchedEffect
+        while (isTracking) {
+            delay(1000)
+            elapsedSeconds += 1
+            val minutes = (elapsedSeconds / 60)
+            // Update tracked apps' minutesUsed with combined usage
+            trackedApps = trackedApps.map { it.copy(minutesUsed = minutes.coerceAtMost(it.limitMinutes)) }
+            // If limit reached for combined usage, show Pause and stop tracking
+            if (minutes >= timeLimitMinutes) {
+                isTracking = false
+                // Navigate to Pause screen
+                route = Route.Pause
+            }
+        }
+    }
+
     // Function to set up default apps
     suspend fun setupDefaultApps() {
         isLoadingApps = true
@@ -283,8 +304,10 @@ private fun AppRoot() {
             qrId = qrId,
             message = qrMessage,
             trackedApps = trackedApps,
-            onPauseTracking = {
-                // Placeholder: would toggle background tracking in platform layer
+            isTracking = isTracking,
+            timeLimitMinutes = timeLimitMinutes,
+            onToggleTracking = {
+                isTracking = !isTracking
             },
             onOpenQrGenerator = { route = Route.QrGenerator },
             onOpenAppSelection = { route = Route.AppSelection },
@@ -410,7 +433,9 @@ private fun DashboardScreen(
     qrId: String?,
     message: String,
     trackedApps: List<TrackedApp>,
-    onPauseTracking: () -> Unit,
+    isTracking: Boolean,
+    timeLimitMinutes: Int,
+    onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
@@ -420,7 +445,9 @@ private fun DashboardScreen(
         qrId = qrId ?: "",
         message = message,
         trackedApps = trackedApps,
-        onPauseTracking = onPauseTracking,
+        isTracking = isTracking,
+        timeLimitMinutes = timeLimitMinutes,
+        onToggleTracking = onToggleTracking,
         onOpenQrGenerator = onOpenQrGenerator,
         onOpenAppSelection = onOpenAppSelection,
         onScanQrCode = onScanQrCode,
@@ -1035,7 +1062,9 @@ private fun DashboardContent(
     qrId: String,
     message: String,
     trackedApps: List<TrackedApp>,
-    onPauseTracking: () -> Unit,
+    isTracking: Boolean,
+    timeLimitMinutes: Int,
+    onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
     onScanQrCode: () -> Unit,
@@ -1115,9 +1144,11 @@ private fun DashboardContent(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("15m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        val minutesUsed = trackedApps.maxOfOrNull { it.minutesUsed } ?: 0
+                        val remaining = (timeLimitMinutes - minutesUsed).coerceAtLeast(0)
+                        Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("minutes of app time remaining today", fontSize = 14.sp, color = Color.White)
-                        Text("Daily limit: 15 minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("Daily limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
                 
@@ -1142,15 +1173,15 @@ private fun DashboardContent(
                 
                 // Start tracking button
                 Button(
-                    onClick = onPauseTracking,
+                    onClick = onToggleTracking,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFF4CAF50)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
-                    Text("▶", color = Color.White)
+                    Text(if (isTracking) "⏸" else "▶", color = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(if (isTracking) "Pause Tracking" else "Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(Modifier.height(12.dp))
