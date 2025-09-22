@@ -50,6 +50,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material.Switch
@@ -101,6 +105,7 @@ private fun AppRoot() {
     var qrMessage by remember { mutableStateOf("Take a mindful pause") }
     var qrId by remember { mutableStateOf<String?>(null) }
     var showNotificationDialog by remember { mutableStateOf(false) }
+    var showTimeRemainingInfoDialog by remember { mutableStateOf(false) }
     var trackedApps by remember {
         mutableStateOf(
             listOf(
@@ -418,7 +423,8 @@ private fun AppRoot() {
                     val selectedPackages = availableApps.filter { it.isSelected }.map { it.packageName }
                     storage.saveSelectedAppPackages(selectedPackages)
                 }
-            }
+            },
+            onShowTimeRemainingInfo = { showTimeRemainingInfoDialog = true }
         )
         Route.Settings -> SettingsScreen(
             onBack = { route = Route.Dashboard },
@@ -572,6 +578,38 @@ private fun AppRoot() {
             contentColor = Color.White
         )
     }
+    
+    // Time Remaining Info Dialog
+    if (showTimeRemainingInfoDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showTimeRemainingInfoDialog = false },
+            title = {
+                Text(
+                    "Time Remaining",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    "This is the time until your selected apps are blocked. When the time runs out, you will have to physically walk and scan your QR code to unblock your apps, then you can use them again.",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { showTimeRemainingInfoDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
 }
 
 
@@ -632,7 +670,8 @@ private fun DashboardScreen(
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
     onOpenSettings: () -> Unit,
-    onRemoveTrackedApp: (String) -> Unit
+    onRemoveTrackedApp: (String) -> Unit,
+    onShowTimeRemainingInfo: () -> Unit
 ) {
     DashboardContent(
         qrId = qrId ?: "",
@@ -647,7 +686,8 @@ private fun DashboardScreen(
         onOpenPause = onOpenPause,
         onOpenDurationSetting = onOpenDurationSetting,
         onOpenSettings = onOpenSettings,
-        onRemoveTrackedApp = onRemoveTrackedApp
+        onRemoveTrackedApp = onRemoveTrackedApp,
+        onShowTimeRemainingInfo = onShowTimeRemainingInfo
     )
 }
 
@@ -1267,7 +1307,8 @@ private fun DashboardContent(
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
     onOpenSettings: () -> Unit,
-    onRemoveTrackedApp: (String) -> Unit
+    onRemoveTrackedApp: (String) -> Unit,
+    onShowTimeRemainingInfo: () -> Unit
 ) {
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
@@ -1342,16 +1383,34 @@ private fun DashboardContent(
                         .fillMaxWidth()
                         .background(Color(0xFFA5C29B), RoundedCornerShape(12.dp))
                         .clickable { onOpenDurationSetting() }
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(24.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // Info button in top-right corner
+                    IconButton(
+                        onClick = { onShowTimeRemainingInfo() },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info about time remaining",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    
+                    // Main content centered
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.align(Alignment.Center)
+                    ) {
                         val minutesUsed = trackedApps.maxOfOrNull { it.minutesUsed } ?: 0
                         val remaining = (timeLimitMinutes - minutesUsed).coerceAtLeast(0)
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                            Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color.White)
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "✏",
