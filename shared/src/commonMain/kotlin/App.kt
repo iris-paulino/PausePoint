@@ -696,7 +696,7 @@ private fun QrGeneratorContent(
             onClick = { 
                 if (downloadSuccess) {
                     // If already downloaded, navigate to dashboard
-                    onGenerate()
+                    onClose()
                 } else {
                     // Download PDF first
                     onDownloadPdf(qrText)
@@ -714,7 +714,7 @@ private fun QrGeneratorContent(
             Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                if (downloadSuccess) "Add Apps to Track" else "Download PDF for Printing", 
+                if (downloadSuccess) "Go to Dashboard" else "Download PDF for Printing", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
