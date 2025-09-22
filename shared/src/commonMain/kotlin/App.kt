@@ -77,7 +77,7 @@ fun App() {
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting }
 
 private data class TrackedApp(
     val name: String,
@@ -121,6 +121,8 @@ private fun AppRoot() {
             )
         )
     }
+    
+    var timeLimitMinutes by remember { mutableStateOf(15) }
     
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -188,14 +190,22 @@ private fun AppRoot() {
                 }
             },
             onContinue = { 
-                // Convert selected apps to tracked apps
-                val selectedApps = availableApps.filter { it.isSelected }
-                trackedApps = selectedApps.map { app ->
-                    TrackedApp(app.name, 0, 60) // Default 60 minute limit
-                }
-                route = Route.Dashboard 
+                route = Route.DurationSetting 
             },
             onBack = { route = Route.Dashboard }
+        )
+        Route.DurationSetting -> DurationSettingScreen(
+            timeLimitMinutes = timeLimitMinutes,
+            onTimeLimitChange = { timeLimitMinutes = it },
+            onCompleteSetup = {
+                // Convert selected apps to tracked apps with the chosen time limit
+                val selectedApps = availableApps.filter { it.isSelected }
+                trackedApps = selectedApps.map { app ->
+                    TrackedApp(app.name, 0, timeLimitMinutes)
+                }
+                route = Route.Dashboard
+            },
+            onBack = { route = Route.AppSelection }
         )
     }
 }
@@ -1131,7 +1141,7 @@ private fun AppSelectionScreen(
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
             Text(
-                "Continue with $selectedCount apps",
+                "Continue",
                 color = Color.White,
                 fontWeight = FontWeight.Bold
             )
@@ -1204,6 +1214,234 @@ private fun AppSelectionItem(
                         )
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun DurationSettingScreen(
+    timeLimitMinutes: Int,
+    onTimeLimitChange: (Int) -> Unit,
+    onCompleteSetup: () -> Unit,
+    onBack: () -> Unit
+) {
+    val quickSelectOptions = listOf(5, 10, 15, 45, 60, 90, 120)
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .padding(24.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "←",
+                fontSize = 24.sp,
+                color = Color.White,
+                modifier = Modifier.clickable { onBack() }
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    "Set Time Limit",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "How long before you take a pause?",
+                    fontSize = 14.sp,
+                    color = Color(0xFFD1D5DB)
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(32.dp))
+        
+        // Current Limit Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🕒", fontSize = 20.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Current Limit",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Time display
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = timeLimitMinutes.toString(),
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "minutes",
+                        fontSize = 16.sp,
+                        color = Color.White
+                    )
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Adjust controls
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Button(
+                        onClick = { 
+                            if (timeLimitMinutes > 1) {
+                                onTimeLimitChange(timeLimitMinutes - 1)
+                            }
+                        },
+                        modifier = Modifier.size(40.dp),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "-",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        "adjust",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    
+                    Button(
+                        onClick = { 
+                            if (timeLimitMinutes < 480) { // Max 8 hours
+                                onTimeLimitChange(timeLimitMinutes + 1)
+                            }
+                        },
+                        modifier = Modifier.size(40.dp),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "+",
+                            color = Color.White,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Quick Select
+        Text(
+            "Quick Select",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
+        
+        Spacer(Modifier.height(12.dp))
+        
+        // Quick select buttons
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(quickSelectOptions.chunked(3)) { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    row.forEach { minutes ->
+                        Button(
+                            onClick = { onTimeLimitChange(minutes) },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = if (timeLimitMinutes == minutes) 
+                                    Color(0xFF4CAF50) else Color(0xFF2C2C2C)
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Text(
+                                "${minutes}m",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    // Fill remaining space if row has less than 3 items
+                    repeat(3 - row.size) {
+                        Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        // Information card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text(
+                "All selected apps will be blocked after $timeLimitMinutes minutes of combined use.",
+                modifier = Modifier.padding(16.dp),
+                color = Color.White,
+                fontSize = 14.sp
+            )
+        }
+        
+        Spacer(Modifier.weight(1f))
+        
+        // Complete Setup button
+        Button(
+            onClick = onCompleteSetup,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+            shape = RoundedCornerShape(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)
+        ) {
+            Text(
+                "Complete Setup",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
         }
     }
 }
