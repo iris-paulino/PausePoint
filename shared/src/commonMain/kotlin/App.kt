@@ -158,6 +158,14 @@ private fun AppRoot() {
             
             trackedApps = defaultTrackedApps
             println("DEBUG: Set up ${trackedApps.size} default tracked apps")
+            // Persist selected packages for defaults
+            val selectedPackages = installedApps.filter { app ->
+                defaultAppNames.any { defaultName ->
+                    app.appName.contains(defaultName, ignoreCase = true) ||
+                    defaultName.contains(app.appName, ignoreCase = true)
+                }
+            }.map { it.packageName }
+            try { storage.saveSelectedAppPackages(selectedPackages) } catch (_: Exception) {}
             
         } catch (e: Exception) {
             println("DEBUG: Exception occurred while loading apps: ${e.message}")
@@ -170,6 +178,15 @@ private fun AppRoot() {
                 TrackedApp("Chrome", 0, 15),
                 TrackedApp("YouTube", 0, 15)
             )
+            // Persist fallback package identifiers so the choice survives restarts
+            val fallbackPackages = listOf(
+                "com.instagram.android",
+                "com.zhiliaoapp.musically",
+                "com.snapchat.android",
+                "com.android.chrome",
+                "com.google.android.youtube"
+            )
+            try { storage.saveSelectedAppPackages(fallbackPackages) } catch (_: Exception) {}
         } finally {
             isLoadingApps = false
         }
@@ -184,8 +201,35 @@ private fun AppRoot() {
             } ?: false // Default to false if timeout occurs
             
             if (isOnboardingCompleted) {
-                // If onboarding is completed, set up default apps and go to dashboard
-                setupDefaultApps()
+                // Load persisted selections and time limit
+                val savedTime = withTimeoutOrNull(3000) { storage.getTimeLimitMinutes() } ?: 15
+                timeLimitMinutes = savedTime
+
+                val savedPackages = withTimeoutOrNull(3000) { storage.getSelectedAppPackages() } ?: emptyList()
+                if (savedPackages.isNotEmpty()) {
+                    try {
+                        val installed = installedAppsProvider.getInstalledApps()
+                        val selected = installed.filter { it.packageName in savedPackages.toSet() }
+                        trackedApps = selected.map { TrackedApp(it.appName, 0, timeLimitMinutes) }
+                        // Pre-populate available apps to reflect saved selection when opening selection screen later
+                        availableApps = installed.map { installedApp ->
+                            val selectedSet = savedPackages.toSet()
+                            AvailableApp(
+                                name = installedApp.appName,
+                                category = installedApp.category,
+                                icon = installedApp.icon,
+                                packageName = installedApp.packageName,
+                                isSelected = installedApp.packageName in selectedSet
+                            )
+                        }
+                    } catch (_: Exception) {
+                        // Fallback to defaults if loading installed apps fails
+                        setupDefaultApps()
+                    }
+                } else {
+                    // No saved selection: set up defaults
+                    setupDefaultApps()
+                }
                 route = Route.Dashboard
             } else {
                 // If onboarding is not completed, show onboarding
@@ -208,19 +252,24 @@ private fun AppRoot() {
                     // Debug: Print the number of apps found
                     println("DEBUG: Found ${installedApps.size} installed apps")
                     if (installedApps.isNotEmpty()) {
+                        // Use persisted package selections if available
+                        val savedPackages = try { storage.getSelectedAppPackages() } catch (_: Exception) { emptyList() }
+                        val savedSet = savedPackages.toSet()
                         availableApps = installedApps.map { installedApp ->
-                            // Selection strictly mirrors current tracked apps
-                            val isTracked = trackedApps.any { tracked ->
-                                tracked.name.equals(installedApp.appName, ignoreCase = true) ||
-                                tracked.name.contains(installedApp.appName, ignoreCase = true) ||
-                                installedApp.appName.contains(tracked.name, ignoreCase = true)
+                            val isSelected = if (savedSet.isNotEmpty()) installedApp.packageName in savedSet else {
+                                // Fallback to matching by current tracked apps
+                                trackedApps.any { tracked ->
+                                    tracked.name.equals(installedApp.appName, ignoreCase = true) ||
+                                    tracked.name.contains(installedApp.appName, ignoreCase = true) ||
+                                    installedApp.appName.contains(tracked.name, ignoreCase = true)
+                                }
                             }
                             AvailableApp(
                                 name = installedApp.appName,
                                 category = installedApp.category,
                                 icon = installedApp.icon,
                                 packageName = installedApp.packageName,
-                                isSelected = isTracked
+                                isSelected = isSelected
                             )
                         }
                         println("DEBUG: Loaded ${availableApps.size} apps for selection")
@@ -354,6 +403,11 @@ private fun AppRoot() {
                         appName.contains(app.name, ignoreCase = true)
                     if (matches) app.copy(isSelected = false) else app
                 }
+                // Persist updated selection
+                coroutineScope.launch {
+                    val selectedPackages = availableApps.filter { it.isSelected }.map { it.packageName }
+                    storage.saveSelectedAppPackages(selectedPackages)
+                }
             }
         )
         Route.Settings -> SettingsScreen(
@@ -382,6 +436,10 @@ private fun AppRoot() {
                         limitMinutes = existingApp?.limitMinutes ?: timeLimitMinutes
                     )
                 }
+                // Persist updated selection
+                coroutineScope.launch {
+                    storage.saveSelectedAppPackages(selectedApps.map { it.packageName })
+                }
             },
             onContinue = {
                 // Ensure dashboard reflects the current selections even if user didn't toggle
@@ -394,13 +452,21 @@ private fun AppRoot() {
                         limitMinutes = existingApp?.limitMinutes ?: timeLimitMinutes
                     )
                 }
+                // Persist selection
+                coroutineScope.launch {
+                    storage.saveSelectedAppPackages(selectedApps.map { it.packageName })
+                }
                 route = Route.Dashboard
             },
             onBack = { route = Route.Dashboard }
         )
         Route.DurationSetting -> DurationSettingScreen(
             timeLimitMinutes = timeLimitMinutes,
-            onTimeLimitChange = { timeLimitMinutes = it },
+            onTimeLimitChange = { 
+                timeLimitMinutes = it
+                // Persist time limit immediately
+                coroutineScope.launch { storage.saveTimeLimitMinutes(it) }
+            },
             onCompleteSetup = {
                 // Convert selected apps to tracked apps with the chosen time limit
                 val selectedApps = availableApps.filter { it.isSelected }
@@ -412,6 +478,11 @@ private fun AppRoot() {
                         minutesUsed = existingApp?.minutesUsed ?: 0,
                         limitMinutes = timeLimitMinutes
                     )
+                }
+                // Ensure persisted values are saved
+                coroutineScope.launch {
+                    storage.saveSelectedAppPackages(selectedApps.map { it.packageName })
+                    storage.saveTimeLimitMinutes(timeLimitMinutes)
                 }
                 route = Route.Dashboard
             },
