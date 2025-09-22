@@ -11,6 +11,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,7 +85,7 @@ private data class TrackedApp(
 
 @Composable
 private fun AppRoot() {
-    var route by remember { mutableStateOf(Route.Onboarding) }
+    var route by remember { mutableStateOf<Route?>(null) } // Start with null to show loading
     var qrMessage by remember { mutableStateOf("Take a mindful pause") }
     var qrId by remember { mutableStateOf<String?>(null) }
     var trackedApps by remember {
@@ -95,10 +97,45 @@ private fun AppRoot() {
             )
         )
     }
+    
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Check onboarding completion status on app start
+    LaunchedEffect(Unit) {
+        try {
+            // Add a timeout to prevent hanging
+            val isOnboardingCompleted = withTimeoutOrNull(5000) {
+                storage.isOnboardingCompleted()
+            } ?: false // Default to false if timeout occurs
+            
+            route = if (isOnboardingCompleted) Route.Dashboard else Route.Onboarding
+        } catch (e: Exception) {
+            // If storage fails, default to onboarding
+            route = Route.Onboarding
+        }
+    }
 
-    when (route) {  
+    when (route) {
+        null -> {
+            // Show loading state while checking onboarding status
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Loading...", color = Color.White)
+                    Text("Checking onboarding status...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                }
+            }
+        }
         Route.Onboarding -> OnboardingFlow(
-            onGenerateQr = { route = Route.QrGenerator }
+            onGenerateQr = { 
+                coroutineScope.launch {
+                    storage.setOnboardingCompleted(true)
+                }
+                route = Route.QrGenerator 
+            }
         )
         Route.QrGenerator -> QrGeneratorScreen(
             message = qrMessage,
