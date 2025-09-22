@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -29,6 +30,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import androidx.compose.material.Button
 import androidx.compose.material.ButtonDefaults
 import androidx.compose.material.Card
@@ -210,96 +215,138 @@ private fun OnboardingPager(
     onDone: () -> Unit
 ) {
     var index by remember { mutableStateOf(0) }
-    val page = pages[index]
+    var offsetX by remember { mutableStateOf(0f) }
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
-            .padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(24.dp)
     ) {
-        // Progress indicators
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.Center
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            repeat(pages.size) { i ->
-                Box(
-                    modifier = Modifier
-                        .width(if (i == index) 24.dp else 8.dp)
-                        .height(8.dp)
-                        .background(
-                            if (i == index) Color(0xFF6EE7B7) else Color(0xFF4B5563),
-                            RoundedCornerShape(4.dp)
-                        )
-                )
-                if (i < pages.lastIndex) Spacer(Modifier.width(8.dp))
-            }
-        }
-
-        // Main content card
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF222625),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Illustration - person walking on path through hills
-                Image(
-                    painter = painterResource("images/onboarding/mindful_breaks.png"),
-                    contentDescription = "Mindful breaks illustration",
-                    modifier = Modifier.size(200.dp)
-                )
-                
-                Spacer(Modifier.height(24.dp))
-                
-                Text(
-                    text = page.title,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                
-                Spacer(Modifier.height(16.dp))
-                
-                Text(
-                    text = page.description,
-                    fontSize = 16.sp,
-                    color = Color(0xFFD1D5DB),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-            }
-        }
-
-        // Action buttons
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Button(
-                onClick = {
-                    if (index < pages.lastIndex) index++ else onDone()
-                },
+            // Progress indicators at top
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6EE7B7)),
-                contentPadding = PaddingValues(vertical = 16.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) { 
-                Text(
-                    page.primaryCta,
-                    color = Color(0xFF1A1A1A),
-                    fontWeight = FontWeight.Bold
-                ) 
+                horizontalArrangement = Arrangement.Center
+            ) {
+                repeat(pages.size) { i ->
+                    Box(
+                        modifier = Modifier
+                            .width(if (i == index) 24.dp else 8.dp)
+                            .height(8.dp)
+                            .background(
+                                if (i == index) Color(0xFF6EE7B7) else Color(0xFF4B5563),
+                                RoundedCornerShape(4.dp)
+                            )
+                    )
+                    if (i < pages.lastIndex) Spacer(Modifier.width(8.dp))
+                }
             }
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = "Skip",
+
+            // Empty space for centering
+            Spacer(Modifier.weight(1f))
+
+            // Action buttons at bottom
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = {
+                        if (index < pages.lastIndex) index++ else onDone()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6EE7B7)),
+                    contentPadding = PaddingValues(vertical = 16.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) { 
+                    Text(
+                        pages[index].primaryCta,
+                        color = Color(0xFF1A1A1A),
+                        fontWeight = FontWeight.Bold
+                    ) 
+                }
+                Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Skip",
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .clickable { onDone() },
+                    color = Color(0xFFD1D5DB)
+                )
+            }
+        }
+
+        // Centered swipeable content area
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragEnd = {
+                            // Determine if swipe was significant enough to change page
+                            val threshold = size.width * 0.2f // 20% of screen width
+                            when {
+                                offsetX > threshold && index > 0 -> {
+                                    // Swipe right - go to previous page
+                                    index--
+                                }
+                                offsetX < -threshold && index < pages.lastIndex -> {
+                                    // Swipe left - go to next page
+                                    index++
+                                }
+                            }
+                            offsetX = 0f
+                        }
+                    ) { _, dragAmount ->
+                        // Only allow horizontal swiping
+                        offsetX += dragAmount.x
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            // Main content card with swipe offset
+            Card(
                 modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .clickable { onDone() },
-                color = Color(0xFFD1D5DB)
-            )
+                    .fillMaxWidth()
+                    .offset { IntOffset(offsetX.roundToInt(), 0) },
+                backgroundColor = Color(0xFF222625),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                val page = pages[index]
+                Column(
+                    modifier = Modifier.padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Illustration - person walking on path through hills
+                    Image(
+                        painter = painterResource("images/onboarding/mindful_breaks.png"),
+                        contentDescription = "Mindful breaks illustration",
+                        modifier = Modifier.size(200.dp)
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Text(
+                        text = page.title,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        text = page.description,
+                        fontSize = 16.sp,
+                        color = Color(0xFFD1D5DB),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
         }
     }
 }
