@@ -7,8 +7,6 @@ plugins {
 kotlin {
     androidTarget()
 
-    jvm("desktop")
-
     listOf(
         iosX64(),
         iosArm64(),
@@ -30,7 +28,7 @@ kotlin {
                 implementation(compose.components.resources)
                 implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
                 implementation("com.google.zxing:core:3.5.2")
-                implementation("com.google.zxing:javase:3.5.2")
+                // 'javase' artifact is desktop-only; not needed for Android/iOS
             }
         }
         val androidMain by getting {
@@ -39,7 +37,7 @@ kotlin {
                 api("androidx.appcompat:appcompat:1.6.1")
                 api("androidx.core:core-ktx:1.10.1")
                 implementation("com.google.zxing:core:3.5.2")
-                implementation("com.google.zxing:javase:3.5.2")
+                // 'javase' artifact is desktop-only; not needed for Android
             }
         }
         val iosX64Main by getting
@@ -51,11 +49,7 @@ kotlin {
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
         }
-        val desktopMain by getting {
-            dependencies {
-                implementation(compose.desktop.common)
-            }
-        }
+        
     }
 }
 
