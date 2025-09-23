@@ -78,3 +78,11 @@ actual fun getCurrentTimeMillis(): Long {
     // Simple implementation - in a real app you'd use proper iOS time APIs
     return kotlin.random.Random.nextLong(1000000000000L, 2000000000000L)
 }
+
+actual fun openAccessibilitySettings() {
+    // No-op on iOS
+}
+
+actual fun isAccessibilityServiceEnabled(): Boolean {
+    return true
+}
