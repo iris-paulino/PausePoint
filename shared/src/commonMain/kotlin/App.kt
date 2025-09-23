@@ -134,6 +134,7 @@ private fun AppRoot() {
     
     // Counter for times unblocked today
     var timesUnblockedToday by remember { mutableStateOf(0) }
+    var isSetupMode by remember { mutableStateOf(false) }
 
     // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
     fun finalizeSessionUsage() {
@@ -565,10 +566,15 @@ private fun AppRoot() {
             return@LaunchedEffect
         }
 
-        // 3) QR code
-        if (qrId.isNullOrBlank()) {
-            showNoQrCodeDialog = true
-            return@LaunchedEffect
+        // 3) QR code - allow existing saved codes to satisfy this
+        run {
+            val hasAnySavedQr = withTimeoutOrNull(2000) {
+                storage.getSavedQrCodes().isNotEmpty()
+            } ?: false
+            if (qrId.isNullOrBlank() && !hasAnySavedQr) {
+                showNoQrCodeDialog = true
+                return@LaunchedEffect
+            }
         }
 
         // Also ensure there are tracked apps
@@ -603,14 +609,16 @@ private fun AppRoot() {
                 coroutineScope.launch {
                     storage.setOnboardingCompleted(true)
                     setupDefaultApps()
-                    route = Route.Dashboard
+                    isSetupMode = true
+                    route = Route.QrGenerator
                 }
             },
             onSkip = {
                 coroutineScope.launch {
                     storage.setOnboardingCompleted(true)
                     setupDefaultApps()
-                    route = Route.Dashboard
+                    isSetupMode = true
+                    route = Route.QrGenerator
                 }
             }
         )
@@ -621,7 +629,8 @@ private fun AppRoot() {
                 qrId = id
                 route = Route.AppSelection
             },
-            onClose = { route = Route.Dashboard }
+            onClose = { route = Route.Dashboard },
+            isSetupMode = isSetupMode
         )
         Route.Dashboard -> DashboardScreen(
             qrId = qrId,
@@ -633,7 +642,10 @@ private fun AppRoot() {
             timesUnblockedToday = timesUnblockedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = { pendingStartTracking = true },
-            onOpenQrGenerator = { route = Route.QrGenerator },
+            onOpenQrGenerator = { 
+                isSetupMode = false
+                route = Route.QrGenerator 
+            },
             onOpenAppSelection = { route = Route.AppSelection },
             onScanQrCode = {
                 // Trigger QR code scanning to unblock apps
@@ -1081,7 +1093,8 @@ private fun QrGeneratorScreen(
     message: String,
     onMessageChange: (String) -> Unit,
     onQrCreated: (String) -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    isSetupMode: Boolean
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -1113,7 +1126,8 @@ private fun QrGeneratorScreen(
             val id = "pause-${kotlin.random.Random.nextLong()}"
             onQrCreated(id)
         },
-        onClose = onClose
+        onClose = onClose,
+        isSetupMode = isSetupMode
     )
 }
 
@@ -1385,7 +1399,8 @@ private fun QrGeneratorContent(
     onMessageChange: (String) -> Unit,
     onDownloadPdf: (String) -> Unit,
     onGenerate: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    isSetupMode: Boolean
 ) {
     var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
     var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
@@ -1413,7 +1428,7 @@ private fun QrGeneratorContent(
             )
             Spacer(Modifier.width(16.dp))
             Column {
-                Text("QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(if (isSetupMode) "Set Up: QR Code Generator" else "QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Create QR codes to place around your home", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
@@ -1550,7 +1565,9 @@ private fun QrGeneratorContent(
             Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                if (downloadSuccess) "Go to Dashboard" else "Save and Download PDF for printing", 
+                if (downloadSuccess) {
+                    if (isSetupMode) "Done" else "Go to Dashboard"
+                } else "Save and Download PDF for printing", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
