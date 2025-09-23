@@ -106,15 +106,7 @@ private fun AppRoot() {
     var qrId by remember { mutableStateOf<String?>(null) }
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showTimeRemainingInfoDialog by remember { mutableStateOf(false) }
-    var trackedApps by remember {
-        mutableStateOf(
-            listOf(
-                TrackedApp("Instagram", 45, 60),
-                TrackedApp("TikTok", 32, 45),
-                TrackedApp("Facebook", 18, 30)
-            )
-        )
-    }
+    var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
     var availableApps by remember { mutableStateOf<List<AvailableApp>>(emptyList()) }
     var isLoadingApps by remember { mutableStateOf(false) }
@@ -128,11 +120,63 @@ private fun AppRoot() {
     var isTracking by remember { mutableStateOf(false) }
     var trackingStartTime by remember { mutableStateOf(0L) }
     var appUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    
+    // Session tracking variables that reset on dismiss/QR scan
+    var sessionStartTime by remember { mutableStateOf(0L) }
+    var sessionAppUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var sessionElapsedSeconds by remember { mutableStateOf(0L) }
+    
+    // Counter for times unblocked today
+    var timesUnblockedToday by remember { mutableStateOf(0) }
+
+    // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
+    fun finalizeSessionUsage() {
+        println("DEBUG: finalizeSessionUsage() called")
+        println("DEBUG: sessionAppUsageTimes: $sessionAppUsageTimes")
+        println("DEBUG: trackedApps before: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+        
+        if (sessionAppUsageTimes.isEmpty()) {
+            println("DEBUG: sessionAppUsageTimes is empty, returning")
+            return
+        }
+        
+        // Update trackedApps minutesUsed by adding session minutes
+        trackedApps = trackedApps.map { app ->
+            val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
+            val sessionMinutes = (sessionSeconds / 60L).toInt()
+            println("DEBUG: App ${app.name}: sessionSeconds=$sessionSeconds, sessionMinutes=$sessionMinutes, currentMinutes=${app.minutesUsed}")
+            // Always update the app, even if sessionMinutes is 0, to ensure consistency
+            app.copy(minutesUsed = app.minutesUsed + sessionMinutes)
+        }
+        
+        println("DEBUG: trackedApps after: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+        
+        // Update lifetime seconds map as well
+        val updatedLifetimeSeconds = appUsageTimes.toMutableMap()
+        sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
+            val current = updatedLifetimeSeconds[appName] ?: 0L
+            updatedLifetimeSeconds[appName] = current + sessionSeconds
+        }
+        appUsageTimes = updatedLifetimeSeconds
+        
+        println("DEBUG: appUsageTimes after: $appUsageTimes")
+        
+        // Save the updated usage data to storage
+        coroutineScope.launch {
+            try {
+                storage.saveAppUsageTimes(appUsageTimes)
+                println("DEBUG: Saved appUsageTimes to storage: $appUsageTimes")
+            } catch (e: Exception) {
+                println("DEBUG: Failed to save appUsageTimes: ${e.message}")
+            }
+        }
+    }
 
     // Track individual app usage when tracking is active
     LaunchedEffect(isTracking) {
         if (isTracking) {
             trackingStartTime = getCurrentTimeMillis()
+            sessionStartTime = getCurrentTimeMillis() // Start new session
             
             // Save tracking state and start time to storage
             coroutineScope.launch {
@@ -189,36 +233,45 @@ private fun AppRoot() {
             while (isTracking) {
                 delay(1000) // Update every second
                 
+                // Update session elapsed time from start
+                if (sessionStartTime > 0L) {
+                    sessionElapsedSeconds = (getCurrentTimeMillis() - sessionStartTime) / 1000L
+                }
+                
                 // Simulate app usage detection
                 // In a real implementation, this would query the platform's usage stats
                 val currentTime = getCurrentTimeMillis()
                 val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
                 
-                // Simulate realistic app usage patterns
-                // This simulates that different apps are being used at different times
-                trackedApps = trackedApps.mapIndexed { index, app ->
-                    val currentUsage = appUsageTimes[app.name] ?: 0L
+                // Simulate individual app usage patterns
+                // For testing purposes, simulate that Chrome is being used continuously
+                val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                
+                trackedApps.forEach { app ->
+                    val currentSessionUsage = updatedSessionUsage[app.name] ?: 0L
                     
-                    // Simulate usage patterns:
-                    // - Apps get used in cycles (simulating user switching between apps)
-                    // - Each app gets usage time every few seconds
-                    val cycleTime = sessionDuration % 10 // 10-second cycles
-                    val appCycle = (sessionDuration + index) % 10
+                    // For testing: Chrome gets continuous usage, others get minimal usage
+                    val shouldGetUsage = when (app.name.lowercase()) {
+                        "chrome" -> true  // Chrome gets continuous usage for testing
+                        "youtube" -> sessionDuration % 20 < 5  // YouTube gets usage 25% of the time
+                        else -> sessionDuration % 30 < 3  // Other apps get minimal usage
+                    }
                     
-                    // App gets usage if it's "active" in this cycle
-                    val usageIncrement = if (cycleTime == appCycle && sessionDuration > 0) 1L else 0L
-                    val newUsage = currentUsage + usageIncrement
-                    val newMinutesUsed = (newUsage / 60).toInt().coerceAtMost(app.limitMinutes)
+                    val usageIncrement = if (shouldGetUsage && sessionDuration > 0) 1L else 0L
+                    updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
                     
-                    app.copy(minutesUsed = newMinutesUsed)
+                    if (usageIncrement > 0) {
+                        println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
+                    }
                 }
                 
-                // Update the usage times map
-                appUsageTimes = trackedApps.associate { it.name to (it.minutesUsed * 60L) }
+                sessionAppUsageTimes = updatedSessionUsage
                 
-                // Check if total usage has reached the limit
-                val totalUsage = trackedApps.sumOf { it.minutesUsed }
-                if (totalUsage >= timeLimitMinutes) {
+                // Check if session usage has reached the limit
+                val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
+                if (elapsedMinutes >= timeLimitMinutes) {
+                    // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
+                    finalizeSessionUsage()
                     isTracking = false
                     route = Route.Pause
                 }
@@ -228,13 +281,18 @@ private fun AppRoot() {
 
     // Function to set up default apps
     suspend fun setupDefaultApps() {
+        println("DEBUG: setupDefaultApps() called")
         isLoadingApps = true
         try {
             val installedApps = installedAppsProvider.getInstalledApps()
             println("DEBUG: Found ${installedApps.size} installed apps")
             
-            // Define default apps to track (same list as in AppSelection)
-            val defaultAppNames = listOf("Instagram", "TikTok", "Snapchat", "Chrome", "YouTube")
+            // Define default apps to track - social media, YouTube, and Chrome
+            val defaultAppNames = listOf(
+                "Instagram", "TikTok", "Snapchat", "Facebook", "Twitter", "Reddit", 
+                "Pinterest", "LinkedIn", "Discord", "Telegram", "WhatsApp",
+                "YouTube", "Chrome"
+            )
             
             // Filter to only include installed default apps
             val defaultTrackedApps = installedApps
@@ -243,6 +301,11 @@ private fun AppRoot() {
                     defaultName.contains(app.appName, ignoreCase = true)
                 }}
                 .map { app -> TrackedApp(app.appName, 0, 15) } // 15 minutes default
+            
+            println("DEBUG: Found ${installedApps.size} total installed apps")
+            println("DEBUG: Installed apps: ${installedApps.map { it.appName }}")
+            println("DEBUG: Looking for: $defaultAppNames")
+            println("DEBUG: Matched ${defaultTrackedApps.size} default apps: ${defaultTrackedApps.map { it.name }}")
             
             trackedApps = defaultTrackedApps
             println("DEBUG: Set up ${trackedApps.size} default tracked apps")
@@ -263,16 +326,22 @@ private fun AppRoot() {
                 TrackedApp("Instagram", 0, 15),
                 TrackedApp("TikTok", 0, 15),
                 TrackedApp("Snapchat", 0, 15),
-                TrackedApp("Chrome", 0, 15),
-                TrackedApp("YouTube", 0, 15)
+                TrackedApp("Facebook", 0, 15),
+                TrackedApp("Twitter", 0, 15),
+                TrackedApp("Reddit", 0, 15),
+                TrackedApp("YouTube", 0, 15),
+                TrackedApp("Chrome", 0, 15)
             )
             // Persist fallback package identifiers so the choice survives restarts
             val fallbackPackages = listOf(
                 "com.instagram.android",
                 "com.zhiliaoapp.musically",
                 "com.snapchat.android",
-                "com.android.chrome",
-                "com.google.android.youtube"
+                "com.facebook.katana",
+                "com.twitter.android",
+                "com.reddit.frontpage",
+                "com.google.android.youtube",
+                "com.android.chrome"
             )
             try { storage.saveSelectedAppPackages(fallbackPackages) } catch (_: Exception) {}
         } finally {
@@ -355,6 +424,10 @@ private fun AppRoot() {
                     showNotificationDialog = true
                 }
                 
+                // Ensure we have tracked apps even if somehow we don't
+                if (trackedApps.isEmpty()) {
+                    setupDefaultApps()
+                }
                 route = Route.Dashboard
             } else {
                 // If onboarding is not completed, show onboarding
@@ -493,7 +566,14 @@ private fun AppRoot() {
             trackedApps = trackedApps,
             isTracking = isTracking,
             timeLimitMinutes = timeLimitMinutes,
+            sessionAppUsageTimes = sessionAppUsageTimes,
+            timesUnblockedToday = timesUnblockedToday,
+            sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = {
+                if (isTracking) {
+                    // Pausing tracking: merge this session into lifetime first
+                    finalizeSessionUsage()
+                }
                 isTracking = !isTracking
             },
             onOpenQrGenerator = { route = Route.QrGenerator },
@@ -509,9 +589,7 @@ private fun AppRoot() {
                     }
                 }
             },
-            onOpenPause = {
-                route = Route.Pause
-            },
+            onOpenPause = { route = Route.Pause },
             onOpenDurationSetting = { route = Route.DurationSetting },
             onOpenSettings = { route = Route.Settings },
             onRemoveTrackedApp = { appName ->
@@ -595,30 +673,42 @@ private fun AppRoot() {
                 coroutineScope.launch { storage.saveTimeLimitMinutes(it) }
             },
             onCompleteSetup = {
-                // Convert selected apps to tracked apps with the chosen time limit
+                // Check if we have selected apps from app selection flow
                 val selectedApps = availableApps.filter { it.isSelected }
-                trackedApps = selectedApps.map { app ->
-                    // Try to preserve existing usage data if app was already tracked
-                    val existingApp = trackedApps.find { it.name == app.name }
-                    TrackedApp(
-                        name = app.name,
-                        minutesUsed = existingApp?.minutesUsed ?: 0,
-                        limitMinutes = timeLimitMinutes
-                    )
-                }
-                // Ensure persisted values are saved
-                coroutineScope.launch {
-                    storage.saveSelectedAppPackages(selectedApps.map { it.packageName })
-                    storage.saveTimeLimitMinutes(timeLimitMinutes)
+                if (selectedApps.isNotEmpty()) {
+                    // Coming from app selection flow - create new tracked apps
+                    trackedApps = selectedApps.map { app ->
+                        // Try to preserve existing usage data if app was already tracked
+                        val existingApp = trackedApps.find { it.name == app.name }
+                        TrackedApp(
+                            name = app.name,
+                            minutesUsed = existingApp?.minutesUsed ?: 0,
+                            limitMinutes = timeLimitMinutes
+                        )
+                    }
+                    // Persist the new selection
+                    coroutineScope.launch {
+                        storage.saveSelectedAppPackages(selectedApps.map { it.packageName })
+                        storage.saveTimeLimitMinutes(timeLimitMinutes)
+                    }
+                } else {
+                    // Coming from dashboard - just update the time limit for existing tracked apps
+                    trackedApps = trackedApps.map { app ->
+                        app.copy(limitMinutes = timeLimitMinutes)
+                    }
+                    // Persist the time limit change
+                    coroutineScope.launch {
+                        storage.saveTimeLimitMinutes(timeLimitMinutes)
+                    }
                 }
                 route = Route.Dashboard
             },
             onBack = { route = Route.Dashboard }
         )
         Route.Pause -> {
-            val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
-            val hours = totalMinutesUsed / 60
-            val minutes = totalMinutesUsed % 60
+            val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
+            val hours = elapsedMinutes / 60
+            val minutes = elapsedMinutes % 60
             val durationText = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
             
             PauseScreen(
@@ -627,15 +717,36 @@ private fun AppRoot() {
                     coroutineScope.launch {
                         val ok = scanQrAndDismiss(qrMessage)
                         if (ok) {
-                            // Reset tracking state
+                            // Reset session tracking state and increment unblocked counter
                             isTracking = false
-                            trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
-                            appUsageTimes = emptyMap()
+                            sessionAppUsageTimes = emptyMap()
+                            sessionStartTime = 0L
+                            sessionElapsedSeconds = 0L
+                            timesUnblockedToday += 1
                             route = Route.Dashboard
                         }
                     }
                 },
-                onClose = { route = Route.Dashboard }
+                onClose = { 
+                    println("DEBUG: PauseScreen onClose called")
+                    println("DEBUG: trackedApps before finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+                    println("DEBUG: sessionAppUsageTimes before finalize: $sessionAppUsageTimes")
+                    
+                    // Finalize session usage before resetting (same as QR code)
+                    finalizeSessionUsage()
+                    
+                    println("DEBUG: trackedApps after finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+                    
+                    // Reset session tracking state and increment unblocked counter when dismissing
+                    isTracking = false
+                    sessionAppUsageTimes = emptyMap()
+                    sessionStartTime = 0L
+                    sessionElapsedSeconds = 0L
+                    timesUnblockedToday += 1
+                    
+                    println("DEBUG: trackedApps after reset: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+                    route = Route.Dashboard 
+                }
             )
         }
     }
@@ -785,6 +896,9 @@ private fun DashboardScreen(
     trackedApps: List<TrackedApp>,
     isTracking: Boolean,
     timeLimitMinutes: Int,
+    sessionAppUsageTimes: Map<String, Long>,
+    timesUnblockedToday: Int,
+    sessionElapsedSeconds: Long,
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
@@ -801,6 +915,9 @@ private fun DashboardScreen(
         trackedApps = trackedApps,
         isTracking = isTracking,
         timeLimitMinutes = timeLimitMinutes,
+        sessionAppUsageTimes = sessionAppUsageTimes,
+        timesUnblockedToday = timesUnblockedToday,
+        sessionElapsedSeconds = sessionElapsedSeconds,
         onToggleTracking = onToggleTracking,
         onOpenQrGenerator = onOpenQrGenerator,
         onOpenAppSelection = onOpenAppSelection,
@@ -1422,6 +1539,9 @@ private fun DashboardContent(
     trackedApps: List<TrackedApp>,
     isTracking: Boolean,
     timeLimitMinutes: Int,
+    sessionAppUsageTimes: Map<String, Long>,
+    timesUnblockedToday: Int,
+    sessionElapsedSeconds: Long,
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
@@ -1527,9 +1647,9 @@ private fun DashboardContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.align(Alignment.Center)
                     ) {
-                        // Calculate total usage across all tracked apps
-                        val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
-                        val remaining = (timeLimitMinutes - totalMinutesUsed).coerceAtLeast(0)
+                        // Calculate remaining time from elapsed session time
+                        val totalSessionMinutesUsed = (sessionElapsedSeconds / 60L).toInt()
+                        val remaining = (timeLimitMinutes - totalSessionMinutesUsed).coerceAtLeast(0)
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1553,13 +1673,13 @@ private fun DashboardContent(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("0", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA4C19A))
+                        Text("${timesUnblockedToday}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA4C19A))
                         Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
-                        val hours = totalMinutesUsed / 60
-                        val minutes = totalMinutesUsed % 60
+                        val totalLifetimeMinutesUsed = trackedApps.sumOf { it.minutesUsed }
+                        val hours = totalLifetimeMinutesUsed / 60
+                        val minutes = totalLifetimeMinutesUsed % 60
                         Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
