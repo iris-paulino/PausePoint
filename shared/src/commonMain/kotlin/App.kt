@@ -126,22 +126,102 @@ private fun AppRoot() {
     val coroutineScope = rememberCoroutineScope()
     
     var isTracking by remember { mutableStateOf(false) }
-    var elapsedSeconds by remember { mutableStateOf(0) }
+    var trackingStartTime by remember { mutableStateOf(0L) }
+    var appUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
 
-    // Drive a simple combined-usage timer while tracking is active
+    // Track individual app usage when tracking is active
     LaunchedEffect(isTracking) {
-        if (!isTracking) return@LaunchedEffect
-        while (isTracking) {
-            delay(1000)
-            elapsedSeconds += 1
-            val minutes = (elapsedSeconds / 60)
-            // Update tracked apps' minutesUsed with combined usage
-            trackedApps = trackedApps.map { it.copy(minutesUsed = minutes.coerceAtMost(it.limitMinutes)) }
-            // If limit reached for combined usage, show Pause and stop tracking
-            if (minutes >= timeLimitMinutes) {
-                isTracking = false
-                // Navigate to Pause screen
-                route = Route.Pause
+        if (isTracking) {
+            trackingStartTime = getCurrentTimeMillis()
+            
+            // Save tracking state and start time to storage
+            coroutineScope.launch {
+                storage.saveTrackingState(true)
+                storage.saveTrackingStartTime(trackingStartTime)
+            }
+            
+            // Start platform-specific usage tracking
+            val trackedPackages = trackedApps.map { app ->
+                // Map app names to package names - this is a simplified mapping
+                // In a real implementation, you'd have proper package name mapping
+                when (app.name.lowercase()) {
+                    "instagram" -> "com.instagram.android"
+                    "tiktok" -> "com.zhiliaoapp.musically"
+                    "facebook" -> "com.facebook.katana"
+                    "snapchat" -> "com.snapchat.android"
+                    "youtube" -> "com.google.android.youtube"
+                    "twitter" -> "com.twitter.android"
+                    "reddit" -> "com.reddit.frontpage"
+                    "linkedin" -> "com.linkedin.android"
+                    "whatsapp" -> "com.whatsapp"
+                    "spotify" -> "com.spotify.music"
+                    "netflix" -> "com.netflix.mediaclient"
+                    "discord" -> "com.discord"
+                    "telegram" -> "org.telegram.messenger"
+                    "chrome" -> "com.android.chrome"
+                    else -> app.name.lowercase().replace(" ", "")
+                }
+            }
+            
+            startUsageTracking(
+                trackedPackages = trackedPackages,
+                limitMinutes = timeLimitMinutes,
+                onLimitReached = {
+                    isTracking = false
+                    route = Route.Pause
+                }
+            )
+        } else {
+            // Stop tracking and save final state
+            if (trackingStartTime > 0) {
+                // Save updated usage times and tracking state to storage
+                coroutineScope.launch {
+                    storage.saveAppUsageTimes(appUsageTimes)
+                    storage.saveTrackingState(false)
+                }
+            }
+        }
+    }
+
+    // Real-time tracking update while tracking is active
+    LaunchedEffect(isTracking, trackingStartTime) {
+        if (isTracking && trackingStartTime > 0) {
+            while (isTracking) {
+                delay(1000) // Update every second
+                
+                // Simulate app usage detection
+                // In a real implementation, this would query the platform's usage stats
+                val currentTime = getCurrentTimeMillis()
+                val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
+                
+                // Simulate realistic app usage patterns
+                // This simulates that different apps are being used at different times
+                trackedApps = trackedApps.mapIndexed { index, app ->
+                    val currentUsage = appUsageTimes[app.name] ?: 0L
+                    
+                    // Simulate usage patterns:
+                    // - Apps get used in cycles (simulating user switching between apps)
+                    // - Each app gets usage time every few seconds
+                    val cycleTime = sessionDuration % 10 // 10-second cycles
+                    val appCycle = (sessionDuration + index) % 10
+                    
+                    // App gets usage if it's "active" in this cycle
+                    val usageIncrement = if (cycleTime == appCycle && sessionDuration > 0) 1L else 0L
+                    val newUsage = currentUsage + usageIncrement
+                    val newMinutesUsed = (newUsage / 60).toInt().coerceAtMost(app.limitMinutes)
+                    
+                    app.copy(minutesUsed = newMinutesUsed)
+                }
+                
+                // Update the usage times map
+                appUsageTimes = trackedApps.associate { it.name to (it.minutesUsed * 60L) }
+                
+                // Check if total usage has reached the limit
+                val totalUsage = trackedApps.sumOf { it.minutesUsed }
+                if (totalUsage >= timeLimitMinutes) {
+                    isTracking = false
+                    route = Route.Pause
+                }
             }
         }
     }
@@ -207,6 +287,36 @@ private fun AppRoot() {
             val isOnboardingCompleted = withTimeoutOrNull(5000) {
                 storage.isOnboardingCompleted()
             } ?: false // Default to false if timeout occurs
+            
+            // Restore tracking state and app usage data
+            val savedTrackingState = withTimeoutOrNull(3000) { storage.getTrackingState() } ?: false
+            val savedAppUsageTimes = withTimeoutOrNull(3000) { storage.getAppUsageTimes() } ?: emptyMap()
+            val savedTrackingStartTime = withTimeoutOrNull(3000) { storage.getTrackingStartTime() } ?: 0L
+            
+            // Restore tracking state
+            isTracking = savedTrackingState
+            appUsageTimes = savedAppUsageTimes
+            trackingStartTime = savedTrackingStartTime
+            
+            // If tracking was active when app was closed, calculate elapsed time and update app usage
+            if (savedTrackingState && savedTrackingStartTime > 0) {
+                val currentTime = getCurrentTimeMillis()
+                val elapsedTime = (currentTime - savedTrackingStartTime) / 1000 // in seconds
+                
+                // Update tracked apps with elapsed time
+                trackedApps = trackedApps.map { app ->
+                    val currentUsage = savedAppUsageTimes[app.name] ?: 0L
+                    val newUsage = currentUsage + elapsedTime
+                    val newMinutesUsed = (newUsage / 60).toInt().coerceAtMost(app.limitMinutes)
+                    app.copy(minutesUsed = newMinutesUsed)
+                }
+                
+                // Update the usage times map
+                appUsageTimes = trackedApps.associate { it.name to (it.minutesUsed * 60L) }
+                
+                // Save updated usage times
+                storage.saveAppUsageTimes(appUsageTimes)
+            }
             
             if (isOnboardingCompleted) {
                 // Load persisted selections and time limit
@@ -505,17 +615,29 @@ private fun AppRoot() {
             },
             onBack = { route = Route.Dashboard }
         )
-        Route.Pause -> PauseScreen(
-            appName = trackedApps.firstOrNull()?.name ?: "Instagram",
-            durationText = "1h 15m",
-            onScanQr = {
-                coroutineScope.launch {
-                    val ok = scanQrAndDismiss(qrMessage)
-                    if (ok) route = Route.Dashboard
-                }
-            },
-            onClose = { route = Route.Dashboard }
-        )
+        Route.Pause -> {
+            val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
+            val hours = totalMinutesUsed / 60
+            val minutes = totalMinutesUsed % 60
+            val durationText = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+            
+            PauseScreen(
+                durationText = durationText,
+                onScanQr = {
+                    coroutineScope.launch {
+                        val ok = scanQrAndDismiss(qrMessage)
+                        if (ok) {
+                            // Reset tracking state
+                            isTracking = false
+                            trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
+                            appUsageTimes = emptyMap()
+                            route = Route.Dashboard
+                        }
+                    }
+                },
+                onClose = { route = Route.Dashboard }
+            )
+        }
     }
     
     // Notification Permission Dialog
@@ -1405,8 +1527,9 @@ private fun DashboardContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.align(Alignment.Center)
                     ) {
-                        val minutesUsed = trackedApps.maxOfOrNull { it.minutesUsed } ?: 0
-                        val remaining = (timeLimitMinutes - minutesUsed).coerceAtLeast(0)
+                        // Calculate total usage across all tracked apps
+                        val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
+                        val remaining = (timeLimitMinutes - totalMinutesUsed).coerceAtLeast(0)
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1434,7 +1557,10 @@ private fun DashboardContent(
                         Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("0h 0m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
+                        val totalMinutesUsed = trackedApps.sumOf { it.minutesUsed }
+                        val hours = totalMinutesUsed / 60
+                        val minutes = totalMinutesUsed % 60
+                        Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
@@ -1589,7 +1715,7 @@ private fun DashboardContent(
                         ) {
                             Text(app.name, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("0m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                                Text("${app.minutesUsed}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     "🗑",
@@ -2007,7 +2133,6 @@ private fun SavedQrCodesScreen(
 
 @Composable
 private fun PauseScreen(
-    appName: String,
     durationText: String,
     onScanQr: () -> Unit,
     onClose: () -> Unit
@@ -2048,11 +2173,10 @@ private fun PauseScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(Modifier.height(16.dp))
-                    Row {
-                        Text("You've used ", color = Color(0xFFD1D5DB))
-                        Text(appName, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(" for", color = Color(0xFFD1D5DB))
-                    }
+                    Text(
+                        text = "You have used your tracked apps for",
+                        color = Color(0xFFD1D5DB)
+                    )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = durationText,
