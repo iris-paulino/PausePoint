@@ -419,7 +419,7 @@ private fun AppRoot() {
                 }
                 
                 // Check if notifications are disabled and show permission dialog
-                val notificationsEnabled = withTimeoutOrNull(3000) { storage.getNotificationsEnabled() } ?: true
+                val notificationsEnabled = withTimeoutOrNull(3000) { storage.getNotificationsEnabled() } ?: false
                 if (!notificationsEnabled) {
                     showNotificationDialog = true
                 }
@@ -522,6 +522,16 @@ private fun AppRoot() {
         }
     }
 
+    // Whenever we navigate to Dashboard, show the notification enable dialog if notifications are off
+    LaunchedEffect(route) {
+        if (route == Route.Dashboard) {
+            val enabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
+            if (!enabled) {
+                showNotificationDialog = true
+            }
+        }
+    }
+
     when (route) {
         null -> {
             // Show loading state while checking onboarding status
@@ -616,7 +626,11 @@ private fun AppRoot() {
         )
         Route.Settings -> SettingsScreen(
             onBack = { route = Route.Dashboard },
-            onOpenSavedQrCodes = { route = Route.SavedQrCodes }
+            onOpenSavedQrCodes = { route = Route.SavedQrCodes },
+            onNotificationsTurnedOff = {
+                showNotificationDialog = true
+                route = Route.Dashboard
+            }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
@@ -1917,7 +1931,8 @@ private fun DashboardContent(
 @Composable
 private fun SettingsScreen(
     onBack: () -> Unit,
-    onOpenSavedQrCodes: () -> Unit
+    onOpenSavedQrCodes: () -> Unit,
+    onNotificationsTurnedOff: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -1946,11 +1961,11 @@ private fun SettingsScreen(
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
-            var notificationsEnabled by remember { mutableStateOf(true) }
+            var notificationsEnabled by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 try {
                     notificationsEnabled = storage.getNotificationsEnabled()
-                } catch (_: Exception) { notificationsEnabled = true }
+                } catch (_: Exception) { notificationsEnabled = false }
             }
             Column(modifier = Modifier.padding(24.dp)) {
                 Row(
@@ -1966,6 +1981,9 @@ private fun SettingsScreen(
                             // Persist change
                             coroutineScope.launch {
                                 try { storage.saveNotificationsEnabled(enabled) } catch (_: Exception) {}
+                            }
+                            if (!enabled) {
+                                onNotificationsTurnedOff()
                             }
                         },
                         colors = SwitchDefaults.colors(
