@@ -136,8 +136,17 @@ actual fun startUsageTracking(
     limitMinutes: Int,
     onLimitReached: () -> Unit
 ) {
-    // TODO: Implement using UsageStatsManager/AccessibilityService. Placeholder timer.
-    // No-op in this sample.
+    // TODO: Implement using UsageStatsManager/AccessibilityService for real app usage tracking.
+    // For now, this is a placeholder that would need proper Android permissions and implementation.
+    // The actual tracking logic is handled in the common code with session-based timing.
+    println("DEBUG: Starting usage tracking for packages: $trackedPackages with limit: $limitMinutes minutes")
+    
+    // In a real implementation, you would:
+    // 1. Request USAGE_STATS permission
+    // 2. Use UsageStatsManager to query app usage
+    // 3. Monitor app foreground/background events
+    // 4. Calculate actual usage time per app
+    // 5. Call onLimitReached when limits are exceeded
 }
 
 actual fun showBlockingOverlay(message: String) {

@@ -50,6 +50,9 @@ actual fun startUsageTracking(
     onLimitReached: () -> Unit
 ) {
     // iOS background usage tracking is restricted; would require Screen Time APIs (not public).
+    // For now, this is a placeholder that would need proper iOS implementation.
+    // The actual tracking logic is handled in the common code with session-based timing.
+    println("DEBUG: Starting usage tracking for packages: $trackedPackages with limit: $limitMinutes minutes")
 }
 
 actual fun showBlockingOverlay(message: String) {
