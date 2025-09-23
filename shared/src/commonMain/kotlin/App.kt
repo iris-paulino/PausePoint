@@ -106,6 +106,7 @@ private fun AppRoot() {
     var qrId by remember { mutableStateOf<String?>(null) }
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showTimeRemainingInfoDialog by remember { mutableStateOf(false) }
+    var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
     var availableApps by remember { mutableStateOf<List<AvailableApp>>(emptyList()) }
@@ -580,11 +581,25 @@ private fun AppRoot() {
             timesUnblockedToday = timesUnblockedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = {
-                if (isTracking) {
-                    // Pausing tracking: merge this session into lifetime first
-                    finalizeSessionUsage()
+                // Gate start tracking with notifications and tracked apps checks
+                coroutineScope.launch {
+                    val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
+                    if (!notificationsEnabled) {
+                        showNotificationDialog = true
+                        return@launch
+                    }
+
+                    if (trackedApps.isEmpty()) {
+                        showNoTrackedAppsDialog = true
+                        return@launch
+                    }
+
+                    if (isTracking) {
+                        // Pausing tracking: merge this session into lifetime first
+                        finalizeSessionUsage()
+                    }
+                    isTracking = !isTracking
                 }
-                isTracking = !isTracking
             },
             onOpenQrGenerator = { route = Route.QrGenerator },
             onOpenAppSelection = { route = Route.AppSelection },
@@ -809,7 +824,7 @@ private fun AppRoot() {
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Enable", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -818,7 +833,56 @@ private fun AppRoot() {
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Not Now", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
+
+    // No Tracked Apps Dialog
+    if (showNoTrackedAppsDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showNoTrackedAppsDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📱", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "No tracked apps",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Text(
+                    "You haven’t selected any apps to track yet. Choose which apps to track to start.",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNoTrackedAppsDialog = false
+                        route = Route.AppSelection
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Choose apps", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showNoTrackedAppsDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
