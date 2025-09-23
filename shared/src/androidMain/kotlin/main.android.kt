@@ -18,6 +18,9 @@ import java.io.File
 import java.io.FileOutputStream
 import android.app.Activity
 import android.content.Intent
+import android.provider.Settings
+import android.text.TextUtils
+import android.content.ComponentName
 import java.lang.ref.WeakReference
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -185,4 +188,33 @@ fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
 
 actual fun getCurrentTimeMillis(): Long {
     return System.currentTimeMillis()
+}
+
+actual fun openAccessibilitySettings() {
+    val activity = currentActivityRef?.get() ?: return
+    try {
+        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+        activity.startActivity(intent)
+    } catch (_: Exception) {
+    }
+}
+
+actual fun isAccessibilityServiceEnabled(): Boolean {
+    val activity = currentActivityRef?.get() ?: return false
+    val pkg = activity.packageName
+    val expected = ComponentName(pkg, "$pkg.ForegroundAppAccessibilityService")
+    val enabledServices = Settings.Secure.getString(activity.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
+    if (enabledServices.isNullOrEmpty()) return false
+    val colonSplitter = TextUtils.SimpleStringSplitter(':')
+    colonSplitter.setString(enabledServices)
+    while (colonSplitter.hasNext()) {
+        val componentName = colonSplitter.next()
+        if (componentName.equals(expected.flattenToString(), ignoreCase = true) ||
+            componentName.endsWith("/ForegroundAppAccessibilityService", ignoreCase = true) ||
+            componentName.contains(pkg, ignoreCase = true) && componentName.contains("ForegroundAppAccessibilityService", ignoreCase = true)
+        ) {
+            return true
+        }
+    }
+    return false
 }

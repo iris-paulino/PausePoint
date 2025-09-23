@@ -85,6 +85,14 @@ fun App() {
 // Simple navigation and app state holder
 private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes }
 
+// Disable simulated app usage increments; rely on platform-specific tracking instead
+private const val ENABLE_USAGE_SIMULATION: Boolean = false
+
+// Platform hook to open Accessibility settings (Android) or no-op elsewhere
+expect fun openAccessibilitySettings()
+// Platform check for whether our AccessibilityService is enabled
+expect fun isAccessibilityServiceEnabled(): Boolean
+
 private data class TrackedApp(
     val name: String,
     val minutesUsed: Int,
@@ -109,7 +117,9 @@ private fun AppRoot() {
     var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
     var showNoQrCodeDialog by remember { mutableStateOf(false) }
     var showUsageAccessDialog by remember { mutableStateOf(false) }
-    var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
+    var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
+    var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
+    var showAccessibilityConsentDialog by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
@@ -119,6 +129,7 @@ private fun AppRoot() {
     var timeLimitMinutes by remember { mutableStateOf(15) }
     
     val storage = remember { createAppStorage() }
+    fun currentEpochDayUtc(): Long = getCurrentTimeMillis() / 86_400_000L
     val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
     
@@ -167,10 +178,11 @@ private fun AppRoot() {
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
         
-        // Save the updated usage data to storage
+        // Save the updated usage data to storage and set epoch day
         coroutineScope.launch {
             try {
                 storage.saveAppUsageTimes(appUsageTimes)
+                storage.saveUsageDayEpoch(currentEpochDayUtc())
                 println("DEBUG: Saved appUsageTimes to storage: $appUsageTimes")
             } catch (e: Exception) {
                 println("DEBUG: Failed to save appUsageTimes: ${e.message}")
@@ -238,44 +250,62 @@ private fun AppRoot() {
         if (isTracking && trackingStartTime > 0) {
             while (isTracking) {
                 delay(1000) // Update every second
-                
+
+                // If Pause screen is active, do not accrue usage for any apps
+                if (route == Route.Pause) {
+                    continue
+                }
+
                 // Update session elapsed time from start
                 if (sessionStartTime > 0L) {
                     sessionElapsedSeconds = (getCurrentTimeMillis() - sessionStartTime) / 1000L
                 }
                 
-                // Simulate app usage detection
-                // In a real implementation, this would query the platform's usage stats
-                val currentTime = getCurrentTimeMillis()
-                val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
-                
-                // Simulate individual app usage patterns
-                // For testing purposes, simulate that Chrome is being used continuously
-                val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
-                
-                trackedApps.forEach { app ->
-                    val currentSessionUsage = updatedSessionUsage[app.name] ?: 0L
-                    
-                    // For testing: Chrome gets continuous usage, others get minimal usage
-                    val shouldGetUsage = when (app.name.lowercase()) {
-                        "chrome" -> true  // Chrome gets continuous usage for testing
-                        "youtube" -> sessionDuration % 20 < 5  // YouTube gets usage 25% of the time
-                        else -> sessionDuration % 30 < 3  // Other apps get minimal usage
-                    }
-                    
-                    val usageIncrement = if (shouldGetUsage && sessionDuration > 0) 1L else 0L
-                    updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
-                    
-                    if (usageIncrement > 0) {
-                        println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
-                    }
-                }
-                
-                sessionAppUsageTimes = updatedSessionUsage
-                
-                // Check if session usage has reached the limit
+                // If elapsed minutes reached limit, pause regardless of per-app accrual
                 val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
                 if (elapsedMinutes >= timeLimitMinutes) {
+                    finalizeSessionUsage()
+                    isTracking = false
+                    route = Route.Pause
+                    continue
+                }
+
+                // If Accessibility is not enabled, fall back to simulation to keep UI responsive
+                if (!isAccessibilityServiceEnabled() || ENABLE_USAGE_SIMULATION) {
+                    // Simulate app usage detection
+                    // In a real implementation, this would query the platform's usage stats
+                    val currentTime = getCurrentTimeMillis()
+                    val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
+                    
+                    // Simulate individual app usage patterns
+                    // For testing purposes, simulate that Chrome is being used continuously
+                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                    
+                    trackedApps.forEach { app ->
+                        val currentSessionUsage = updatedSessionUsage[app.name] ?: 0L
+                        
+                        // For testing: Chrome gets continuous usage, others get minimal usage
+                        val shouldGetUsage = when (app.name.lowercase()) {
+                            "chrome" -> true
+                            "youtube" -> sessionDuration % 20 < 5
+                            else -> sessionDuration % 30 < 3
+                        }
+                        
+                        val usageIncrement = if (shouldGetUsage && sessionDuration > 0) 1L else 0L
+                        updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
+                        
+                        if (usageIncrement > 0) {
+                            println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
+                        }
+                    }
+                    
+                    sessionAppUsageTimes = updatedSessionUsage
+                }
+                
+                // Check if session usage has reached the limit based on actual accumulated session usage
+                val totalSessionSeconds = sessionAppUsageTimes.values.sum()
+                val usedMinutes = (totalSessionSeconds / 60L).toInt()
+                if (usedMinutes >= timeLimitMinutes) {
                     // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
                     finalizeSessionUsage()
                     isTracking = false
@@ -367,31 +397,30 @@ private fun AppRoot() {
             val savedTrackingState = withTimeoutOrNull(3000) { storage.getTrackingState() } ?: false
             val savedAppUsageTimes = withTimeoutOrNull(3000) { storage.getAppUsageTimes() } ?: emptyMap()
             val savedTrackingStartTime = withTimeoutOrNull(3000) { storage.getTrackingStartTime() } ?: 0L
+            val savedUsageDay = withTimeoutOrNull(3000) { storage.getUsageDayEpoch() } ?: 0L
+            val todayEpochDay = currentEpochDayUtc()
             
             // Restore tracking state
             isTracking = savedTrackingState
             appUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
-            
-            // If tracking was active when app was closed, calculate elapsed time and update app usage
-            if (savedTrackingState && savedTrackingStartTime > 0) {
-                val currentTime = getCurrentTimeMillis()
-                val elapsedTime = (currentTime - savedTrackingStartTime) / 1000 // in seconds
-                
-                // Update tracked apps with elapsed time
-                trackedApps = trackedApps.map { app ->
-                    val currentUsage = savedAppUsageTimes[app.name] ?: 0L
-                    val newUsage = currentUsage + elapsedTime
-                    val newMinutesUsed = (newUsage / 60).toInt().coerceAtMost(app.limitMinutes)
-                    app.copy(minutesUsed = newMinutesUsed)
+
+            // Daily reset if needed
+            if (savedUsageDay == 0L) {
+                // First run: set today as the usage day
+                withTimeoutOrNull(2000) { storage.saveUsageDayEpoch(todayEpochDay) }
+            } else if (savedUsageDay != todayEpochDay) {
+                // New day: reset today's counters
+                trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
+                appUsageTimes = emptyMap()
+                timesUnblockedToday = 0
+                withTimeoutOrNull(2000) {
+                    storage.saveAppUsageTimes(appUsageTimes)
+                    storage.saveUsageDayEpoch(todayEpochDay)
                 }
-                
-                // Update the usage times map
-                appUsageTimes = trackedApps.associate { it.name to (it.minutesUsed * 60L) }
-                
-                // Save updated usage times
-                storage.saveAppUsageTimes(appUsageTimes)
             }
+            
+            // Do not add background elapsed time to usage; only count active foreground session increments
             
             if (isOnboardingCompleted) {
                 // Load persisted selections and time limit
@@ -404,6 +433,12 @@ private fun AppRoot() {
                         val installed = installedAppsProvider.getInstalledApps()
                         val selected = installed.filter { it.packageName in savedPackages.toSet() }
                         trackedApps = selected.map { TrackedApp(it.appName, 0, timeLimitMinutes) }
+                        // Rehydrate minutes used for today from persisted seconds
+                        trackedApps = trackedApps.map { app ->
+                            val seconds = appUsageTimes[app.name] ?: 0L
+                            val minutes = (seconds / 60L).toInt().coerceAtMost(app.limitMinutes)
+                            app.copy(minutesUsed = minutes)
+                        }
                         // Pre-populate available apps to reflect saved selection when opening selection screen later
                         availableApps = installed.map { installedApp ->
                             val selectedSet = savedPackages.toSet()
@@ -422,6 +457,12 @@ private fun AppRoot() {
                 } else {
                     // No saved selection: set up defaults
                     setupDefaultApps()
+                    // Rehydrate minutes used for today from persisted seconds
+                    trackedApps = trackedApps.map { app ->
+                        val seconds = appUsageTimes[app.name] ?: 0L
+                        val minutes = (seconds / 60L).toInt().coerceAtMost(app.limitMinutes)
+                        app.copy(minutesUsed = minutes)
+                    }
                 }
                 
                 // Check if notifications are disabled and show permission dialog
@@ -544,11 +585,11 @@ private fun AppRoot() {
     }
 
     // Sequentially handle Start Tracking prerequisites
-    LaunchedEffect(pendingStartTracking, showNotificationDialog, showUsageAccessDialog, showNoQrCodeDialog, showNoTrackedAppsDialog) {
+    LaunchedEffect(pendingStartTracking, showNotificationDialog, showUsageAccessDialog, showNoQrCodeDialog, showNoTrackedAppsDialog, showAccessibilityConsentDialog) {
         if (!pendingStartTracking) return@LaunchedEffect
 
         // If any dialog is currently open, wait until user acts
-        if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog) return@LaunchedEffect
+        if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog || showAccessibilityConsentDialog) return@LaunchedEffect
 
         // 1) Notifications
         val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
@@ -578,6 +619,12 @@ private fun AppRoot() {
         // Also ensure there are tracked apps
         if (trackedApps.isEmpty()) {
             showNoTrackedAppsDialog = true
+            return@LaunchedEffect
+        }
+
+        // 4) Accessibility consent (for foreground detection on Android)
+        if (!isAccessibilityServiceEnabled()) {
+            showAccessibilityConsentDialog = true
             return@LaunchedEffect
         }
 
@@ -947,6 +994,89 @@ private fun AppRoot() {
             backgroundColor = Color(0xFF1A1A1A),
             contentColor = Color.White
         )
+    }
+
+    // Accessibility Consent Dialog (shown at end of Start Tracking flow)
+    if (showAccessibilityConsentDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("🧩", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Enable Accessibility?",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "We use Accessibility to detect which app is in the foreground for accurate tracking.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "You can turn this off anytime in Settings.",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        openAccessibilitySettings()
+                        // Keep dialog state; a watcher below will auto-dismiss when enabled
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF8CA6D1)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold) }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { 
+                        showAccessibilityConsentDialog = false
+                        // Proceed without Accessibility
+                        if (pendingStartTracking) {
+                            // Toggle tracking now
+                            if (isTracking) { finalizeSessionUsage() }
+                            isTracking = !isTracking
+                            pendingStartTracking = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Not now", color = Color.White, fontWeight = FontWeight.Bold) }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
+
+    // When accessibility consent dialog is visible, poll for enablement and auto-continue
+    LaunchedEffect(showAccessibilityConsentDialog) {
+        if (showAccessibilityConsentDialog) {
+            repeat(40) { // up to ~20 seconds
+                if (isAccessibilityServiceEnabled()) {
+                    showAccessibilityConsentDialog = false
+                    if (pendingStartTracking) {
+                        // Resume Start Tracking flow
+                        if (isTracking) { finalizeSessionUsage() }
+                        isTracking = !isTracking
+                        pendingStartTracking = false
+                    }
+                    return@LaunchedEffect
+                }
+                delay(500)
+            }
+        }
     }
 
     // No Tracked Apps Dialog
@@ -1921,9 +2051,12 @@ private fun DashboardContent(
                         Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val totalLifetimeMinutesUsed = trackedApps.sumOf { it.minutesUsed }
-                        val hours = totalLifetimeMinutesUsed / 60
-                        val minutes = totalLifetimeMinutesUsed % 60
+                        val totalTodayMinutesUsed = trackedApps.sumOf { app ->
+                            val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
+                            app.minutesUsed + sessionMinutes
+                        }
+                        val hours = totalTodayMinutesUsed / 60
+                        val minutes = totalTodayMinutesUsed % 60
                         Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
@@ -2079,7 +2212,8 @@ private fun DashboardContent(
                         ) {
                             Text(app.name, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("${app.minutesUsed}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                                val liveMinutes = app.minutesUsed + (((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt())
+                                Text("${liveMinutes}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     "🗑",
