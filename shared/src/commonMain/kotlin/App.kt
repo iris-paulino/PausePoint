@@ -107,6 +107,11 @@ private fun AppRoot() {
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showTimeRemainingInfoDialog by remember { mutableStateOf(false) }
     var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
+    var showNoQrCodeDialog by remember { mutableStateOf(false) }
+    var showUsageAccessDialog by remember { mutableStateOf(false) }
+    var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
+    var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
+    var pendingStartTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
     var availableApps by remember { mutableStateOf<List<AvailableApp>>(emptyList()) }
@@ -523,14 +528,61 @@ private fun AppRoot() {
         }
     }
 
-    // Whenever we navigate to Dashboard, show the notification enable dialog if notifications are off
+    // Whenever we navigate to Dashboard, show the permission dialogs once per launch if disabled
     LaunchedEffect(route) {
         if (route == Route.Dashboard) {
             val enabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-            if (!enabled) {
+            if (!enabled && !hasShownNotificationsPromptThisLaunch) {
                 showNotificationDialog = true
+                hasShownNotificationsPromptThisLaunch = true
+            }
+            val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+            if (!usageAllowed && !hasShownUsageAccessPromptThisLaunch) {
+                showUsageAccessDialog = true
+                hasShownUsageAccessPromptThisLaunch = true
             }
         }
+    }
+
+    // Sequentially handle Start Tracking prerequisites
+    LaunchedEffect(pendingStartTracking, showNotificationDialog, showUsageAccessDialog, showNoQrCodeDialog, showNoTrackedAppsDialog) {
+        if (!pendingStartTracking) return@LaunchedEffect
+
+        // If any dialog is currently open, wait until user acts
+        if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog) return@LaunchedEffect
+
+        // 1) Notifications
+        val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
+        if (!notificationsEnabled) {
+            showNotificationDialog = true
+            return@LaunchedEffect
+        }
+
+        // 2) Usage access
+        val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+        if (!usageAllowed) {
+            showUsageAccessDialog = true
+            return@LaunchedEffect
+        }
+
+        // 3) QR code
+        if (qrId.isNullOrBlank()) {
+            showNoQrCodeDialog = true
+            return@LaunchedEffect
+        }
+
+        // Also ensure there are tracked apps
+        if (trackedApps.isEmpty()) {
+            showNoTrackedAppsDialog = true
+            return@LaunchedEffect
+        }
+
+        // All checks passed: toggle tracking
+        if (isTracking) {
+            finalizeSessionUsage()
+        }
+        isTracking = !isTracking
+        pendingStartTracking = false
     }
 
     when (route) {
@@ -580,27 +632,7 @@ private fun AppRoot() {
             sessionAppUsageTimes = sessionAppUsageTimes,
             timesUnblockedToday = timesUnblockedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
-            onToggleTracking = {
-                // Gate start tracking with notifications and tracked apps checks
-                coroutineScope.launch {
-                    val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-                    if (!notificationsEnabled) {
-                        showNotificationDialog = true
-                        return@launch
-                    }
-
-                    if (trackedApps.isEmpty()) {
-                        showNoTrackedAppsDialog = true
-                        return@launch
-                    }
-
-                    if (isTracking) {
-                        // Pausing tracking: merge this session into lifetime first
-                        finalizeSessionUsage()
-                    }
-                    isTracking = !isTracking
-                }
-            },
+            onToggleTracking = { pendingStartTracking = true },
             onOpenQrGenerator = { route = Route.QrGenerator },
             onOpenAppSelection = { route = Route.AppSelection },
             onScanQrCode = {
@@ -642,10 +674,7 @@ private fun AppRoot() {
         Route.Settings -> SettingsScreen(
             onBack = { route = Route.Dashboard },
             onOpenSavedQrCodes = { route = Route.SavedQrCodes },
-            onNotificationsTurnedOff = {
-                showNotificationDialog = true
-                route = Route.Dashboard
-            }
+            onNotificationsTurnedOff = { }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
@@ -783,7 +812,7 @@ private fun AppRoot() {
     // Notification Permission Dialog
     if (showNotificationDialog) {
         androidx.compose.material.AlertDialog(
-            onDismissRequest = { showNotificationDialog = false },
+            onDismissRequest = { showNotificationDialog = false; pendingStartTracking = false },
             title = {
                 Row(
                     verticalAlignment = Alignment.CenterVertically
@@ -820,6 +849,10 @@ private fun AppRoot() {
                             try { storage.saveNotificationsEnabled(true) } catch (_: Exception) {}
                         }
                         showNotificationDialog = false 
+                        if (pendingStartTracking) {
+                            // Continue Start Tracking flow
+                            pendingStartTracking = true
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
                     shape = RoundedCornerShape(8.dp)
@@ -829,7 +862,72 @@ private fun AppRoot() {
             },
             dismissButton = {
                 Button(
-                    onClick = { showNotificationDialog = false },
+                    onClick = { showNotificationDialog = false; pendingStartTracking = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
+
+    // Usage Access Permission Dialog
+    if (showUsageAccessDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showUsageAccessDialog = false; pendingStartTracking = false },
+            title = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("📈", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "Allow App Usage Access?",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "We need permission to read your app usage so tracking works.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "You can change this anytime in Settings.",
+                        color = Color(0xFFD1D5DB),
+                        fontSize = 12.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            try { storage.saveUsageAccessAllowed(true) } catch (_: Exception) {}
+                        }
+                        showUsageAccessDialog = false
+                        if (pendingStartTracking) {
+                            // Continue Start Tracking flow
+                            pendingStartTracking = true
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showUsageAccessDialog = false; pendingStartTracking = false },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -879,6 +977,59 @@ private fun AppRoot() {
             dismissButton = {
                 Button(
                     onClick = { showNoTrackedAppsDialog = false },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
+
+    // No QR Code Dialog
+    if (showNoQrCodeDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { showNoQrCodeDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🧾", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        "QR code required",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
+            },
+            text = {
+                Text(
+                    "You need a QR code to track your apps. Generate one to get started.",
+                    color = Color.White,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showNoQrCodeDialog = false
+                        pendingStartTracking = false
+                        route = Route.QrGenerator
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Create QR code", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { 
+                        showNoQrCodeDialog = false 
+                        pendingStartTracking = false
+                    },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
@@ -1399,7 +1550,7 @@ private fun QrGeneratorContent(
             Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
             Spacer(Modifier.width(8.dp))
             Text(
-                if (downloadSuccess) "Go to Dashboard" else "Download PDF for Printing", 
+                if (downloadSuccess) "Go to Dashboard" else "Save and Download PDF for printing", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
@@ -2046,9 +2197,8 @@ private fun SettingsScreen(
                             coroutineScope.launch {
                                 try { storage.saveNotificationsEnabled(enabled) } catch (_: Exception) {}
                             }
-                            if (!enabled) {
-                                onNotificationsTurnedOff()
-                            }
+                            // Do not trigger permission dialog here; prompts appear only
+                            // on app start, landing on Dashboard, or when starting tracking
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color(0xFF1A1A1A),
@@ -2063,23 +2213,51 @@ private fun SettingsScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
 
         Card(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
+            var usageAccessAllowed by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                try {
+                    usageAccessAllowed = storage.getUsageAccessAllowed()
+                } catch (_: Exception) { usageAccessAllowed = false }
+            }
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("App Behavior", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Allow App Usage Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = usageAccessAllowed,
+                        onCheckedChange = { enabled ->
+                            usageAccessAllowed = enabled
+                            // Persist change
+                            coroutineScope.launch {
+                                try { storage.saveUsageAccessAllowed(enabled) } catch (_: Exception) {}
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFFA4C19A),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
-                Text("Strict Mode — Make it harder to bypass time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-                Spacer(Modifier.height(4.dp))
-                Text("Show Usage Statistics — Display daily usage on dashboard", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Text("Permit the app to access your app usage to enable tracking.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+
+        Spacer(Modifier.height(8.dp))
 
         Card(
             modifier = Modifier
@@ -2095,33 +2273,7 @@ private fun SettingsScreen(
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("Appearance", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(Modifier.height(8.dp))
-                Text("Theme — Switch between light and dark mode", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("Danger Zone", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFF5252))
-                Spacer(Modifier.height(8.dp))
-                Text("Reset All Data — This cannot be undone", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
+        
     }
 }
 
