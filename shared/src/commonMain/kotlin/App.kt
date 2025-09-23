@@ -109,8 +109,7 @@ private fun AppRoot() {
     var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
     var showNoQrCodeDialog by remember { mutableStateOf(false) }
     var showUsageAccessDialog by remember { mutableStateOf(false) }
-    var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
-    var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
+    var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
@@ -528,19 +527,18 @@ private fun AppRoot() {
         }
     }
 
-    // Whenever we navigate to Dashboard, show the permission dialogs once per launch if disabled
+    // On first landing on Dashboard per app launch, prompt for disabled permissions
     LaunchedEffect(route) {
-        if (route == Route.Dashboard) {
+        if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
             val enabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-            if (!enabled && !hasShownNotificationsPromptThisLaunch) {
+            if (!enabled) {
                 showNotificationDialog = true
-                hasShownNotificationsPromptThisLaunch = true
             }
             val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-            if (!usageAllowed && !hasShownUsageAccessPromptThisLaunch) {
+            if (!usageAllowed) {
                 showUsageAccessDialog = true
-                hasShownUsageAccessPromptThisLaunch = true
             }
+            hasCheckedPermissionsOnDashboardThisLaunch = true
         }
     }
 
