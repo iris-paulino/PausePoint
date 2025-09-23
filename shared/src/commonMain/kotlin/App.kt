@@ -569,19 +569,18 @@ private fun AppRoot() {
         }
     }
 
-    // Whenever we navigate to Dashboard, show the permission dialogs once per launch if disabled
+    // On first landing on Dashboard per app launch, prompt for disabled permissions
     LaunchedEffect(route) {
-        if (route == Route.Dashboard) {
+        if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
             val enabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-            if (!enabled && !hasShownNotificationsPromptThisLaunch) {
+            if (!enabled) {
                 showNotificationDialog = true
-                hasShownNotificationsPromptThisLaunch = true
             }
             val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-            if (!usageAllowed && !hasShownUsageAccessPromptThisLaunch) {
+            if (!usageAllowed) {
                 showUsageAccessDialog = true
-                hasShownUsageAccessPromptThisLaunch = true
             }
+            hasCheckedPermissionsOnDashboardThisLaunch = true
         }
     }
 
