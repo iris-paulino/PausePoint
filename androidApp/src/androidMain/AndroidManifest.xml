@@ -3,6 +3,7 @@
 
     <!-- Permissions for querying installed applications -->
     <uses-permission android:name="android.permission.GET_TASKS" />
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
     <uses-permission android:name="android.permission.CAMERA" />
     
     <!-- Queries for specific app categories instead of QUERY_ALL_PACKAGES -->

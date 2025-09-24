@@ -170,37 +170,36 @@ private fun AppRoot() {
             return
         }
         
-        // Update trackedApps minutesUsed by adding session minutes
+        // Determine the single foreground app to credit: the one with the most session seconds
+        val topEntry = sessionAppUsageTimes.maxByOrNull { it.value }
+        if (topEntry == null) {
+            println("DEBUG: No topEntry found, returning without changes")
+            return
+        }
+        val topAppName = topEntry.key
+        val topSessionSeconds = topEntry.value
+        val topSessionMinutes = (topSessionSeconds / 60L).toInt()
+        println("DEBUG: Top foreground app this session: $topAppName with $topSessionSeconds sec (~$topSessionMinutes min)")
+        
+        // Update trackedApps minutesUsed ONLY for the top foreground app
         trackedApps = trackedApps.map { app ->
-            val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
-            val sessionMinutes = (sessionSeconds / 60L).toInt()
-            println("DEBUG: App ${app.name}: sessionSeconds=$sessionSeconds, sessionMinutes=$sessionMinutes, currentMinutes=${app.minutesUsed}")
-            // Always update the app, even if sessionMinutes is 0, to ensure consistency
-            app.copy(minutesUsed = app.minutesUsed + sessionMinutes)
+            if (app.name == topAppName && topSessionMinutes > 0) {
+                println("DEBUG: Crediting $topSessionMinutes min to $topAppName")
+                app.copy(minutesUsed = app.minutesUsed + topSessionMinutes)
+            } else {
+                app
+            }
         }
         
         println("DEBUG: trackedApps after: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
         
-        // Update lifetime seconds map as well
+        // Update lifetime seconds map ONLY for the top foreground app
         val updatedLifetimeSeconds = appUsageTimes.toMutableMap()
-        sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
-            val current = updatedLifetimeSeconds[appName] ?: 0L
-            updatedLifetimeSeconds[appName] = current + sessionSeconds
-        }
+        val current = updatedLifetimeSeconds[topAppName] ?: 0L
+        updatedLifetimeSeconds[topAppName] = current + topSessionSeconds
         appUsageTimes = updatedLifetimeSeconds
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
-        
-        // Save the updated usage data to storage and set epoch day
-        coroutineScope.launch {
-            try {
-                storage.saveAppUsageTimes(appUsageTimes)
-                storage.saveUsageDayEpoch(currentEpochDayUtc())
-                println("DEBUG: Saved appUsageTimes to storage: $appUsageTimes")
-            } catch (e: Exception) {
-                println("DEBUG: Failed to save appUsageTimes: ${e.message}")
-            }
-        }
     }
 
     // Track individual app usage when tracking is active
@@ -286,7 +285,9 @@ private fun AppRoot() {
                 }
 
                 // If Accessibility is not enabled, fall back to simulation to keep UI responsive
-                if (!isAccessibilityServiceEnabled() || ENABLE_USAGE_SIMULATION) {
+                val isAccessibilityEnabled = isAccessibilityServiceEnabled()
+                println("DEBUG: *** TRACKING LOOP DEBUG *** isAccessibilityServiceEnabled: $isAccessibilityEnabled")
+                if (!isAccessibilityEnabled) {
                     println("DEBUG: Using simulation logic - isAccessibilityServiceEnabled: ${isAccessibilityServiceEnabled()}, ENABLE_USAGE_SIMULATION: $ENABLE_USAGE_SIMULATION")
                     // Get the current foreground app to determine which app should get usage time
                     val currentForegroundApp = getCurrentForegroundApp()
@@ -313,25 +314,23 @@ private fun AppRoot() {
                                     "youtube" -> "com.google.android.youtube"
                                     "twitter" -> "com.twitter.android"
                                     "chrome" -> "com.android.chrome"
+                                    "messages" -> "com.google.android.apps.messaging"
+                                    "gmail" -> "com.google.android.gm"
                                     else -> app.name.lowercase().replace(" ", "")
                                 }
                                 currentForegroundApp == expectedPackage
                             }
                             // If we can't detect foreground app, fall back to simulation for testing
                             else -> {
-                                // For testing: Simulate only ONE app being active at a time
-                                // Chrome is active for first 60 seconds, then YouTube for next 60 seconds, then repeat
-                                when {
-                                    sessionDuration < 60 -> app.name.lowercase() == "chrome"
-                                    sessionDuration < 120 -> app.name.lowercase() == "youtube"
-                                    else -> {
-                                        // Repeat the cycle every 120 seconds
-                                        val cyclePosition = sessionDuration % 120
-                                        when {
-                                            cyclePosition < 60 -> app.name.lowercase() == "chrome"
-                                            else -> app.name.lowercase() == "youtube"
-                                        }
+                                // For testing: Simulate realistic foreground app behavior
+                                // Chrome is "foreground" for 60 seconds, then "background" for 30 seconds, then repeat
+                                // This simulates user actively using Chrome, then switching to other apps
+                                when (app.name.lowercase()) {
+                                    "chrome" -> {
+                                        val cyclePosition = sessionDuration % 90 // 90-second cycle
+                                        cyclePosition < 60 // Chrome is foreground for first 60 seconds of each cycle
                                     }
+                                    else -> false // Other apps are never foreground in this simulation
                                 }
                             }
                         }
@@ -343,6 +342,42 @@ private fun AppRoot() {
                             println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
                         }
                         println("DEBUG: App ${app.name} - isAppActive: $isAppActive, sessionDuration: $sessionDuration, currentSessionUsage: $currentSessionUsage")
+                    }
+                    
+                    sessionAppUsageTimes = updatedSessionUsage
+                    println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
+                } else {
+                    // Real foreground app detection using accessibility service
+                    println("DEBUG: Using real foreground app detection")
+                    val currentForegroundApp = getCurrentForegroundApp()
+                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                    
+                    for (app in trackedApps) {
+                        val currentSessionUsage = sessionAppUsageTimes[app.name] ?: 0L
+                        
+                        // Check if this app is currently in the foreground
+                        val isAppActive = when {
+                            currentForegroundApp != null -> {
+                                // Map app names to expected package names
+                                val expectedPackage = when (app.name.lowercase()) {
+                                    "chrome" -> "com.android.chrome"
+                                    "youtube" -> "com.google.android.youtube"
+                                    "messages" -> "com.google.android.apps.messaging"
+                                    "gmail" -> "com.google.android.gm"
+                                    else -> app.name.lowercase().replace(" ", "")
+                                }
+                                currentForegroundApp == expectedPackage
+                            }
+                            else -> false // If we can't detect foreground app, don't give usage to any app
+                        }
+                        
+                        val usageIncrement = if (isAppActive) 1L else 0L
+                        updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
+                        
+                        if (usageIncrement > 0) {
+                            println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
+                        }
+                        println("DEBUG: App ${app.name} - isAppActive: $isAppActive, currentForegroundApp: $currentForegroundApp, currentSessionUsage: $currentSessionUsage")
                     }
                     
                     sessionAppUsageTimes = updatedSessionUsage
@@ -896,6 +931,11 @@ private fun AppRoot() {
                     coroutineScope.launch {
                         val ok = scanQrAndDismiss(qrMessage)
                         if (ok) {
+                            // Finalize session usage before resetting (same as Dismiss)
+                            println("DEBUG: PauseScreen onScanQr called - finalizing session usage")
+                            finalizeSessionUsage()
+                            println("DEBUG: trackedApps after finalize (QR): ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+                            
                             // Reset session tracking state and increment unblocked counter
                             isTracking = false
                             sessionAppUsageTimes = emptyMap()
@@ -1139,7 +1179,7 @@ private fun AppRoot() {
             },
             text = {
                 Text(
-                    "You haven’t selected any apps to track yet. Choose which apps to track to start.",
+                    "You haven't selected any apps to track yet. Choose which apps to track to start.",
                     color = Color.White,
                     fontSize = 14.sp
                 )
