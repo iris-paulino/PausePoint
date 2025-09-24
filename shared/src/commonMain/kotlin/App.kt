@@ -2039,16 +2039,8 @@ private fun DashboardContent(
         // Current Status Card
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF2C2C2C),
-                            Color(0xFF282828)
-                        )
-                    )
-                ),
-            backgroundColor = Color.Transparent,
+                .fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
