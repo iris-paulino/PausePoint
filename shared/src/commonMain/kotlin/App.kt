@@ -2036,45 +2036,72 @@ private fun DashboardContent(
         
         Spacer(Modifier.height(32.dp))
         
-        // Current Status Card (match other cards' background, no outer background box)
+        // Current Status Card
         Card(
             modifier = Modifier
-                .fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF2C2C2C),
+                            Color(0xFF282828)
+                        )
+                    )
+                ),
+            backgroundColor = Color.Transparent,
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
-                // Header row removed per design: no title or pill
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🕐", fontSize = 16.sp, color = Color(0xFF1E3A5F))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Current Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text("Apps Available", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
                 
                 Spacer(Modifier.height(16.dp))
                 
-                // Time remaining display (flattened - remove inner boxed look)
-                Column(
+                // Time remaining display
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
                         .clickable { onOpenDurationSetting() }
                         .padding(24.dp)
                 ) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        IconButton(
-                            onClick = { onShowTimeRemainingInfo() },
-                            modifier = Modifier.size(20.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = "Info about time remaining",
-                                tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                    // Info button in top-right corner
+                    IconButton(
+                        onClick = { onShowTimeRemainingInfo() },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info about time remaining",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
-
+                    
                     // Main content centered
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.align(Alignment.Center)
                     ) {
                         // Calculate remaining time from actual tracked app usage
                         val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
@@ -2082,19 +2109,8 @@ private fun DashboardContent(
                         val remaining = (timeLimitMinutes - totalTrackedAppUsageMinutes).coerceAtLeast(0)
                         // Debug logging
                         println("DEBUG: Time remaining - totalTrackedAppUsageSeconds: $totalTrackedAppUsageSeconds, totalTrackedAppUsageMinutes: $totalTrackedAppUsageMinutes, remaining: $remaining")
-                        Text(
-                            "${remaining}m",
-                            fontSize = 36.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        Text(
-                            "minutes remaining until pause time",
-                            fontSize = 14.sp,
-                            color = Color.White,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
+                        Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color.White)
                             Spacer(Modifier.width(6.dp))
