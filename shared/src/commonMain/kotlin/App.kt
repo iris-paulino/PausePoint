@@ -16,6 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -65,15 +66,24 @@ fun App() {
         colors = androidx.compose.material.MaterialTheme.colors.copy(
             background = Color(0xFF1A1A1A),
             surface = Color(0xFF2C2C2C),
-            primary = Color(0xFFA4C19A),
+            primary = Color(0xFF1A1A1A),
             onBackground = Color.White,
             onSurface = Color.White,
             onPrimary = Color.White
         )
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = Color(0xFF1A1A1A)
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF1A1A1A),
+                            Color(0xFF161616)
+                        )
+                    )
+                ),
+            color = Color.Transparent
         ) {
             Box(Modifier.fillMaxSize()) {
                 AppRoot()
@@ -119,6 +129,7 @@ private fun AppRoot() {
     var showUsageAccessDialog by remember { mutableStateOf(false) }
     var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
     var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
+    var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
     var showAccessibilityConsentDialog by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
@@ -580,6 +591,10 @@ private fun AppRoot() {
             if (!usageAllowed) {
                 showUsageAccessDialog = true
             }
+            val accessibilityAllowed = isAccessibilityServiceEnabled()
+            if (!accessibilityAllowed) {
+                showAccessibilityConsentDialog = true
+            }
             hasCheckedPermissionsOnDashboardThisLaunch = true
         }
     }
@@ -605,7 +620,14 @@ private fun AppRoot() {
             return@LaunchedEffect
         }
 
-        // 3) QR code - allow existing saved codes to satisfy this
+        // 3) Accessibility access
+        val accessibilityAllowed = isAccessibilityServiceEnabled()
+        if (!accessibilityAllowed) {
+            showAccessibilityConsentDialog = true
+            return@LaunchedEffect
+        }
+
+        // 4) QR code - allow existing saved codes to satisfy this
         run {
             val hasAnySavedQr = withTimeoutOrNull(2000) {
                 storage.getSavedQrCodes().isNotEmpty()
@@ -616,15 +638,9 @@ private fun AppRoot() {
             }
         }
 
-        // Also ensure there are tracked apps
+        // 5) Also ensure there are tracked apps
         if (trackedApps.isEmpty()) {
             showNoTrackedAppsDialog = true
-            return@LaunchedEffect
-        }
-
-        // 4) Accessibility consent (for foreground detection on Android)
-        if (!isAccessibilityServiceEnabled()) {
-            showAccessibilityConsentDialog = true
             return@LaunchedEffect
         }
 
@@ -686,7 +702,17 @@ private fun AppRoot() {
             sessionAppUsageTimes = sessionAppUsageTimes,
             timesUnblockedToday = timesUnblockedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
-            onToggleTracking = { pendingStartTracking = true },
+            onToggleTracking = { 
+                if (isTracking) {
+                    // Pause tracking - no dialogs needed
+                    if (isTracking) { finalizeSessionUsage() }
+                    isTracking = false
+                    pendingStartTracking = false
+                } else {
+                    // Start tracking - check permissions first
+                    pendingStartTracking = true
+                }
+            },
             onOpenQrGenerator = { 
                 isSetupMode = false
                 route = Route.QrGenerator 
@@ -852,12 +878,11 @@ private fun AppRoot() {
                     
                     println("DEBUG: trackedApps after finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                     
-                    // Reset session tracking state and increment unblocked counter when dismissing
+                    // Reset session tracking state when dismissing (no counter increment)
                     isTracking = false
                     sessionAppUsageTimes = emptyMap()
                     sessionStartTime = 0L
                     sessionElapsedSeconds = 0L
-                    timesUnblockedToday += 1
                     
                     println("DEBUG: trackedApps after reset: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                     route = Route.Dashboard 
@@ -911,7 +936,7 @@ private fun AppRoot() {
                             pendingStartTracking = true
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold)
@@ -976,7 +1001,7 @@ private fun AppRoot() {
                             pendingStartTracking = true
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1033,24 +1058,21 @@ private fun AppRoot() {
                 Button(
                     onClick = {
                         openAccessibilitySettings()
-                        // Keep dialog state; a watcher below will auto-dismiss when enabled
+                        // Don't save the preference yet - let the user actually enable it in settings
+                        // The toggle will reflect the actual system state when they return
+                        showAccessibilityConsentDialog = false 
+                        if (pendingStartTracking) {
+                            // Continue Start Tracking flow
+                            pendingStartTracking = true
+                        }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF8CA6D1)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
-                ) { Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold) }
+                ) { Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
                 Button(
-                    onClick = { 
-                        showAccessibilityConsentDialog = false
-                        // Proceed without Accessibility
-                        if (pendingStartTracking) {
-                            // Toggle tracking now
-                            if (isTracking) { finalizeSessionUsage() }
-                            isTracking = !isTracking
-                            pendingStartTracking = false
-                        }
-                    },
+                    onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
                     shape = RoundedCornerShape(8.dp)
                 ) { Text("Not now", color = Color.White, fontWeight = FontWeight.Bold) }
@@ -1060,24 +1082,6 @@ private fun AppRoot() {
         )
     }
 
-    // When accessibility consent dialog is visible, poll for enablement and auto-continue
-    LaunchedEffect(showAccessibilityConsentDialog) {
-        if (showAccessibilityConsentDialog) {
-            repeat(40) { // up to ~20 seconds
-                if (isAccessibilityServiceEnabled()) {
-                    showAccessibilityConsentDialog = false
-                    if (pendingStartTracking) {
-                        // Resume Start Tracking flow
-                        if (isTracking) { finalizeSessionUsage() }
-                        isTracking = !isTracking
-                        pendingStartTracking = false
-                    }
-                    return@LaunchedEffect
-                }
-                delay(500)
-            }
-        }
-    }
 
     // No Tracked Apps Dialog
     if (showNoTrackedAppsDialog) {
@@ -1108,7 +1112,7 @@ private fun AppRoot() {
                         showNoTrackedAppsDialog = false
                         route = Route.AppSelection
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Choose apps", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1158,7 +1162,7 @@ private fun AppRoot() {
                         pendingStartTracking = false
                         route = Route.QrGenerator
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Create QR code", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1202,7 +1206,7 @@ private fun AppRoot() {
             confirmButton = {
                 Button(
                     onClick = { showTimeRemainingInfoDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
@@ -1408,7 +1412,7 @@ private fun OnboardingPager(
                         .width(if (i == index) 24.dp else 8.dp)
                         .height(8.dp)
                         .background(
-                            if (i == index) Color(0xFFA4C19A) else Color(0xFF4B5563),
+                            if (i == index) Color(0xFF1E3A5F) else Color(0xFF4B5563),
                             RoundedCornerShape(4.dp)
                         )
                 )
@@ -1496,13 +1500,13 @@ private fun OnboardingPager(
                     if (index < pages.lastIndex) index++ else onDone()
                 },
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                 contentPadding = PaddingValues(vertical = 16.dp),
                 shape = RoundedCornerShape(12.dp)
             ) { 
                 Text(
                     pages[index].primaryCta,
-                    color = Color(0xFF1A1A1A),
+                    color = Color.White,
                     fontWeight = FontWeight.Bold
                 ) 
             }
@@ -1605,7 +1609,7 @@ private fun QrGeneratorContent(
                 
                 if (hasGeneratedQr) {
                     Spacer(Modifier.height(12.dp))
-                    Text(message, color = Color(0xFFA4C19A), fontSize = 16.sp)
+                    Text(message, color = Color.White, fontSize = 16.sp)
                     
                     Spacer(Modifier.height(8.dp))
                     Row(
@@ -1651,17 +1655,15 @@ private fun QrGeneratorContent(
             ) {
                 Text("Customize Message", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(12.dp))
-                Text("Personal Message", fontSize = 14.sp, color = Color(0xFFD1D5DB))
-                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = message,
                     onValueChange = onMessageChange,
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
-                        focusedBorderColor = Color(0xFFA4C19A),
+                        focusedBorderColor = Color(0xFF1E3A5F),
                         unfocusedBorderColor = Color(0xFF4B5563),
                         textColor = Color.White,
-                        cursorColor = Color(0xFFA4C19A)
+                        cursorColor = Color(0xFF1E3A5F)
                     ),
                     shape = RoundedCornerShape(8.dp)
                 )
@@ -1684,7 +1686,7 @@ private fun QrGeneratorContent(
             },
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (downloadSuccess) Color(0xFF0B5E47) else if (hasGeneratedQr) Color(0xFFA4C19A) else Color(0xFF4B5563)
+                backgroundColor = if (hasGeneratedQr) Color(0xFF1E3A5F) else Color(0xFF4B5563)
             ),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp),
@@ -1705,8 +1707,8 @@ private fun QrGeneratorContent(
         if (downloadSuccess) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "✓ File saved to Downloads folder",
-                color = Color(0xFF6EE7B7),
+                text = "✓ QR code saved to Downloads folder",
+                color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             )
@@ -1755,7 +1757,7 @@ private fun QrGeneratorContent(
                         "1.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1777,7 +1779,7 @@ private fun QrGeneratorContent(
                         "2.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1799,7 +1801,7 @@ private fun QrGeneratorContent(
                         "3.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1821,7 +1823,7 @@ private fun QrGeneratorContent(
                         "4.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1843,7 +1845,7 @@ private fun QrGeneratorContent(
                         "5.",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         modifier = Modifier.width(24.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -1965,8 +1967,17 @@ private fun DashboardContent(
         
         // Current Status Card
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF2C2C2C),
+                            Color(0xFF282828)
+                        )
+                    )
+                ),
+            backgroundColor = Color.Transparent,
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -1978,13 +1989,13 @@ private fun DashboardContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🕐", fontSize = 16.sp, color = Color(0xFFA4C19A))
+                        Text("🕐", fontSize = 16.sp, color = Color(0xFF1E3A5F))
                         Spacer(Modifier.width(8.dp))
                         Text("Current Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                     Box(
                         modifier = Modifier
-                            .background(Color(0xFFA4C19A), RoundedCornerShape(12.dp))
+                            .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
                             .padding(horizontal = 12.dp, vertical = 4.dp)
                     ) {
                         Text("Apps Available", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -1997,7 +2008,7 @@ private fun DashboardContent(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFA5C29B), RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
                         .clickable { onOpenDurationSetting() }
                         .padding(24.dp)
                 ) {
@@ -2047,8 +2058,8 @@ private fun DashboardContent(
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${timesUnblockedToday}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA4C19A))
-                        Text("times unblocked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("${timesUnblockedToday}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
+                        Text("times walked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val totalTodayMinutesUsed = trackedApps.sumOf { app ->
@@ -2057,7 +2068,7 @@ private fun DashboardContent(
                         }
                         val hours = totalTodayMinutesUsed / 60
                         val minutes = totalTodayMinutesUsed % 60
-                        Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
+                        Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
@@ -2068,7 +2079,7 @@ private fun DashboardContent(
                 Button(
                     onClick = onToggleTracking,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
@@ -2082,7 +2093,7 @@ private fun DashboardContent(
                 Button(
                     onClick = onOpenPause,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
@@ -2129,7 +2140,7 @@ private fun DashboardContent(
                         Button(
                             onClick = onOpenQrGenerator,
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(vertical = 12.dp)
                         ) {
@@ -2175,7 +2186,7 @@ private fun DashboardContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("📊", fontSize = 16.sp, color = Color(0xFFA4C19A))
+                        Text("📊", fontSize = 16.sp, color = Color(0xFF1E3A5F))
                         Spacer(Modifier.width(8.dp))
                         Text("App Usage", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
@@ -2303,7 +2314,14 @@ private fun SettingsScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A1A))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1A1A1A),
+                        Color(0xFF2A2A2A)
+                    )
+                )
+            )
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -2321,8 +2339,17 @@ private fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
 
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFF2C2C2C),
+                            Color(0xFF282828)
+                        )
+                    )
+                ),
+            backgroundColor = Color.Transparent,
             shape = RoundedCornerShape(16.dp)
         ) {
             var notificationsEnabled by remember { mutableStateOf(false) }
@@ -2351,7 +2378,7 @@ private fun SettingsScreen(
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFFA4C19A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
                             uncheckedThumbColor = Color(0xFF1A1A1A),
                             uncheckedTrackColor = Color(0xFF4B5563)
                         )
@@ -2393,7 +2420,7 @@ private fun SettingsScreen(
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFFA4C19A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
                             uncheckedThumbColor = Color(0xFF1A1A1A),
                             uncheckedTrackColor = Color(0xFF4B5563)
                         )
@@ -2405,6 +2432,61 @@ private fun SettingsScreen(
         }
 
         Spacer(Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            var accessibilityAccessAllowed by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                try {
+                    // Check actual system permission status instead of app preference
+                    accessibilityAccessAllowed = isAccessibilityServiceEnabled()
+                } catch (_: Exception) { accessibilityAccessAllowed = false }
+            }
+            
+            // Periodically check system status to catch changes when user returns from settings
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(2000) // Check every 2 seconds
+                    try {
+                        val actualStatus = isAccessibilityServiceEnabled()
+                        // Always update to match actual system state
+                        accessibilityAccessAllowed = actualStatus
+                        // Update storage to match actual system state
+                        coroutineScope.launch {
+                            try { storage.saveAccessibilityAccessAllowed(actualStatus) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Allow Accessibility Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = accessibilityAccessAllowed,
+                        onCheckedChange = { enabled ->
+                            // Always open system settings - let user manage the permission there
+                            // The toggle will reflect actual system state when user returns
+                            openAccessibilitySettings()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
 
         Spacer(Modifier.height(8.dp))
 
@@ -2488,7 +2570,7 @@ private fun SavedQrCodesScreen(
                 Button(
                     onClick = { onOpenQrGenerator() },
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(vertical = 14.dp)
                 ) {
@@ -2597,7 +2679,7 @@ private fun SavedQrCodesScreen(
                         Button(
                             onClick = { onOpenQrGenerator() },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                             shape = RoundedCornerShape(10.dp),
                             contentPadding = PaddingValues(vertical = 14.dp)
                         ) {
@@ -2665,7 +2747,7 @@ private fun PauseScreen(
                 ) {
                     Text(
                         text = "✦",
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         fontSize = 24.sp
                     )
                     Spacer(Modifier.height(8.dp))
@@ -2683,7 +2765,7 @@ private fun PauseScreen(
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = durationText,
-                        color = Color(0xFF6EE7B7),
+                        color = Color.White,
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -2978,7 +3060,7 @@ private fun DurationSettingScreen(
                         text = timeLimitMinutes.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFA4C19A)
+                        color = Color(0xFF1E3A5F)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
@@ -3072,7 +3154,7 @@ private fun DurationSettingScreen(
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 backgroundColor = if (timeLimitMinutes == minutes) 
-                                    Color(0xFFA4C19A) else Color(0xFF2C2C2C)
+                                    Color(0xFF1E3A5F) else Color(0xFF2C2C2C)
                             ),
                             shape = RoundedCornerShape(8.dp),
                             contentPadding = PaddingValues(vertical = 12.dp)
@@ -3114,7 +3196,7 @@ private fun DurationSettingScreen(
         Button(
             onClick = onCompleteSetup,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFA4C19A)),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
