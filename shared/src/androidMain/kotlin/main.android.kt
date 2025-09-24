@@ -159,7 +159,24 @@ actual fun startUsageTracking(
 }
 
 actual fun showBlockingOverlay(message: String) {
-    // TODO: Implement using Activity/Window overlay or a full-screen Activity with FLAG_SHOW_WHEN_LOCKED.
+    // Signal the AccessibilityService to show an overlay via broadcast
+    val ctx = currentActivityRef?.get()?.applicationContext ?: appContextRef ?: return
+    try {
+        println("DEBUG: showBlockingOverlay - sending broadcast with message='$message'")
+        val intent = Intent("com.myapplication.SHOW_BLOCKING_OVERLAY").apply {
+            setPackage(ctx.packageName)
+            putExtra("message", message)
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            ctx.sendBroadcast(intent, null)
+        } else {
+            @Suppress("DEPRECATION")
+            ctx.sendBroadcast(intent)
+        }
+        println("DEBUG: showBlockingOverlay - broadcast sent")
+    } catch (_: Exception) {
+        println("DEBUG: showBlockingOverlay - error sending broadcast")
+    }
 }
 
 actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
@@ -172,7 +189,23 @@ actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
     }
     val storage = createAppStorage()
     val match = scanned?.let { storage.validateQrCode(it) }
-    return match != null && match.message == expectedMessage
+    val ok = match != null && match.message == expectedMessage
+    if (ok) {
+        // Tell service to hide overlay
+        val ctx = activity.applicationContext
+        try {
+            println("DEBUG: scanQrAndDismiss - valid QR, sending HIDE broadcast")
+            val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply { setPackage(ctx.packageName) }
+            if (Build.VERSION.SDK_INT >= 33) {
+                ctx.sendBroadcast(intent, null)
+            } else {
+                @Suppress("DEPRECATION")
+                ctx.sendBroadcast(intent)
+            }
+            println("DEBUG: scanQrAndDismiss - HIDE broadcast sent")
+        } catch (_: Exception) {}
+    }
+    return ok
 }
 
 private const val QR_REQUEST_CODE = 9001
