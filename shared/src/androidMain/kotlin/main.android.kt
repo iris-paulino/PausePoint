@@ -200,11 +200,20 @@ actual fun openAccessibilitySettings() {
 }
 
 actual fun isAccessibilityServiceEnabled(): Boolean {
-    val activity = currentActivityRef?.get() ?: return false
+    val activity = currentActivityRef?.get()
+    println("DEBUG: isAccessibilityServiceEnabled - activity: $activity")
+    if (activity == null) {
+        println("DEBUG: isAccessibilityServiceEnabled - no activity, returning false")
+        return false
+    }
     val pkg = activity.packageName
     val expected = ComponentName(pkg, "$pkg.ForegroundAppAccessibilityService")
     val enabledServices = Settings.Secure.getString(activity.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-    if (enabledServices.isNullOrEmpty()) return false
+    println("DEBUG: isAccessibilityServiceEnabled - pkg: $pkg, expected: $expected, enabledServices: $enabledServices")
+    if (enabledServices.isNullOrEmpty()) {
+        println("DEBUG: isAccessibilityServiceEnabled - no enabled services, returning false")
+        return false
+    }
     val colonSplitter = TextUtils.SimpleStringSplitter(':')
     colonSplitter.setString(enabledServices)
     while (colonSplitter.hasNext()) {
@@ -213,8 +222,21 @@ actual fun isAccessibilityServiceEnabled(): Boolean {
             componentName.endsWith("/ForegroundAppAccessibilityService", ignoreCase = true) ||
             componentName.contains(pkg, ignoreCase = true) && componentName.contains("ForegroundAppAccessibilityService", ignoreCase = true)
         ) {
+            println("DEBUG: isAccessibilityServiceEnabled - found matching service, returning true")
             return true
         }
     }
+    println("DEBUG: isAccessibilityServiceEnabled - no matching service found, returning false")
     return false
+}
+
+actual fun getCurrentForegroundApp(): String? {
+    // TODO: Implement using ActivityManager or AccessibilityService to get current foreground app
+    // For now, return null to indicate no foreground app detection
+    // In a real implementation, you would:
+    // 1. Use ActivityManager.getRunningTasks() (deprecated but still works)
+    // 2. Use UsageStatsManager.queryUsageStats() for recent usage
+    // 3. Use AccessibilityService to monitor window state changes
+    // 4. Use ActivityManager.getRunningAppProcesses() and check importance
+    return null
 }

@@ -86,3 +86,10 @@ actual fun openAccessibilitySettings() {
 actual fun isAccessibilityServiceEnabled(): Boolean {
     return true
 }
+
+actual fun getCurrentForegroundApp(): String? {
+    // iOS doesn't allow apps to detect other apps' foreground state for privacy reasons
+    // Screen Time APIs are not publicly available
+    // For now, return null to indicate no foreground app detection
+    return null
+}

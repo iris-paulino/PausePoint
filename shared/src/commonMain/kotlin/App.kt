@@ -95,13 +95,15 @@ fun App() {
 // Simple navigation and app state holder
 private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes }
 
-// Disable simulated app usage increments; rely on platform-specific tracking instead
-private const val ENABLE_USAGE_SIMULATION: Boolean = false
+// Enable simulated app usage increments for testing; rely on platform-specific tracking instead
+private const val ENABLE_USAGE_SIMULATION: Boolean = true
 
 // Platform hook to open Accessibility settings (Android) or no-op elsewhere
 expect fun openAccessibilitySettings()
 // Platform check for whether our AccessibilityService is enabled
 expect fun isAccessibilityServiceEnabled(): Boolean
+// Platform function to get the current foreground app package name
+expect fun getCurrentForegroundApp(): String?
 
 private data class TrackedApp(
     val name: String,
@@ -259,18 +261,20 @@ private fun AppRoot() {
     // Real-time tracking update while tracking is active
     LaunchedEffect(isTracking, trackingStartTime) {
         if (isTracking && trackingStartTime > 0) {
+            println("DEBUG: Starting tracking loop")
             while (isTracking) {
                 delay(1000) // Update every second
+                println("DEBUG: Tracking loop iteration - isTracking: $isTracking")
 
                 // If Pause screen is active, do not accrue usage for any apps
                 if (route == Route.Pause) {
                     continue
                 }
 
-                // Update session elapsed time from start
-                if (sessionStartTime > 0L) {
-                    sessionElapsedSeconds = (getCurrentTimeMillis() - sessionStartTime) / 1000L
-                }
+                // Session elapsed time should only count when tracked apps are active
+                // We'll calculate this based on the actual tracked app usage time
+                val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
+                sessionElapsedSeconds = totalTrackedAppUsageSeconds
                 
                 // If elapsed minutes reached limit, pause regardless of per-app accrual
                 val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
@@ -283,34 +287,66 @@ private fun AppRoot() {
 
                 // If Accessibility is not enabled, fall back to simulation to keep UI responsive
                 if (!isAccessibilityServiceEnabled() || ENABLE_USAGE_SIMULATION) {
-                    // Simulate app usage detection
-                    // In a real implementation, this would query the platform's usage stats
+                    println("DEBUG: Using simulation logic - isAccessibilityServiceEnabled: ${isAccessibilityServiceEnabled()}, ENABLE_USAGE_SIMULATION: $ENABLE_USAGE_SIMULATION")
+                    // Get the current foreground app to determine which app should get usage time
+                    val currentForegroundApp = getCurrentForegroundApp()
+                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                    
+                    // Calculate session duration for debug logging
                     val currentTime = getCurrentTimeMillis()
                     val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
                     
-                    // Simulate individual app usage patterns
-                    // For testing purposes, simulate that Chrome is being used continuously
-                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
-                    
+                    // Only increment usage for the app that is currently in the foreground
                     trackedApps.forEach { app ->
                         val currentSessionUsage = updatedSessionUsage[app.name] ?: 0L
                         
-                        // For testing: Chrome gets continuous usage, others get minimal usage
-                        val shouldGetUsage = when (app.name.lowercase()) {
-                            "chrome" -> true
-                            "youtube" -> sessionDuration % 20 < 5
-                            else -> sessionDuration % 30 < 3
+                        // Check if this app is currently in the foreground
+                        val isAppActive = when {
+                            // If we can detect the foreground app, only increment for that app
+                            currentForegroundApp != null -> {
+                                // Map app name to package name for comparison
+                                val expectedPackage = when (app.name.lowercase()) {
+                                    "instagram" -> "com.instagram.android"
+                                    "tiktok" -> "com.zhiliaoapp.musically"
+                                    "facebook" -> "com.facebook.katana"
+                                    "snapchat" -> "com.snapchat.android"
+                                    "youtube" -> "com.google.android.youtube"
+                                    "twitter" -> "com.twitter.android"
+                                    "chrome" -> "com.android.chrome"
+                                    else -> app.name.lowercase().replace(" ", "")
+                                }
+                                currentForegroundApp == expectedPackage
+                            }
+                            // If we can't detect foreground app, fall back to simulation for testing
+                            else -> {
+                                // For testing: Simulate only ONE app being active at a time
+                                // Chrome is active for first 60 seconds, then YouTube for next 60 seconds, then repeat
+                                when {
+                                    sessionDuration < 60 -> app.name.lowercase() == "chrome"
+                                    sessionDuration < 120 -> app.name.lowercase() == "youtube"
+                                    else -> {
+                                        // Repeat the cycle every 120 seconds
+                                        val cyclePosition = sessionDuration % 120
+                                        when {
+                                            cyclePosition < 60 -> app.name.lowercase() == "chrome"
+                                            else -> app.name.lowercase() == "youtube"
+                                        }
+                                    }
+                                }
+                            }
                         }
                         
-                        val usageIncrement = if (shouldGetUsage && sessionDuration > 0) 1L else 0L
+                        val usageIncrement = if (isAppActive) 1L else 0L
                         updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
                         
                         if (usageIncrement > 0) {
                             println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
                         }
+                        println("DEBUG: App ${app.name} - isAppActive: $isAppActive, sessionDuration: $sessionDuration, currentSessionUsage: $currentSessionUsage")
                     }
                     
                     sessionAppUsageTimes = updatedSessionUsage
+                    println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
                 }
                 
                 // Check if session usage has reached the limit based on actual accumulated session usage
@@ -847,13 +883,15 @@ private fun AppRoot() {
             onBack = { route = Route.Dashboard }
         )
         Route.Pause -> {
-            val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
+            val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
+            val elapsedMinutes = (totalTrackedAppUsageSeconds / 60L).toInt()
             val hours = elapsedMinutes / 60
             val minutes = elapsedMinutes % 60
             val durationText = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
             
             PauseScreen(
                 durationText = durationText,
+                timeLimitMinutes = timeLimitMinutes,
                 onScanQr = {
                     coroutineScope.launch {
                         val ok = scanQrAndDismiss(qrMessage)
@@ -2032,9 +2070,12 @@ private fun DashboardContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.align(Alignment.Center)
                     ) {
-                        // Calculate remaining time from elapsed session time
-                        val totalSessionMinutesUsed = (sessionElapsedSeconds / 60L).toInt()
-                        val remaining = (timeLimitMinutes - totalSessionMinutesUsed).coerceAtLeast(0)
+                        // Calculate remaining time from actual tracked app usage
+                        val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
+                        val totalTrackedAppUsageMinutes = (totalTrackedAppUsageSeconds / 60L).toInt()
+                        val remaining = (timeLimitMinutes - totalTrackedAppUsageMinutes).coerceAtLeast(0)
+                        // Debug logging
+                        println("DEBUG: Time remaining - totalTrackedAppUsageSeconds: $totalTrackedAppUsageSeconds, totalTrackedAppUsageMinutes: $totalTrackedAppUsageMinutes, remaining: $remaining")
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2068,6 +2109,9 @@ private fun DashboardContent(
                         }
                         val hours = totalTodayMinutesUsed / 60
                         val minutes = totalTodayMinutesUsed % 60
+                        // Debug logging
+                        println("DEBUG: Total usage calculation - sessionAppUsageTimes: $sessionAppUsageTimes, totalTodayMinutesUsed: $totalTodayMinutesUsed")
+                        println("DEBUG: Total usage calculation - trackedApps: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                         Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                         Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
@@ -2079,7 +2123,7 @@ private fun DashboardContent(
                 Button(
                     onClick = onToggleTracking,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFFFF9800) else Color(0xFF1E3A5F)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = if (isTracking) Color(0xFF6B7B8C) else Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
@@ -2223,7 +2267,11 @@ private fun DashboardContent(
                         ) {
                             Text(app.name, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                val liveMinutes = app.minutesUsed + (((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt())
+                                val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
+                                val liveMinutes = app.minutesUsed + sessionMinutes
+                                // Debug logging
+                                println("DEBUG: App ${app.name} - sessionMinutes: $sessionMinutes, app.minutesUsed: ${app.minutesUsed}, liveMinutes: $liveMinutes")
+                                println("DEBUG: App ${app.name} - sessionAppUsageTimes[${app.name}]: ${sessionAppUsageTimes[app.name]}")
                                 Text("${liveMinutes}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -2719,13 +2767,14 @@ private fun SavedQrCodesScreen(
 @Composable
 private fun PauseScreen(
     durationText: String,
+    timeLimitMinutes: Int,
     onScanQr: () -> Unit,
     onClose: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0F1111)),
+            .background(Color(0xFF1A1A1A)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -2736,7 +2785,7 @@ private fun PauseScreen(
         ) {
             // Card-like container
             Card(
-                backgroundColor = Color(0xFF16201B),
+                backgroundColor = Color(0xFF1E3A5F),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Column(
@@ -2746,7 +2795,7 @@ private fun PauseScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "✦",
+                        text = "⏸",
                         color = Color.White,
                         fontSize = 24.sp
                     )
@@ -2759,8 +2808,8 @@ private fun PauseScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "You have used your tracked apps for",
-                        color = Color(0xFFD1D5DB)
+                        text = "You have used your tracked apps for ${timeLimitMinutes}m",
+                        color = Color(0xFFBFC7C2)
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -2783,15 +2832,15 @@ private fun PauseScreen(
             Button(
                 onClick = onScanQr,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF34D399)),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                Text("▣", color = Color(0xFF1A1A1A))
+                Text("▣", color = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.Start) {
-                    Text("Scan My QR Code", color = Color(0xFF1A1A1A), fontWeight = FontWeight.Bold)
-                    Text("Get up and scan your printed QR code", color = Color(0xFFBFC7C2), fontSize = 12.sp)
+                    Text("Scan My QR Code", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Get up and scan your printed QR code", color = Color(0xFFE3F2FD), fontSize = 12.sp)
                 }
             }
 
@@ -2799,7 +2848,7 @@ private fun PauseScreen(
 
             Text(
                 text = "× Dismiss",
-                color = Color(0xFFBFC7C2),
+                color = Color(0xFF9CA3AF),
                 modifier = Modifier.clickable { onClose() }
             )
         }
