@@ -273,7 +273,9 @@ private fun AppRoot() {
                 if (elapsedMinutes >= timeLimitMinutes) {
                     finalizeSessionUsage()
                     isTracking = false
-                    route = Route.Pause
+                    println("DEBUG: Limit reached by elapsedMinutes=$elapsedMinutes, timeLimitMinutes=$timeLimitMinutes. Triggering overlay with message='$qrMessage'")
+                    // Show blocking overlay on top of the currently used app instead of navigating
+                    showBlockingOverlay(qrMessage)
                     continue
                 }
 
@@ -381,10 +383,12 @@ private fun AppRoot() {
                 val totalSessionSeconds = sessionAppUsageTimes.values.sum()
                 val usedMinutes = (totalSessionSeconds / 60L).toInt()
                 if (usedMinutes >= timeLimitMinutes) {
-                    // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
+                    // Before pausing, merge the session into lifetime so UI shows correctly on Dashboard
                     finalizeSessionUsage()
                     isTracking = false
-                    route = Route.Pause
+                    println("DEBUG: Limit reached by usedMinutes=$usedMinutes, timeLimitMinutes=$timeLimitMinutes. Triggering overlay with message='$qrMessage'")
+                    // Show blocking overlay on top of the tracked app currently being used
+                    showBlockingOverlay(qrMessage)
                 }
             }
         }
@@ -2815,7 +2819,7 @@ private fun SavedQrCodesScreen(
 }
 
 @Composable
-private fun PauseScreen(
+fun PauseScreen(
     durationText: String,
     timeLimitMinutes: Int,
     onScanQr: () -> Unit,
