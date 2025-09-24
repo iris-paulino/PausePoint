@@ -170,33 +170,26 @@ private fun AppRoot() {
             return
         }
         
-        // Determine the single foreground app to credit: the one with the most session seconds
-        val topEntry = sessionAppUsageTimes.maxByOrNull { it.value }
-        if (topEntry == null) {
-            println("DEBUG: No topEntry found, returning without changes")
-            return
-        }
-        val topAppName = topEntry.key
-        val topSessionSeconds = topEntry.value
-        val topSessionMinutes = (topSessionSeconds / 60L).toInt()
-        println("DEBUG: Top foreground app this session: $topAppName with $topSessionSeconds sec (~$topSessionMinutes min)")
-        
-        // Update trackedApps minutesUsed ONLY for the top foreground app
+        // Credit ALL apps that have at least 60 seconds this session
         trackedApps = trackedApps.map { app ->
-            if (app.name == topAppName && topSessionMinutes > 0) {
-                println("DEBUG: Crediting $topSessionMinutes min to $topAppName")
-                app.copy(minutesUsed = app.minutesUsed + topSessionMinutes)
-            } else {
-                app
-            }
+            val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
+            val sessionMinutes = (sessionSeconds / 60L).toInt()
+            if (sessionMinutes > 0) {
+                println("DEBUG: Crediting ${sessionMinutes} min to ${app.name}")
+                app.copy(minutesUsed = app.minutesUsed + sessionMinutes)
+            } else app
         }
         
         println("DEBUG: trackedApps after: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
         
-        // Update lifetime seconds map ONLY for the top foreground app
+        // Update lifetime seconds for all apps that recorded seconds this session
         val updatedLifetimeSeconds = appUsageTimes.toMutableMap()
-        val current = updatedLifetimeSeconds[topAppName] ?: 0L
-        updatedLifetimeSeconds[topAppName] = current + topSessionSeconds
+        sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
+            if (sessionSeconds > 0) {
+                val current = updatedLifetimeSeconds[appName] ?: 0L
+                updatedLifetimeSeconds[appName] = current + sessionSeconds
+            }
+        }
         appUsageTimes = updatedLifetimeSeconds
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
@@ -2043,72 +2036,45 @@ private fun DashboardContent(
         
         Spacer(Modifier.height(32.dp))
         
-        // Current Status Card
+        // Current Status Card (match other cards' background, no outer background box)
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF2C2C2C),
-                            Color(0xFF282828)
-                        )
-                    )
-                ),
-            backgroundColor = Color.Transparent,
+                .fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🕐", fontSize = 16.sp, color = Color(0xFF1E3A5F))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Current Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("Apps Available", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                // Header row removed per design: no title or pill
                 
                 Spacer(Modifier.height(16.dp))
                 
-                // Time remaining display
-                Box(
+                // Time remaining display (flattened - remove inner boxed look)
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
                         .clickable { onOpenDurationSetting() }
                         .padding(24.dp)
                 ) {
-                    // Info button in top-right corner
-                    IconButton(
-                        onClick = { onShowTimeRemainingInfo() },
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .size(20.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info about time remaining",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        IconButton(
+                            onClick = { onShowTimeRemainingInfo() },
+                            modifier = Modifier.size(20.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info about time remaining",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
                     }
-                    
+
                     // Main content centered
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         // Calculate remaining time from actual tracked app usage
                         val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
@@ -2116,8 +2082,19 @@ private fun DashboardContent(
                         val remaining = (timeLimitMinutes - totalTrackedAppUsageMinutes).coerceAtLeast(0)
                         // Debug logging
                         println("DEBUG: Time remaining - totalTrackedAppUsageSeconds: $totalTrackedAppUsageSeconds, totalTrackedAppUsageMinutes: $totalTrackedAppUsageMinutes, remaining: $remaining")
-                        Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
+                        Text(
+                            "${remaining}m",
+                            fontSize = 36.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        Text(
+                            "minutes remaining until pause time",
+                            fontSize = 14.sp,
+                            color = Color.White,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color.White)
                             Spacer(Modifier.width(6.dp))
@@ -2167,7 +2144,32 @@ private fun DashboardContent(
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(vertical = 16.dp)
                 ) {
-                    Text(if (isTracking) "⏸" else "▶", color = Color.White)
+                    if (isTracking) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .background(Color(0xFF1E3A5F), RoundedCornerShape(4.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(12.dp)
+                                        .background(Color.White, RoundedCornerShape(1.dp))
+                                )
+                                Spacer(Modifier.width(3.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .width(3.dp)
+                                        .height(12.dp)
+                                        .background(Color.White, RoundedCornerShape(1.dp))
+                                )
+                            }
+                        }
+                    } else {
+                        Text("▶", color = Color.White)
+                    }
                     Spacer(Modifier.width(8.dp))
                     Text(if (isTracking) "Pause Tracking" else "Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -2328,13 +2330,13 @@ private fun DashboardContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(8.dp)
-                                .background(Color(0xFF4B5563), RoundedCornerShape(8.dp))
+                                .background(Color(0xFF334155), RoundedCornerShape(8.dp))
                         ) {
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(fraction = percent)
                                     .height(8.dp)
-                                    .background(Color(0xFF4CAF50), RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF1E3A5F), RoundedCornerShape(8.dp))
                             )
                         }
                     }
@@ -2834,11 +2836,28 @@ private fun PauseScreen(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        text = "⏸",
-                        color = Color.White,
-                        fontSize = 24.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .background(Color(0xFF1E3A5F), RoundedCornerShape(6.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(16.dp)
+                                    .background(Color.White, RoundedCornerShape(1.dp))
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .width(4.dp)
+                                    .height(16.dp)
+                                    .background(Color.White, RoundedCornerShape(1.dp))
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = "Time for a Pause",
