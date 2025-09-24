@@ -2024,7 +2024,7 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("PausePal", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("DoomDrop", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
