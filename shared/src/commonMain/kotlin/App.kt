@@ -275,7 +275,7 @@ private fun AppRoot() {
                     isTracking = false
                     route = Route.Pause
                     // Show the blocking overlay to prevent further app usage
-                    showBlockingOverlay("Take a mindful pause - you've reached your time limit")
+                    showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
                     continue
                 }
 
@@ -388,7 +388,7 @@ private fun AppRoot() {
                     isTracking = false
                     route = Route.Pause
                     // Show the blocking overlay to prevent further app usage
-                    showBlockingOverlay("Take a mindful pause - you've reached your time limit")
+                    showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
                 }
             }
         }
@@ -2047,8 +2047,6 @@ private fun DashboardContent(
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
-                Text("☀", fontSize = 24.sp, color = Color(0xFFD1D5DB))
-                Spacer(Modifier.width(16.dp))
                 Text("⚙", fontSize = 24.sp, color = Color(0xFFD1D5DB), modifier = Modifier.clickable { onOpenSettings() })
             }
         }
