@@ -18,6 +18,7 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val USAGE_ACCESS_ALLOWED_KEY = "usage_access_allowed"
     private val ACCESSIBILITY_ACCESS_ALLOWED_KEY = "accessibility_access_allowed"
     private val USAGE_DAY_EPOCH_KEY = "usage_day_epoch"
+    private val BLOCKED_STATE_KEY = "blocked_state"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -214,6 +215,22 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
 
     override suspend fun getUsageDayEpoch(): Long {
         return try { prefs.getLong(USAGE_DAY_EPOCH_KEY, 0L) } catch (_: Exception) { 0L }
+    }
+
+    override suspend fun saveBlockedState(isBlocked: Boolean) {
+        try {
+            prefs.edit().putBoolean(BLOCKED_STATE_KEY, isBlocked).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getBlockedState(): Boolean {
+        return try {
+            prefs.getBoolean(BLOCKED_STATE_KEY, false)
+        } catch (e: Exception) {
+            false
+        }
     }
     
     // Simple JSON serialization functions
@@ -418,6 +435,14 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getUsageDayEpoch(): Long {
         return 0L
+    }
+
+    override suspend fun saveBlockedState(isBlocked: Boolean) {
+        // No-op for fallback
+    }
+
+    override suspend fun getBlockedState(): Boolean {
+        return false
     }
 }
 
