@@ -885,8 +885,6 @@ private fun AppRoot() {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    AppLogo(size = 120.dp)
-                    Spacer(modifier = Modifier.height(24.dp))
                     Text("Loading...", color = Color.White)
                 }
             }
@@ -1859,11 +1857,11 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(if (isSetupMode) "Set Up: QR Code Generator" else "QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Create QR codes to place around your home", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("Create QR codes to place around your home or share with your digital pause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
         
         // QR Code Card
         Card(
@@ -1872,7 +1870,7 @@ private fun QrGeneratorContent(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -1883,12 +1881,12 @@ private fun QrGeneratorContent(
                     Text("Your QR Code", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
                 
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(8.dp))
                 
                 // QR Code - only shows after generation
                 Box(
                     modifier = Modifier
-                        .size(200.dp)
+                        .size(160.dp)
                         .background(Color.White, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -1906,7 +1904,7 @@ private fun QrGeneratorContent(
                 }
                 
                 if (hasGeneratedQr) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(message, color = Color.White, fontSize = 16.sp)
                     
                     Spacer(Modifier.height(8.dp))
@@ -1918,7 +1916,7 @@ private fun QrGeneratorContent(
                         Text("⧉", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                     }
                     
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     
                     // Generate New QR Code Button inside the card
                     Button(
@@ -1930,7 +1928,7 @@ private fun QrGeneratorContent(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1A1A1A)),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+                        contentPadding = PaddingValues(vertical = 10.dp)
                     ) {
                         Text("↻", color = Color.White)
                         Spacer(Modifier.width(8.dp))
@@ -1940,7 +1938,7 @@ private fun QrGeneratorContent(
             }
         }
         
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
         
         // Customize Message Card
         Card(
@@ -1949,10 +1947,10 @@ private fun QrGeneratorContent(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp)
+                modifier = Modifier.padding(16.dp)
             ) {
                 Text("Customize Message", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = message,
                     onValueChange = onMessageChange,
@@ -1968,7 +1966,7 @@ private fun QrGeneratorContent(
             }
         }
         
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
         
         // Download Button - only enabled when QR is generated
         Button(
@@ -1995,7 +1993,7 @@ private fun QrGeneratorContent(
             Text(
                 if (downloadSuccess) {
                     if (isSetupMode) "Done" else "Go to Dashboard"
-                } else "Save and Download PDF for printing", 
+                } else "Save and download QR Code",
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
@@ -2014,60 +2012,8 @@ private fun QrGeneratorContent(
         
         Spacer(Modifier.height(12.dp))
         
-        // Don't have a printer? Button
-        Button(
-            onClick = { showAccountabilityDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-			Text("Don't have a printer?", color = Color.White, fontWeight = FontWeight.Bold)
-        }
-		
-		// Dialog for Don't have a printer?
-		if (showAccountabilityDialog) {
-			androidx.compose.material.AlertDialog(
-				onDismissRequest = { showAccountabilityDialog = false },
-				title = {
-					Row(
-						verticalAlignment = Alignment.CenterVertically
-					) {
-						Text("👥", fontSize = 24.sp)
-						Spacer(Modifier.width(12.dp))
-						Text(
-							"Coming Soon",
-							fontSize = 18.sp,
-							fontWeight = FontWeight.Bold,
-							color = Color.White
-						)
-					}
-				},
-				text = {
-					Column {
-						Text(
-							"Invite a family member, friend, or housemate to be your digital pause partner! Share your QR code and scan it from their device whenever you need to unlock your apps. They can help keep you on track — plus it’s a little extra social time together.",
-							color = Color.White,
-							fontSize = 14.sp
-						)
-						Spacer(Modifier.height(12.dp))
-					}
-				},
-				confirmButton = {
-					Button(
-						onClick = { showAccountabilityDialog = false },
-						colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-						shape = RoundedCornerShape(8.dp)
-					) {
-						Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
-					}
-				},
-				backgroundColor = Color(0xFF1A1A1A),
-				contentColor = Color.White
-			)
-		}
-        
-        Spacer(Modifier.height(32.dp))
+        // reduced spacing to reveal more of the next section
+        Spacer(Modifier.height(12.dp))
         
         // How Physical Movement Unlocks Work Section
         Card(
@@ -2079,7 +2025,7 @@ private fun QrGeneratorContent(
                 modifier = Modifier.padding(24.dp)
             ) {
                 Text(
-                    "How Physical Movement Unlocks Work:",
+                    "How ScreenGo QR Code Works:",
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -2100,7 +2046,7 @@ private fun QrGeneratorContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Download and print this QR code",
+                        "Download this QR code. Either print it or share it with your digital pause partner.",
                         fontSize = 16.sp,
                         color = Color.White,
                         modifier = Modifier.weight(1f)
@@ -2122,7 +2068,7 @@ private fun QrGeneratorContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "Place it somewhere you need to walk to (kitchen, bedroom, upstairs, etc.)",
+                        "If you printed your QR code, place it somewhere you need to walk to (kitchen, bedroom, upstairs, etc.)",
                         fontSize = 16.sp,
                         color = Color.White,
                         modifier = Modifier.weight(1f)
@@ -2144,7 +2090,7 @@ private fun QrGeneratorContent(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        "When your app time limit is reached, you'll need to physically get up and scan this code to unlock your apps",
+                        "Once your app time limit is up, you’ll need to get up and scan your QR code — either where you’ve placed it or from your digital pause partner — to unlock your apps.",
                         fontSize = 16.sp,
                         color = Color.White,
                         modifier = Modifier.weight(1f)
@@ -2547,20 +2493,7 @@ private fun DashboardContent(
     if (showAccountabilityDialog) {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showAccountabilityDialog = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("👥", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Coming Soon",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            },
+				title = null,
             text = {
                 Column {
                     Text(
