@@ -22,6 +22,7 @@ import PauseScreen
 import createAppStorage
 import setQrScanningActive
 import resetTimerAndContinueTracking
+import dismissAndContinueTracking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,13 +83,21 @@ class PauseOverlayActivity : ComponentActivity() {
             PauseOverlayContent(
                 message = message, 
                 onFinish = { 
-                    // Reset timer and continue tracking when user dismisses
-                    resetTimerAndContinueTracking()
+                    // Dismiss and continue tracking when user dismisses
+                    dismissAndContinueTracking()
                     finish() 
                 },
                 qrScanLauncher = qrScanLauncher
             )
         }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        println("DEBUG: PauseOverlayActivity - onNewIntent called")
+        // Bring the activity to the foreground when user switches to another tracked app
+        // The activity is already running, so we just need to make sure it's visible
+        // The existing content will remain the same
     }
 
 

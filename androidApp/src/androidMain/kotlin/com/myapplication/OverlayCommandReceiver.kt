@@ -18,7 +18,7 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                     if (context != null) {
                         println("DEBUG: OverlayCommandReceiver - launching PauseOverlayActivity")
                         val activityIntent = Intent(context, PauseOverlayActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             putExtra("message", message)
                         }
                         context.startActivity(activityIntent)

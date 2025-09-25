@@ -491,7 +491,7 @@ private fun AppRoot() {
     // Check onboarding completion status on app start
     LaunchedEffect(Unit) {
         try {
-            // Register timer reset callback for pause overlay
+            // Register timer reset callback for QR scan
             setOnTimerResetCallback {
                 println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
                 println("DEBUG: Current state - isBlocked: $isBlocked, isTracking: $isTracking")
@@ -532,6 +532,49 @@ private fun AppRoot() {
                 println("DEBUG: Dismissed blocking overlays")
                 
                 println("DEBUG: ===== TIMER RESET CALLBACK COMPLETED (QR SCAN) =====")
+            }
+            
+            // Register timer reset callback for dismiss button
+            setOnDismissCallback {
+                println("DEBUG: ===== DISMISS CALLBACK CALLED =====")
+                println("DEBUG: Current state - isBlocked: $isBlocked, isTracking: $isTracking")
+                println("DEBUG: sessionAppUsageTimes before: $sessionAppUsageTimes")
+                println("DEBUG: timesDismissedToday before: $timesDismissedToday")
+                
+                // 1. Finalize session usage before resetting (same as QR scan)
+                finalizeSessionUsage()
+                println("DEBUG: Finalized session usage after dismiss")
+                
+                // 2. Increment times dismissed counter (different from QR scan)
+                timesDismissedToday += 1
+                println("DEBUG: Incremented times dismissed counter to: $timesDismissedToday")
+                
+                // 3. Reset session tracking state when dismissing (same as QR scan)
+                isTracking = false
+                isBlocked = false
+                // Save unblocked state to storage
+                coroutineScope.launch {
+                    try { 
+                        storage.saveBlockedState(false)
+                        println("DEBUG: Saved unblocked state to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving unblocked state: ${e.message}")
+                    }
+                }
+                sessionAppUsageTimes = emptyMap()
+                sessionStartTime = 0L
+                sessionElapsedSeconds = 0L
+                println("DEBUG: Reset session timer and unblocked user")
+                
+                // 4. Navigate back to dashboard (same as QR scan)
+                route = Route.Dashboard
+                println("DEBUG: Set route to Dashboard")
+                
+                // 5. Dismiss any blocking overlays (same as QR scan)
+                dismissBlockingOverlay()
+                println("DEBUG: Dismissed blocking overlays")
+                
+                println("DEBUG: ===== DISMISS CALLBACK COMPLETED =====")
             }
             
             // Add a timeout to prevent hanging
@@ -1502,6 +1545,7 @@ expect fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
 expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
+expect fun setOnDismissCallback(callback: (() -> Unit)?)
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

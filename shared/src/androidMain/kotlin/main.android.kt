@@ -220,6 +220,29 @@ fun resetTimerAndContinueTracking() {
     }
 }
 
+fun dismissAndContinueTracking() {
+    println("DEBUG: dismissAndContinueTracking called")
+    
+    // Call the dismiss callback if it's set
+    onDismissCallback?.invoke()
+    
+    val activity = currentActivityRef?.get()
+    if (activity != null) {
+        try {
+            // Use broadcast receiver to dismiss and continue tracking
+            val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+                setPackage(activity.packageName) // Explicitly set the package
+            }
+            activity.sendBroadcast(intent)
+            println("DEBUG: dismissAndContinueTracking - sent RESET_TIMER_AND_CONTINUE broadcast with package: ${activity.packageName}")
+        } catch (e: Exception) {
+            println("DEBUG: dismissAndContinueTracking - error sending broadcast: ${e.message}")
+        }
+    } else {
+        println("DEBUG: dismissAndContinueTracking - no activity available")
+    }
+}
+
 actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
     if (!isBlocked) return
     
@@ -265,6 +288,7 @@ private var isQrScanningActive = false
 fun setQrScanningActive(active: Boolean) { isQrScanningActive = active }
 
 private var onTimerResetCallback: (() -> Unit)? = null
+private var onDismissCallback: (() -> Unit)? = null
 
 actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
     // QR scanning is handled directly by PauseOverlayActivity
@@ -279,6 +303,10 @@ actual fun getCurrentTimeMillis(): Long {
 
 actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
     onTimerResetCallback = callback
+}
+
+actual fun setOnDismissCallback(callback: (() -> Unit)?) {
+    onDismissCallback = callback
 }
 
 actual fun openAccessibilitySettings() {

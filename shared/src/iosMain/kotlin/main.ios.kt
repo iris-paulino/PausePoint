@@ -83,6 +83,10 @@ actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
     // No-op on iOS for now
 }
 
+actual fun setOnDismissCallback(callback: (() -> Unit)?) {
+    // No-op on iOS for now
+}
+
 actual fun openAccessibilitySettings() {
     // No-op on iOS
 }
