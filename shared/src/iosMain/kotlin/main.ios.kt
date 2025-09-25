@@ -79,6 +79,10 @@ actual fun getCurrentTimeMillis(): Long {
     return kotlin.random.Random.nextLong(1000000000000L, 2000000000000L)
 }
 
+actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
+    // No-op on iOS for now
+}
+
 actual fun openAccessibilitySettings() {
     // No-op on iOS
 }

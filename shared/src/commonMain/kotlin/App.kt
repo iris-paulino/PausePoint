@@ -491,6 +491,49 @@ private fun AppRoot() {
     // Check onboarding completion status on app start
     LaunchedEffect(Unit) {
         try {
+            // Register timer reset callback for pause overlay
+            setOnTimerResetCallback {
+                println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
+                println("DEBUG: Current state - isBlocked: $isBlocked, isTracking: $isTracking")
+                println("DEBUG: sessionAppUsageTimes before: $sessionAppUsageTimes")
+                println("DEBUG: timesUnblockedToday before: $timesUnblockedToday")
+                
+                // 1. Finalize session usage before resetting (same as Dismiss)
+                finalizeSessionUsage()
+                println("DEBUG: Finalized session usage after QR scan")
+                
+                // 2. Increment times walked counter (different from dismiss)
+                timesUnblockedToday += 1
+                println("DEBUG: Incremented times walked counter to: $timesUnblockedToday")
+                
+                // 3. Reset session tracking state when QR scanning (same as dismiss)
+                isTracking = false
+                isBlocked = false
+                // Save unblocked state to storage
+                coroutineScope.launch {
+                    try { 
+                        storage.saveBlockedState(false)
+                        println("DEBUG: Saved unblocked state to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving unblocked state: ${e.message}")
+                    }
+                }
+                sessionAppUsageTimes = emptyMap()
+                sessionStartTime = 0L
+                sessionElapsedSeconds = 0L
+                println("DEBUG: Reset session timer and unblocked user")
+                
+                // 4. Navigate back to dashboard (same as dismiss)
+                route = Route.Dashboard
+                println("DEBUG: Set route to Dashboard")
+                
+                // 5. Dismiss any blocking overlays (same as dismiss)
+                dismissBlockingOverlay()
+                println("DEBUG: Dismissed blocking overlays")
+                
+                println("DEBUG: ===== TIMER RESET CALLBACK COMPLETED (QR SCAN) =====")
+            }
+            
             // Add a timeout to prevent hanging
             val isOnboardingCompleted = withTimeoutOrNull(5000) {
                 storage.isOnboardingCompleted()
@@ -1458,6 +1501,7 @@ expect fun dismissBlockingOverlay()
 expect fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int)
 expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
+expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {
@@ -2001,52 +2045,6 @@ private fun QrGeneratorContent(
         }
     }
     
-    // Pause Partners Dialog
-    if (showAccountabilityDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showAccountabilityDialog = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("👥", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Coming Soon: Pause Partners",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            },
-            text = {
-                Column {
-                    Text(
-                        "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showAccountabilityDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
-        )
-    }
 }
 
 @Composable
@@ -2264,33 +2262,16 @@ private fun DashboardContent(
                     
                     Spacer(Modifier.height(16.dp))
                     
-                    Row(
+                    Button(
+                        onClick = onOpenQrGenerator,
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Button(
-                            onClick = onOpenQrGenerator,
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 12.dp)
-                        ) {
-                            Text("▦", color = Color.White)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Generate QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
-                        
-                        Button(
-                            onClick = { showAccountabilityDialog = true },
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                            shape = RoundedCornerShape(12.dp),
-                            contentPadding = PaddingValues(vertical = 12.dp)
-                        ) {
-                            Text("👥", color = Color.White)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Add Partners", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                        }
+                        Text("▦", color = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generate QR Codes", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                     
                     // Removed scan action button per requirements

@@ -36,6 +36,12 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                 // If fallback activity is showing, ensure it closes
                 // Activity registers a receiver to finish on this signal
             }
+            "com.myapplication.RESET_TIMER_AND_CONTINUE" -> {
+                println("DEBUG: OverlayCommandReceiver - RESET_TIMER_AND_CONTINUE received")
+                // This will be handled by the main app's broadcast receiver
+                // Just hide the overlay for now
+                ForegroundAppAccessibilityService.setPendingHide()
+            }
         }
     }
 }
