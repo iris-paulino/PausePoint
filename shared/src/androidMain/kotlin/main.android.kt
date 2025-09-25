@@ -330,6 +330,27 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
     }
 }
 
+actual fun openEmailClient(recipient: String) {
+    val activity = currentActivityRef?.get() ?: return
+    try {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = android.net.Uri.parse("mailto:$recipient")
+        }
+        if (intent.resolveActivity(activity.packageManager) != null) {
+            activity.startActivity(intent)
+        } else {
+            // Fallback to generic email intent if no email app is available
+            val fallbackIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+            }
+            activity.startActivity(Intent.createChooser(fallbackIntent, "Send Email"))
+        }
+    } catch (e: Exception) {
+        println("DEBUG: openEmailClient - error opening email client: ${e.message}")
+    }
+}
+
 actual fun openAccessibilitySettings() {
     val activity = currentActivityRef?.get() ?: return
     try {
