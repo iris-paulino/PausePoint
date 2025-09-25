@@ -168,6 +168,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         }
                         startActivity(intent)
+                        // Note: QR validation and overlay dismissal will be handled by the main app
+                        // when it receives the QR scan result through the activity result system
                     } catch (_: Exception) {}
                 }
             }

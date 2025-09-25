@@ -144,6 +144,16 @@ interface AppStorage {
      * Retrieve the saved epoch day (UTC). Return 0 if unset.
      */
     suspend fun getUsageDayEpoch(): Long
+
+    /**
+     * Persist blocked state (whether user is currently blocked from using tracked apps)
+     */
+    suspend fun saveBlockedState(isBlocked: Boolean)
+
+    /**
+     * Retrieve blocked state. Return false if unset.
+     */
+    suspend fun getBlockedState(): Boolean
 }
 
 /**

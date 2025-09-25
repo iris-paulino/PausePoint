@@ -178,6 +178,57 @@ actual fun showBlockingOverlay(message: String) {
     }
 }
 
+actual fun dismissBlockingOverlay() {
+    println("DEBUG: dismissBlockingOverlay called")
+    val activity = currentActivityRef?.get()
+    if (activity != null) {
+        try {
+            // Use broadcast receiver to hide the overlay
+            val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
+                setPackage(activity.packageName) // Explicitly set the package
+            }
+            activity.sendBroadcast(intent)
+            println("DEBUG: dismissBlockingOverlay - sent HIDE_BLOCKING_OVERLAY broadcast with package: ${activity.packageName}")
+        } catch (e: Exception) {
+            println("DEBUG: dismissBlockingOverlay - error sending broadcast: ${e.message}")
+        }
+    } else {
+        println("DEBUG: dismissBlockingOverlay - no activity available")
+    }
+}
+
+actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
+    if (!isBlocked) return
+    
+    println("DEBUG: checkAndShowOverlayIfBlocked called - isBlocked: $isBlocked")
+    
+    // Get the current foreground app using the existing expect/actual function
+    val currentForegroundApp = getCurrentForegroundApp()
+    println("DEBUG: checkAndShowOverlayIfBlocked - currentForegroundApp: $currentForegroundApp")
+    
+    if (currentForegroundApp != null) {
+        // Check if the current foreground app is one of the tracked apps
+        val isTrackedApp = trackedAppNames.any { appName ->
+            val expectedPackage = when (appName.lowercase()) {
+                "chrome" -> "com.android.chrome"
+                "youtube" -> "com.google.android.youtube"
+                "messages" -> "com.google.android.apps.messaging"
+                "gmail" -> "com.google.android.gm"
+                else -> appName.lowercase().replace(" ", "")
+            }
+            currentForegroundApp == expectedPackage
+        }
+        
+        println("DEBUG: checkAndShowOverlayIfBlocked - isTrackedApp: $isTrackedApp")
+        
+        if (isTrackedApp) {
+            // User is trying to use a tracked app while blocked, show overlay
+            println("DEBUG: checkAndShowOverlayIfBlocked - showing overlay for blocked tracked app")
+            showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
+        }
+    }
+}
+
 actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
     // Launch a small activity that wraps ZXing scanner and await result
     val activity = currentActivityRef?.get() ?: return false

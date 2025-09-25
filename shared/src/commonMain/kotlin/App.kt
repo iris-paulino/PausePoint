@@ -149,6 +149,7 @@ private fun AppRoot() {
     var isTracking by remember { mutableStateOf(false) }
     var trackingStartTime by remember { mutableStateOf(0L) }
     var appUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    var isBlocked by remember { mutableStateOf(false) }
     
     // Session tracking variables that reset on dismiss/QR scan
     var sessionStartTime by remember { mutableStateOf(0L) }
@@ -250,6 +251,17 @@ private fun AppRoot() {
         }
     }
 
+    // Monitor foreground app changes to show overlay when blocked user tries to use tracked apps
+    LaunchedEffect(isBlocked, trackedApps, timeLimitMinutes) {
+        if (isBlocked) {
+            // Check periodically if user is trying to use a tracked app while blocked
+            while (isBlocked) {
+                delay(2000) // Check every 2 seconds
+                checkAndShowOverlayIfBlocked(trackedApps.map { it.name }, isBlocked, timeLimitMinutes)
+            }
+        }
+    }
+
     // Real-time tracking update while tracking is active
     LaunchedEffect(isTracking, trackingStartTime) {
         if (isTracking && trackingStartTime > 0) {
@@ -273,6 +285,11 @@ private fun AppRoot() {
                 if (elapsedMinutes >= timeLimitMinutes) {
                     finalizeSessionUsage()
                     isTracking = false
+                    isBlocked = true
+                    // Save blocked state to storage
+                    coroutineScope.launch {
+                        storage.saveBlockedState(true)
+                    }
                     route = Route.Pause
                     // Show the blocking overlay to prevent further app usage
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
@@ -386,6 +403,11 @@ private fun AppRoot() {
                     // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
                     finalizeSessionUsage()
                     isTracking = false
+                    isBlocked = true
+                    // Save blocked state to storage
+                    coroutineScope.launch {
+                        storage.saveBlockedState(true)
+                    }
                     route = Route.Pause
                     // Show the blocking overlay to prevent further app usage
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
@@ -477,12 +499,14 @@ private fun AppRoot() {
             val savedAppUsageTimes = withTimeoutOrNull(3000) { storage.getAppUsageTimes() } ?: emptyMap()
             val savedTrackingStartTime = withTimeoutOrNull(3000) { storage.getTrackingStartTime() } ?: 0L
             val savedUsageDay = withTimeoutOrNull(3000) { storage.getUsageDayEpoch() } ?: 0L
+            val savedBlockedState = withTimeoutOrNull(3000) { storage.getBlockedState() } ?: false
             val todayEpochDay = currentEpochDayUtc()
             
             // Restore tracking state
             isTracking = savedTrackingState
             appUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
+            isBlocked = savedBlockedState
 
             // Daily reset if needed
             if (savedUsageDay == 0L) {
@@ -950,11 +974,19 @@ private fun AppRoot() {
                             
                             // Reset session tracking state and increment unblocked counter
                             isTracking = false
+                            isBlocked = false
+                            // Save unblocked state to storage
+                            coroutineScope.launch {
+                                storage.saveBlockedState(false)
+                            }
                             sessionAppUsageTimes = emptyMap()
                             sessionStartTime = 0L
                             sessionElapsedSeconds = 0L
                             timesUnblockedToday += 1
                             route = Route.Dashboard
+                            
+                            // Dismiss any blocking overlays
+                            dismissBlockingOverlay()
                         }
                     }
                 },
@@ -970,12 +1002,20 @@ private fun AppRoot() {
                     
                     // Reset session tracking state when dismissing (no counter increment)
                     isTracking = false
+                    isBlocked = false
+                    // Save unblocked state to storage
+                    coroutineScope.launch {
+                        storage.saveBlockedState(false)
+                    }
                     sessionAppUsageTimes = emptyMap()
                     sessionStartTime = 0L
                     sessionElapsedSeconds = 0L
                     
                     println("DEBUG: trackedApps after reset: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                     route = Route.Dashboard 
+                    
+                    // Dismiss any blocking overlays
+                    dismissBlockingOverlay()
                 }
             )
         }
@@ -1405,6 +1445,8 @@ expect fun startUsageTracking(
     onLimitReached: () -> Unit
 )
 expect fun showBlockingOverlay(message: String)
+expect fun dismissBlockingOverlay()
+expect fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int)
 expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 

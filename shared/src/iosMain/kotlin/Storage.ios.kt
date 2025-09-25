@@ -304,6 +304,23 @@ class IOSAppStorage : AppStorage {
         
         return usageTimes
     }
+
+    override suspend fun saveBlockedState(isBlocked: Boolean) {
+        try {
+            userDefaults.setBool(isBlocked, "blocked_state")
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getBlockedState(): Boolean {
+        return try {
+            userDefaults.boolForKey("blocked_state")
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
 
 actual fun createAppStorage(): AppStorage {

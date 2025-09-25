@@ -47,7 +47,14 @@ class PauseOverlayActivity : ComponentActivity() {
         } catch (_: Exception) { }
 
         setContent {
-            PauseOverlayContent(message = message, onFinish = { finish() })
+            PauseOverlayContent(message = message, onFinish = { 
+                // Send broadcast to dismiss all overlays before finishing
+                val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
+                    setPackage(this@PauseOverlayActivity.packageName)
+                }
+                sendBroadcast(intent)
+                finish() 
+            })
         }
     }
 
@@ -64,7 +71,11 @@ class PauseOverlayActivity : ComponentActivity() {
                             val storage = createAppStorage()
                             val match = storage.validateQrCode(qrText)
                             if (match != null) {
-                                // QR code is valid, close overlay
+                                // QR code is valid, dismiss all overlays and close this activity
+                                val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
+                                    setPackage(this@PauseOverlayActivity.packageName)
+                                }
+                                sendBroadcast(intent)
                                 finish()
                             } else {
                                 // QR code is invalid, show error or keep overlay open
