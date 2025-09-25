@@ -59,6 +59,23 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material.Switch
 import androidx.compose.material.SwitchDefaults
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.Dp
+
+@OptIn(ExperimentalResourceApi::class)
+@Composable
+fun AppLogo(
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    contentDescription: String = "ScreenGo Logo"
+) {
+    Image(
+        painter = painterResource("images/Untitled design (1).png"),
+        contentDescription = contentDescription,
+        modifier = modifier.size(size),
+        contentScale = ContentScale.Fit
+    )
+}
 
 @Composable
 fun App() {
@@ -868,6 +885,8 @@ private fun AppRoot() {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    AppLogo(size = 120.dp)
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text("Loading...", color = Color.White)
                     Text("Checking onboarding status...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                 }
@@ -1613,6 +1632,11 @@ private fun OnboardingFlow(
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
+                title = "Welcome to ScreenGo",
+                description = "Take mindful breaks and set healthy limits on your app usage.",
+                showLogo = true
+            ),
+            OnboardingPage(
                 title = "Take Mindful Breaks",
                 description = "Set limits on your app usage and take meaningful pauses when you reach them."
             ),
@@ -1635,7 +1659,8 @@ private fun OnboardingFlow(
 private data class OnboardingPage(
     val title: String,
     val description: String,
-    val primaryCta: String = "Next"
+    val primaryCta: String = "Next",
+    val showLogo: Boolean = false
 )
 
 @OptIn(ExperimentalResourceApi::class)
@@ -1716,12 +1741,17 @@ private fun OnboardingPager(
                     modifier = Modifier.padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Illustration - person walking on path through hills
-                    Image(
-                        painter = painterResource("images/onboarding/mindful_breaks.png"),
-                        contentDescription = "Mindful breaks illustration",
-                        modifier = Modifier.size(200.dp)
-                    )
+                    // Show logo on first page, otherwise show illustration
+                    if (page.showLogo) {
+                        AppLogo(size = 200.dp)
+                    } else {
+                        // Illustration - person walking on path through hills
+                        Image(
+                            painter = painterResource("images/onboarding/mindful_breaks.png"),
+                            contentDescription = "Mindful breaks illustration",
+                            modifier = Modifier.size(200.dp)
+                        )
+                    }
                     
                     Spacer(Modifier.height(24.dp))
                     
