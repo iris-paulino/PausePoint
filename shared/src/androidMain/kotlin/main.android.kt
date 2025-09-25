@@ -101,7 +101,7 @@ actual fun saveQrPdf(qrText: String, message: String): String {
     }
     
     // Title
-    canvas.drawText("DoomDrop QR Code", 72f, 96f, paint)
+    canvas.drawText("ScreenGo QR Code", 72f, 96f, paint)
     
     // Message
     paint.textSize = 20f

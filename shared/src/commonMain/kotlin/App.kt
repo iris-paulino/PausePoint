@@ -676,21 +676,27 @@ private fun AppRoot() {
 
         // 1) Notifications
         val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
+        println("DEBUG: Checking notifications - enabled: $notificationsEnabled")
         if (!notificationsEnabled) {
+            println("DEBUG: Notifications not enabled, showing dialog")
             showNotificationDialog = true
             return@LaunchedEffect
         }
 
         // 2) Usage access
         val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+        println("DEBUG: Checking usage access - allowed: $usageAllowed")
         if (!usageAllowed) {
+            println("DEBUG: Usage access not allowed, showing dialog")
             showUsageAccessDialog = true
             return@LaunchedEffect
         }
 
         // 3) Accessibility access
         val accessibilityAllowed = isAccessibilityServiceEnabled()
+        println("DEBUG: Checking accessibility - enabled: $accessibilityAllowed")
         if (!accessibilityAllowed) {
+            println("DEBUG: Accessibility not enabled, showing dialog")
             showAccessibilityConsentDialog = true
             return@LaunchedEffect
         }
@@ -700,24 +706,30 @@ private fun AppRoot() {
             val hasAnySavedQr = withTimeoutOrNull(2000) {
                 storage.getSavedQrCodes().isNotEmpty()
             } ?: false
+            println("DEBUG: Checking QR codes - qrId: '$qrId', hasAnySavedQr: $hasAnySavedQr")
             if (qrId.isNullOrBlank() && !hasAnySavedQr) {
+                println("DEBUG: No QR codes available, showing dialog")
                 showNoQrCodeDialog = true
                 return@LaunchedEffect
             }
         }
 
         // 5) Also ensure there are tracked apps
+        println("DEBUG: Checking tracked apps - count: ${trackedApps.size}")
         if (trackedApps.isEmpty()) {
+            println("DEBUG: No tracked apps, showing dialog")
             showNoTrackedAppsDialog = true
             return@LaunchedEffect
         }
 
         // All checks passed: toggle tracking
+        println("DEBUG: All prerequisites passed, toggling tracking from $isTracking to ${!isTracking}")
         if (isTracking) {
             finalizeSessionUsage()
         }
         isTracking = !isTracking
         pendingStartTracking = false
+        println("DEBUG: Tracking state updated to: $isTracking")
     }
 
     when (route) {
@@ -771,13 +783,16 @@ private fun AppRoot() {
             timesUnblockedToday = timesUnblockedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = { 
+                println("DEBUG: onToggleTracking called, current isTracking: $isTracking")
                 if (isTracking) {
                     // Pause tracking - no dialogs needed
+                    println("DEBUG: Pausing tracking")
                     if (isTracking) { finalizeSessionUsage() }
                     isTracking = false
                     pendingStartTracking = false
                 } else {
                     // Start tracking - check permissions first
+                    println("DEBUG: Starting tracking, setting pendingStartTracking = true")
                     pendingStartTracking = true
                 }
             },
@@ -2028,7 +2043,7 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("DoomDrop", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("ScreenGo", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
@@ -2050,26 +2065,6 @@ private fun DashboardContent(
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("🕐", fontSize = 16.sp, color = Color(0xFF1E3A5F))
-                        Spacer(Modifier.width(8.dp))
-                        Text("Current Status", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    }
-                    Box(
-                        modifier = Modifier
-                            .background(Color(0xFF1E3A5F), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("Apps Available", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-                
-                Spacer(Modifier.height(16.dp))
                 
                 // Time remaining display
                 Box(
@@ -2441,17 +2436,8 @@ private fun SettingsScreen(
         Spacer(Modifier.height(24.dp))
 
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFF2C2C2C),
-                            Color(0xFF282828)
-                        )
-                    )
-                ),
-            backgroundColor = Color.Transparent,
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
             var notificationsEnabled by remember { mutableStateOf(false) }
@@ -2879,7 +2865,7 @@ fun PauseScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "You have used your tracked apps for ${timeLimitMinutes}m",
+                        text = "You have used your tracked apps for $durationText",
                         color = Color(0xFFBFC7C2)
                     )
                     Spacer(Modifier.height(8.dp))
@@ -2891,7 +2877,7 @@ fun PauseScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Choose how you'd like to take your mindful break",
+                        text = "Walk to your QR code to unlock your apps",
                         color = Color(0xFFBFC7C2),
                         fontSize = 14.sp
                     )
