@@ -164,18 +164,28 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 text = "Scan QR to continue"
                 setOnClickListener {
                     try {
-                        val intent = Intent(this@ForegroundAppAccessibilityService, QrScanActivity::class.java).apply {
+                        val intent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra("message", message)
                         }
                         startActivity(intent)
-                        // Note: QR validation and overlay dismissal will be handled by the main app
-                        // when it receives the QR scan result through the activity result system
-                    } catch (_: Exception) {}
+                        // Hide the system overlay since we're showing the activity
+                        hideOverlay()
+                    } catch (e: Exception) {
+                        println("DEBUG: showOverlay - error launching PauseOverlayActivity: ${e.message}")
+                    }
                 }
             }
             val dismissBtn = Button(this).apply {
                 text = "Dismiss"
-                setOnClickListener { hideOverlay() }
+                setOnClickListener { 
+                    // Send dismiss broadcast to trigger the dismiss callback
+                    val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+                        setPackage(applicationContext.packageName)
+                    }
+                    applicationContext.sendBroadcast(intent)
+                    hideOverlay()
+                }
             }
 
             val layout = FrameLayout(this).apply {
