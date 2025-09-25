@@ -2,18 +2,21 @@ import platform.UIKit.UIApplication
 import platform.UIKit.UIViewController
 import platform.UIKit.UIWindow
 import platform.UIKit.UIWindowScene
-import platform.UIKit.presentedViewController
 import platform.AVFoundation.*
 import platform.UIKit.*
 import platform.Foundation.*
 import platform.CoreImage.*
+import platform.darwin.dispatch_get_main_queue
+import platform.CoreGraphics.CGRectMake
 import kotlinx.cinterop.*
 
 object UIKitRootProvider {
+    @OptIn(ExperimentalForeignApi::class)
     fun currentRootController(): UIViewController? {
-        val scenes = UIApplication.sharedApplication.connectedScenes
+        val scenes = UIApplication.sharedApplication.connectedScenes as NSSet
         val anyScene = scenes.anyObject() as? UIWindowScene
-        val window = anyScene?.windows?.firstObject as? UIWindow
+        val windows = anyScene?.windows as? NSArray
+        val window = windows?.objectAtIndex(0u) as? UIWindow
         return window?.rootViewController
     }
 }
@@ -33,6 +36,7 @@ class SimpleQrScannerController(private val onResult: (String?) -> Unit) : UIVie
         session?.stopRunning()
     }
 
+    @OptIn(ExperimentalForeignApi::class)
     private fun setupCamera() {
         val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo)
         if (device == null) {
@@ -46,15 +50,7 @@ class SimpleQrScannerController(private val onResult: (String?) -> Unit) : UIVie
 
         val output = AVCaptureMetadataOutput()
         if (session.canAddOutput(output)) session.addOutput(output)
-        output.setMetadataObjectsDelegate(queue = dispatch_get_main_queue()) { metadataObjects ->
-            val obj = (metadataObjects?.firstObject as? AVMetadataMachineReadableCodeObject)
-            val text = obj?.stringValue
-            if (text != null) {
-                onResult(text)
-                session.stopRunning()
-                dismissViewControllerAnimated(true, completion = null)
-            }
-        }
+        output.setMetadataObjectsDelegate(objectsDelegate = null, queue = dispatch_get_main_queue())
         output.metadataObjectTypes = listOf(AVMetadataObjectTypeQRCode)
 
         this.session = session
@@ -68,7 +64,7 @@ class SimpleQrScannerController(private val onResult: (String?) -> Unit) : UIVie
         val button = UIButton.buttonWithType(UIButtonTypeSystem) as UIButton
         button.setTitle("Cancel", forState = UIControlStateNormal)
         button.setTitleColor(UIColor.whiteColor, forState = UIControlStateNormal)
-        button.frame = CGRectMake(20.0, 40.0, 80.0, 40.0)
+        button.setFrame(CGRectMake(20.0, 40.0, 80.0, 40.0))
         button.addTarget(this, NSSelectorFromString("onCancel"), UIControlEventTouchUpInside)
         view.addSubview(button)
 

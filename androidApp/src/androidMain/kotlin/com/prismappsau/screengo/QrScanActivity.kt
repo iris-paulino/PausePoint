@@ -1,4 +1,4 @@
-package com.myapplication
+package com.prismappsau.screengo
 
 import android.app.Activity
 import android.content.Intent

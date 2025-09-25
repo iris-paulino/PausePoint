@@ -321,6 +321,23 @@ class IOSAppStorage : AppStorage {
             false
         }
     }
+
+    override suspend fun saveUsageDayEpoch(epochDay: Long) {
+        try {
+            userDefaults.setDouble(epochDay.toDouble(), "usage_day_epoch")
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getUsageDayEpoch(): Long {
+        return try {
+            userDefaults.doubleForKey("usage_day_epoch").toLong()
+        } catch (e: Exception) {
+            0L
+        }
+    }
 }
 
 actual fun createAppStorage(): AppStorage {

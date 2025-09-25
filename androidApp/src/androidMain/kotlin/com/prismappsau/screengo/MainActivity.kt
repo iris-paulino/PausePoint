@@ -1,4 +1,4 @@
-package com.screengo
+package com.prismappsau.screengo
 
 import MainView
 import android.os.Bundle

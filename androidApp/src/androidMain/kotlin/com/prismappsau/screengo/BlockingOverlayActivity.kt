@@ -1,4 +1,4 @@
-package com.myapplication
+package com.prismappsau.screengo
 
 import android.app.Activity
 import android.content.BroadcastReceiver
@@ -73,7 +73,7 @@ class BlockingOverlayActivity : AppCompatActivity() {
         setContentView(container)
 
         // Register receiver to close when HIDE is sent
-        val filter = IntentFilter("com.myapplication.HIDE_BLOCKING_OVERLAY")
+        val filter = IntentFilter("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY")
         try {
             if (android.os.Build.VERSION.SDK_INT >= 33) {
                 registerReceiver(hideReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
