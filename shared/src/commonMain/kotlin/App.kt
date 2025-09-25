@@ -158,6 +158,8 @@ private fun AppRoot() {
     
     // Counter for times unblocked today
     var timesUnblockedToday by remember { mutableStateOf(0) }
+    // Counter for times dismissed today
+    var timesDismissedToday by remember { mutableStateOf(0) }
     var isSetupMode by remember { mutableStateOf(false) }
 
     // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
@@ -517,6 +519,7 @@ private fun AppRoot() {
                 trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
                 appUsageTimes = emptyMap()
                 timesUnblockedToday = 0
+                timesDismissedToday = 0
                 withTimeoutOrNull(2000) {
                     storage.saveAppUsageTimes(appUsageTimes)
                     storage.saveUsageDayEpoch(todayEpochDay)
@@ -805,6 +808,7 @@ private fun AppRoot() {
             timeLimitMinutes = timeLimitMinutes,
             sessionAppUsageTimes = sessionAppUsageTimes,
             timesUnblockedToday = timesUnblockedToday,
+            timesDismissedToday = timesDismissedToday,
             sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = { 
                 println("DEBUG: onToggleTracking called, current isTracking: $isTracking")
@@ -999,6 +1003,9 @@ private fun AppRoot() {
                     finalizeSessionUsage()
                     
                     println("DEBUG: trackedApps after finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+                    
+                    // Increment dismiss counter
+                    timesDismissedToday += 1
                     
                     // Reset session tracking state when dismissing (no counter increment)
                     isTracking = false
@@ -1403,6 +1410,7 @@ private fun DashboardScreen(
     timeLimitMinutes: Int,
     sessionAppUsageTimes: Map<String, Long>,
     timesUnblockedToday: Int,
+    timesDismissedToday: Int,
     sessionElapsedSeconds: Long,
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
@@ -1422,6 +1430,7 @@ private fun DashboardScreen(
         timeLimitMinutes = timeLimitMinutes,
         sessionAppUsageTimes = sessionAppUsageTimes,
         timesUnblockedToday = timesUnblockedToday,
+        timesDismissedToday = timesDismissedToday,
         sessionElapsedSeconds = sessionElapsedSeconds,
         onToggleTracking = onToggleTracking,
         onOpenQrGenerator = onOpenQrGenerator,
@@ -2049,6 +2058,7 @@ private fun DashboardContent(
     timeLimitMinutes: Int,
     sessionAppUsageTimes: Map<String, Long>,
     timesUnblockedToday: Int,
+    timesDismissedToday: Int,
     sessionElapsedSeconds: Long,
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
@@ -2157,6 +2167,16 @@ private fun DashboardContent(
                 
                 Spacer(Modifier.height(16.dp))
                 
+                // Stats title row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("Your Stats Today", fontSize = 16.sp, color = Color.White)
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
                 // Stats row
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -2164,20 +2184,11 @@ private fun DashboardContent(
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("${timesUnblockedToday}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFBFDEDA))
-                        Text("times walked today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("times walked", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val totalTodayMinutesUsed = trackedApps.sumOf { app ->
-                            val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
-                            app.minutesUsed + sessionMinutes
-                        }
-                        val hours = totalTodayMinutesUsed / 60
-                        val minutes = totalTodayMinutesUsed % 60
-                        // Debug logging
-                        println("DEBUG: Total usage calculation - sessionAppUsageTimes: $sessionAppUsageTimes, totalTodayMinutesUsed: $totalTodayMinutesUsed")
-                        println("DEBUG: Total usage calculation - trackedApps: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
-                        Text("${hours}h ${minutes}m", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        Text("${timesDismissedToday}", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB347))
+                        Text("times dismissed", fontSize = 12.sp, color = Color(0xFFD1D5DB))
                     }
                 }
                 
@@ -2221,19 +2232,6 @@ private fun DashboardContent(
                     Text(if (isTracking) "Pause Tracking" else "Start Tracking", color = Color.White, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(Modifier.height(12.dp))
-
-                Button(
-                    onClick = onOpenPause,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(12.dp),
-                    contentPadding = PaddingValues(vertical = 14.dp)
-                ) {
-                    Text("⏸", color = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Simulate Limit Reached (Open Pause Screen)", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                }
             }
         }
         
@@ -2313,6 +2311,16 @@ private fun DashboardContent(
             Column(
                 modifier = Modifier.padding(24.dp)
             ) {
+                // Centered title row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text("Your selected apps to track", fontSize = 19.sp, color = Color.White)
+                }
+                
+                Spacer(Modifier.height(12.dp))
+                
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -2321,7 +2329,16 @@ private fun DashboardContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("📊", fontSize = 16.sp, color = Color(0xFF1E3A5F))
                         Spacer(Modifier.width(8.dp))
-                        Text("App Usage", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Column(horizontalAlignment = Alignment.Start) {
+                            val totalTodayMinutesUsed = trackedApps.sumOf { app ->
+                                val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
+                                app.minutesUsed + sessionMinutes
+                            }
+                            val hours = totalTodayMinutesUsed / 60
+                            val minutes = totalTodayMinutesUsed % 60
+                            Text("${hours}h ${minutes}m", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text("total usage today", fontSize = 12.sp, color = Color(0xFFD1D5DB))
+                        }
                     }
                     Text(
                         text = "+", 
