@@ -309,4 +309,3 @@ class IOSAppStorage : AppStorage {
 actual fun createAppStorage(): AppStorage {
     return IOSAppStorage()
 }
-

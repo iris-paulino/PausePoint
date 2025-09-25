@@ -200,4 +200,3 @@ class IOSInstalledAppsProvider : InstalledAppsProvider {
 actual fun createInstalledAppsProvider(): InstalledAppsProvider {
     return IOSInstalledAppsProvider()
 }
-

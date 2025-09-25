@@ -81,4 +81,3 @@ class SimpleQrScannerController(private val onResult: (String?) -> Unit) : UIVie
         dismissViewControllerAnimated(true, completion = null)
     }
 }
-

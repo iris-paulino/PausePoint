@@ -398,4 +398,3 @@ fun initializeInstalledAppsProvider(context: Context) {
     globalInstalledAppsProvider = AndroidInstalledAppsProvider(context)
     println("DEBUG: InstalledAppsProvider initialized successfully")
 }
-

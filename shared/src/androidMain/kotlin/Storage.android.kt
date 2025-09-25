@@ -428,4 +428,3 @@ actual fun createAppStorage(): AppStorage {
 fun initializeAppStorage(context: Context) {
     globalStorage = AndroidAppStorage(context)
 }
-

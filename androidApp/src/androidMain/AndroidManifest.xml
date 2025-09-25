@@ -42,10 +42,17 @@
             android:name=".PauseOverlayActivity"
             android:exported="false"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar"
-            android:taskAffinity=""
-            android:excludeFromRecents="true"
-            android:showOnLockScreen="true"
-            android:turnScreenOn="true"/>
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true" />
+
+        <receiver
+            android:name=".OverlayCommandReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.myapplication.SHOW_BLOCKING_OVERLAY" />
+                <action android:name="com.myapplication.HIDE_BLOCKING_OVERLAY" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".ForegroundAppAccessibilityService"
@@ -58,16 +65,6 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/foreground_accessibility_service_config" />
         </service>
-
-        <!-- Exported=false receiver to capture overlay commands even if service isn't alive -->
-        <receiver
-            android:name=".OverlayCommandReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.myapplication.SHOW_BLOCKING_OVERLAY" />
-                <action android:name="com.myapplication.HIDE_BLOCKING_OVERLAY" />
-            </intent-filter>
-        </receiver>
     </application>
 
 </manifest>
