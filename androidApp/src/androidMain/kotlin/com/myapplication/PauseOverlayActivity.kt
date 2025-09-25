@@ -18,6 +18,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import PauseScreen
+import createAppStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class PauseOverlayActivity : ComponentActivity() {
     private val hideReceiver = object : BroadcastReceiver() {
@@ -51,8 +55,28 @@ class PauseOverlayActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == 1002) {
-            // Close overlay after scanner returns
-            finish()
+            if (resultCode == RESULT_OK) {
+                val qrText = data?.getStringExtra("qr_text")
+                if (qrText != null) {
+                    // Validate QR code and handle result
+                    CoroutineScope(Dispatchers.Main).launch {
+                        try {
+                            val storage = createAppStorage()
+                            val match = storage.validateQrCode(qrText)
+                            if (match != null) {
+                                // QR code is valid, close overlay
+                                finish()
+                            } else {
+                                // QR code is invalid, show error or keep overlay open
+                                // For now, we'll keep the overlay open
+                            }
+                        } catch (e: Exception) {
+                            // Error validating QR code, keep overlay open
+                        }
+                    }
+                }
+            }
+            // If result is not OK or QR text is null, keep overlay open
         }
     }
 
@@ -68,10 +92,28 @@ private fun PauseOverlayContent(message: String, onFinish: () -> Unit) {
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
 
-    // Use provided message; duration/limit are not strictly needed for visuals
-    LaunchedEffect(Unit) {
-        durationText = ""
-        limit = 0
+    // Extract time limit from message and set up proper display
+    LaunchedEffect(message) {
+        // Parse the message to extract time limit information
+        // The message should contain time limit info, but if not, we'll use a default
+        val timeLimitMatch = Regex("(\\d+)\\s*(minute|hour|h|m)").find(message)
+        if (timeLimitMatch != null) {
+            val value = timeLimitMatch.groupValues[1].toIntOrNull() ?: 0
+            val unit = timeLimitMatch.groupValues[2]
+            limit = if (unit.contains("hour") || unit == "h") value * 60 else value
+            durationText = if (limit >= 60) "${limit / 60}h ${limit % 60}m" else "${limit}m"
+        } else {
+            // Fallback: try to get time limit from app storage
+            try {
+                val storage = createAppStorage()
+                limit = storage.getTimeLimitMinutes()
+                durationText = if (limit >= 60) "${limit / 60}h ${limit % 60}m" else "${limit}m"
+            } catch (e: Exception) {
+                // If all else fails, use a default
+                limit = 30
+                durationText = "30m"
+            }
+        }
     }
 
     PauseScreen(
