@@ -21,6 +21,9 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         private var currentForegroundPackage: String? = null
         @Volatile private var pendingShowMessage: String? = null
         @Volatile private var pendingHide: Boolean = false
+        @Volatile private var isBlocked: Boolean = false
+        @Volatile private var trackedAppNames: List<String> = emptyList()
+        @Volatile private var timeLimitMinutes: Int = 0
         
         fun getCurrentForegroundPackage(): String? = currentForegroundPackage
         
@@ -37,6 +40,13 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         fun setPendingHide() {
             pendingHide = true
             println("DEBUG: PendingCommands - setPendingHide()")
+        }
+        
+        fun setBlockedState(blocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
+            isBlocked = blocked
+            trackedAppNames = trackedApps
+            timeLimitMinutes = timeLimit
+            println("DEBUG: ForegroundAppAccessibilityService - Set blocked state: blocked=$blocked, apps=$trackedApps, limit=$timeLimit")
         }
     }
 
@@ -90,10 +100,42 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 setPackage(applicationContext.packageName)
             }
             applicationContext.sendBroadcast(intent)
+            
+            // Check if this app should be blocked and show overlay immediately
+            checkAndShowOverlayForApp(pkg)
         }
     }
 
     override fun onInterrupt() {
+    }
+    
+    private fun checkAndShowOverlayForApp(packageName: String?) {
+        if (!isBlocked || packageName.isNullOrBlank()) return
+        
+        println("DEBUG: checkAndShowOverlayForApp - checking package: $packageName, blocked: $isBlocked")
+        
+        // Check if the current foreground app is one of the tracked apps
+        val isTrackedApp = trackedAppNames.any { appName ->
+            val expectedPackage = when (appName.lowercase()) {
+                "chrome" -> "com.android.chrome"
+                "youtube" -> "com.google.android.youtube"
+                "messages" -> "com.google.android.apps.messaging"
+                "gmail" -> "com.google.android.gm"
+                "whatsapp" -> "com.whatsapp"
+                "youtube music" -> "com.google.android.apps.youtube.music"
+                else -> appName.lowercase().replace(" ", "")
+            }
+            packageName == expectedPackage
+        }
+        
+        println("DEBUG: checkAndShowOverlayForApp - isTrackedApp: $isTrackedApp for package: $packageName")
+        
+        if (isTrackedApp) {
+            // User is trying to use a tracked app while blocked, show overlay immediately
+            println("DEBUG: checkAndShowOverlayForApp - showing overlay for blocked tracked app: $packageName")
+            val message = "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
+            showOverlay(message)
+        }
     }
 
     // Overlay management
