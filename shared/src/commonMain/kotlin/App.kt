@@ -93,7 +93,7 @@ fun App() {
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, PrivacyPolicy }
 
 // Enable simulated app usage increments for testing; rely on platform-specific tracking instead
 private const val ENABLE_USAGE_SIMULATION: Boolean = true
@@ -969,7 +969,8 @@ private fun AppRoot() {
         Route.Settings -> SettingsScreen(
             onBack = { route = Route.Dashboard },
             onOpenSavedQrCodes = { route = Route.SavedQrCodes },
-            onNotificationsTurnedOff = { }
+            onNotificationsTurnedOff = { },
+            onOpenPrivacyPolicy = { route = Route.PrivacyPolicy }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
@@ -1131,6 +1132,9 @@ private fun AppRoot() {
                 }
             )
         }
+        Route.PrivacyPolicy -> PrivacyPolicyScreen(
+            onBack = { route = Route.Settings }
+        )
     }
     
     // Notification Permission Dialog
@@ -2507,7 +2511,8 @@ private fun DashboardContent(
 private fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSavedQrCodes: () -> Unit,
-    onNotificationsTurnedOff: () -> Unit
+    onNotificationsTurnedOff: () -> Unit,
+    onOpenPrivacyPolicy: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -2708,6 +2713,22 @@ private fun SettingsScreen(
                 Text("Contact us", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(8.dp))
                 Text("Get in touch for suggestions, comments, support, complaints, and more", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenPrivacyPolicy() },
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Privacy Policy", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Learn how we collect, use, and protect your data", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
@@ -3201,6 +3222,201 @@ private fun AppSelectionItem(
                         .offset(
                             x = if (app.isSelected) 10.dp else (-10).dp
                         )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PrivacyPolicyScreen(
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "←",
+                fontSize = 24.sp,
+                color = Color.White,
+                modifier = Modifier.clickable { onBack() }
+            )
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(
+                    "Privacy Policy",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    "Last updated: December 2024",
+                    fontSize = 14.sp,
+                    color = Color(0xFFD1D5DB)
+                )
+            }
+        }
+        
+        Spacer(Modifier.height(32.dp))
+        
+        // Privacy Policy Content
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp)
+            ) {
+                Text(
+                    "Introduction",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "ScreenGo (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Information We Collect",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• App Usage Data: We track which apps you use and for how long to help you manage your digital wellness\n" +
+                    "• Device Information: Basic device information necessary for app functionality\n" +
+                    "• QR Code Data: QR codes you generate and scan for pause functionality\n" +
+                    "• Settings Preferences: Your app settings and preferences",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "How We Use Your Information",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• Provide digital wellness tracking and pause functionality\n" +
+                    "• Generate and manage QR codes for your pause system\n" +
+                    "• Send notifications when time limits are reached\n" +
+                    "• Improve app performance and user experience",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Data Storage and Security",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• All data is stored locally on your device\n" +
+                    "• We do not transmit your personal data to external servers\n" +
+                    "• Your app usage data remains private and under your control\n" +
+                    "• We implement appropriate security measures to protect your information",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Permissions",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• Usage Access: Required to track app usage for wellness features\n" +
+                    "• Accessibility Service: Used to show pause overlays when time limits are reached\n" +
+                    "• Camera: Used to scan QR codes for pause functionality\n" +
+                    "• Notifications: Used to alert you when time limits are reached",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Your Rights",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• Access your data stored in the app\n" +
+                    "• Delete your data by uninstalling the app\n" +
+                    "• Modify your privacy settings at any time\n" +
+                    "• Contact us with privacy concerns",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Contact Us",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
+                    "Email: contact.screengo@gmail.com",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Changes to This Policy",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy in the app. You are advised to review this Privacy Policy periodically for any changes.",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
                 )
             }
         }
