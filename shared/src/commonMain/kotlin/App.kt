@@ -2643,7 +2643,7 @@ private fun SettingsScreen(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Your QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(8.dp))
                 Text("Manage, share, and protect your QR codes", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
@@ -2689,7 +2689,7 @@ private fun SavedQrCodesScreen(
                 Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
                 Spacer(Modifier.width(16.dp))
                 Column {
-                    Text("Saved QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("Your QR Codes", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     Text("View and reprint your previously generated QR codes", fontSize = 14.sp, color = Color(0xFFD1D5DB))
                 }
             }
