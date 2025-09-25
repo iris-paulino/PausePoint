@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +20,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import PauseScreen
 import createAppStorage
+import setQrScanningActive
+import resetTimerAndContinueTracking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -28,6 +31,35 @@ class PauseOverlayActivity : ComponentActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             finish()
         }
+    }
+
+    private val qrScanLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        // QR scanning is no longer active
+        setQrScanningActive(false)
+        
+        if (result.resultCode == RESULT_OK) {
+            val qrText = result.data?.getStringExtra("qr_text")
+            if (qrText != null) {
+                // Validate QR code and handle result
+                CoroutineScope(Dispatchers.Main).launch {
+                    try {
+                        val storage = createAppStorage()
+                        val match = storage.validateQrCode(qrText)
+                        if (match != null) {
+                            // QR code is valid, reset timer and continue tracking
+                            resetTimerAndContinueTracking()
+                            finish()
+                        } else {
+                            // QR code is invalid, show error or keep overlay open
+                            // For now, we'll keep the overlay open
+                        }
+                    } catch (e: Exception) {
+                        // Error validating QR code, keep overlay open
+                    }
+                }
+            }
+        }
+        // If result is not OK or QR text is null, keep overlay open
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,49 +79,18 @@ class PauseOverlayActivity : ComponentActivity() {
         } catch (_: Exception) { }
 
         setContent {
-            PauseOverlayContent(message = message, onFinish = { 
-                // Send broadcast to dismiss all overlays before finishing
-                val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
-                    setPackage(this@PauseOverlayActivity.packageName)
-                }
-                sendBroadcast(intent)
-                finish() 
-            })
+            PauseOverlayContent(
+                message = message, 
+                onFinish = { 
+                    // Reset timer and continue tracking when user dismisses
+                    resetTimerAndContinueTracking()
+                    finish() 
+                },
+                qrScanLauncher = qrScanLauncher
+            )
         }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1002) {
-            if (resultCode == RESULT_OK) {
-                val qrText = data?.getStringExtra("qr_text")
-                if (qrText != null) {
-                    // Validate QR code and handle result
-                    CoroutineScope(Dispatchers.Main).launch {
-                        try {
-                            val storage = createAppStorage()
-                            val match = storage.validateQrCode(qrText)
-                            if (match != null) {
-                                // QR code is valid, dismiss all overlays and close this activity
-                                val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
-                                    setPackage(this@PauseOverlayActivity.packageName)
-                                }
-                                sendBroadcast(intent)
-                                finish()
-                            } else {
-                                // QR code is invalid, show error or keep overlay open
-                                // For now, we'll keep the overlay open
-                            }
-                        } catch (e: Exception) {
-                            // Error validating QR code, keep overlay open
-                        }
-                    }
-                }
-            }
-            // If result is not OK or QR text is null, keep overlay open
-        }
-    }
 
     override fun onDestroy() {
         try { unregisterReceiver(hideReceiver) } catch (_: Exception) {}
@@ -98,7 +99,7 @@ class PauseOverlayActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PauseOverlayContent(message: String, onFinish: () -> Unit) {
+private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLauncher: androidx.activity.result.ActivityResultLauncher<Intent>) {
     val ctx = LocalContext.current
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
@@ -131,8 +132,8 @@ private fun PauseOverlayContent(message: String, onFinish: () -> Unit) {
         durationText = durationText,
         timeLimitMinutes = limit,
         onScanQr = {
-            @Suppress("DEPRECATION")
-            (ctx as? PauseOverlayActivity)?.startActivityForResult(Intent(ctx, QrScanActivity::class.java), 1002)
+            setQrScanningActive(true)
+            qrScanLauncher.launch(Intent(ctx, QrScanActivity::class.java))
         },
         onClose = onFinish
     )

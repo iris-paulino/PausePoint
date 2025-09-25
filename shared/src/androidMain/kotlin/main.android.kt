@@ -197,10 +197,39 @@ actual fun dismissBlockingOverlay() {
     }
 }
 
+fun resetTimerAndContinueTracking() {
+    println("DEBUG: resetTimerAndContinueTracking called")
+    
+    // Call the callback if it's set
+    onTimerResetCallback?.invoke()
+    
+    val activity = currentActivityRef?.get()
+    if (activity != null) {
+        try {
+            // Use broadcast receiver to reset timer and continue tracking
+            val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+                setPackage(activity.packageName) // Explicitly set the package
+            }
+            activity.sendBroadcast(intent)
+            println("DEBUG: resetTimerAndContinueTracking - sent RESET_TIMER_AND_CONTINUE broadcast with package: ${activity.packageName}")
+        } catch (e: Exception) {
+            println("DEBUG: resetTimerAndContinueTracking - error sending broadcast: ${e.message}")
+        }
+    } else {
+        println("DEBUG: resetTimerAndContinueTracking - no activity available")
+    }
+}
+
 actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
     if (!isBlocked) return
     
-    println("DEBUG: checkAndShowOverlayIfBlocked called - isBlocked: $isBlocked")
+    println("DEBUG: checkAndShowOverlayIfBlocked called - isBlocked: $isBlocked, isQrScanningActive: $isQrScanningActive")
+    
+    // Don't show overlay if QR scanning is currently active
+    if (isQrScanningActive) {
+        println("DEBUG: checkAndShowOverlayIfBlocked - QR scanning is active, not showing overlay")
+        return
+    }
     
     // Get the current foreground app using the existing expect/actual function
     val currentForegroundApp = getCurrentForegroundApp()
@@ -229,38 +258,27 @@ actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
     }
 }
 
-actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
-    // Launch a small activity that wraps ZXing scanner and await result
-    val activity = currentActivityRef?.get() ?: return false
-    val scanned = suspendCancellableCoroutine<String?> { cont ->
-        QrResultHolder.continuation = cont
-        @Suppress("DEPRECATION")
-        activity.startActivityForResult(Intent(activity, com.myapplication.QrScanActivity::class.java), QR_REQUEST_CODE)
-    }
-    val storage = createAppStorage()
-    val match = scanned?.let { storage.validateQrCode(it) }
-    return match != null && match.message == expectedMessage
-}
-
-private const val QR_REQUEST_CODE = 9001
-
 private var currentActivityRef: WeakReference<Activity>? = null
 fun registerCurrentActivity(activity: Activity) { currentActivityRef = WeakReference(activity) }
 
-object QrResultHolder {
-    var continuation: kotlinx.coroutines.CancellableContinuation<String?>? = null
+private var isQrScanningActive = false
+fun setQrScanningActive(active: Boolean) { isQrScanningActive = active }
+
+private var onTimerResetCallback: (() -> Unit)? = null
+
+actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
+    // QR scanning is handled directly by PauseOverlayActivity
+    // This function is not used in the current implementation
+    return false
 }
 
-fun handleActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    if (requestCode == QR_REQUEST_CODE) {
-        val text = if (resultCode == Activity.RESULT_OK) data?.getStringExtra("qr_text") else null
-        QrResultHolder.continuation?.resume(text)
-        QrResultHolder.continuation = null
-    }
-}
 
 actual fun getCurrentTimeMillis(): Long {
     return System.currentTimeMillis()
+}
+
+actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
+    onTimerResetCallback = callback
 }
 
 actual fun openAccessibilitySettings() {
