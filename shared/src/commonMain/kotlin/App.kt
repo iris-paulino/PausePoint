@@ -288,6 +288,8 @@ private fun AppRoot() {
                     finalizeSessionUsage()
                     isTracking = false
                     isBlocked = true
+                    // Update accessibility service with blocked state
+                    updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
                     // Save blocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(true)
@@ -406,6 +408,8 @@ private fun AppRoot() {
                     finalizeSessionUsage()
                     isTracking = false
                     isBlocked = true
+                    // Update accessibility service with blocked state
+                    updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
                     // Save blocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(true)
@@ -509,6 +513,8 @@ private fun AppRoot() {
                 // 3. Reset session tracking state when QR scanning (same as dismiss)
                 isTracking = false
                 isBlocked = false
+                // Update accessibility service with unblocked state
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -552,6 +558,8 @@ private fun AppRoot() {
                 // 3. Reset session tracking state when dismissing (same as QR scan)
                 isTracking = false
                 isBlocked = false
+                // Update accessibility service with unblocked state
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -595,6 +603,13 @@ private fun AppRoot() {
             appUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
             isBlocked = savedBlockedState
+            
+            // Update accessibility service with restored blocked state
+            if (isBlocked) {
+                updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+            } else {
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+            }
 
             // Daily reset if needed
             if (savedUsageDay == 0L) {
@@ -1065,6 +1080,8 @@ private fun AppRoot() {
                             // Reset session tracking state and increment unblocked counter
                             isTracking = false
                             isBlocked = false
+                            // Update accessibility service with unblocked state
+                            updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                             // Save unblocked state to storage
                             coroutineScope.launch {
                                 storage.saveBlockedState(false)
@@ -1096,6 +1113,8 @@ private fun AppRoot() {
                     // Reset session tracking state when dismissing (no counter increment)
                     isTracking = false
                     isBlocked = false
+                    // Update accessibility service with unblocked state
+                    updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                     // Save unblocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(false)
@@ -1546,6 +1565,7 @@ expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
+expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

@@ -266,6 +266,8 @@ actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
                 "youtube" -> "com.google.android.youtube"
                 "messages" -> "com.google.android.apps.messaging"
                 "gmail" -> "com.google.android.gm"
+                "whatsapp" -> "com.whatsapp"
+                "youtube music" -> "com.google.android.apps.youtube.music"
                 else -> appName.lowercase().replace(" ", "")
             }
             currentForegroundApp == expectedPackage
@@ -307,6 +309,25 @@ actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
 
 actual fun setOnDismissCallback(callback: (() -> Unit)?) {
     onDismissCallback = callback
+}
+
+actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
+    println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
+    try {
+        // Use reflection to call the accessibility service method safely
+        val serviceClass = Class.forName("com.myapplication.ForegroundAppAccessibilityService")
+        val companionClass = serviceClass.getDeclaredClasses().find { it.simpleName == "Companion" }
+        if (companionClass != null) {
+            val companionInstance = companionClass.getDeclaredField("INSTANCE").get(null)
+            val setBlockedStateMethod = companionClass.getDeclaredMethod("setBlockedState", Boolean::class.java, List::class.java, Int::class.java)
+            setBlockedStateMethod.invoke(companionInstance, isBlocked, trackedAppNames, timeLimitMinutes)
+            println("DEBUG: updateAccessibilityServiceBlockedState - successfully updated accessibility service")
+        } else {
+            println("DEBUG: updateAccessibilityServiceBlockedState - could not find Companion class")
+        }
+    } catch (e: Exception) {
+        println("DEBUG: updateAccessibilityServiceBlockedState - error updating accessibility service: ${e.message}")
+    }
 }
 
 actual fun openAccessibilitySettings() {

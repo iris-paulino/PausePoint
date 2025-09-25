@@ -87,6 +87,10 @@ actual fun setOnDismissCallback(callback: (() -> Unit)?) {
     // No-op on iOS for now
 }
 
+actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
+    // No-op on iOS for now
+}
+
 actual fun openAccessibilitySettings() {
     // No-op on iOS
 }
