@@ -273,9 +273,9 @@ private fun AppRoot() {
                 if (elapsedMinutes >= timeLimitMinutes) {
                     finalizeSessionUsage()
                     isTracking = false
-                    println("DEBUG: Limit reached by elapsedMinutes=$elapsedMinutes, timeLimitMinutes=$timeLimitMinutes. Triggering overlay with message='$qrMessage'")
-                    // Show blocking overlay on top of the currently used app instead of navigating
-                    showBlockingOverlay(qrMessage)
+                    route = Route.Pause
+                    // Show the blocking overlay to prevent further app usage
+                    showBlockingOverlay("Take a mindful pause - you've reached your time limit")
                     continue
                 }
 
@@ -383,12 +383,12 @@ private fun AppRoot() {
                 val totalSessionSeconds = sessionAppUsageTimes.values.sum()
                 val usedMinutes = (totalSessionSeconds / 60L).toInt()
                 if (usedMinutes >= timeLimitMinutes) {
-                    // Before pausing, merge the session into lifetime so UI shows correctly on Dashboard
+                    // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
                     finalizeSessionUsage()
                     isTracking = false
-                    println("DEBUG: Limit reached by usedMinutes=$usedMinutes, timeLimitMinutes=$timeLimitMinutes. Triggering overlay with message='$qrMessage'")
-                    // Show blocking overlay on top of the tracked app currently being used
-                    showBlockingOverlay(qrMessage)
+                    route = Route.Pause
+                    // Show the blocking overlay to prevent further app usage
+                    showBlockingOverlay("Take a mindful pause - you've reached your time limit")
                 }
             }
         }
