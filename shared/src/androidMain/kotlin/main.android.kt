@@ -164,7 +164,7 @@ actual fun showBlockingOverlay(message: String) {
     if (activity != null) {
         try {
             // Use broadcast receiver to show the overlay
-            val intent = Intent("com.myapplication.SHOW_BLOCKING_OVERLAY").apply {
+            val intent = Intent("com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY").apply {
                 putExtra("message", message)
                 setPackage(activity.packageName) // Explicitly set the package
             }
@@ -184,7 +184,7 @@ actual fun dismissBlockingOverlay() {
     if (activity != null) {
         try {
             // Use broadcast receiver to hide the overlay
-            val intent = Intent("com.myapplication.HIDE_BLOCKING_OVERLAY").apply {
+            val intent = Intent("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -207,7 +207,7 @@ fun resetTimerAndContinueTracking() {
     if (activity != null) {
         try {
             // Use broadcast receiver to reset timer and continue tracking
-            val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+            val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -230,7 +230,7 @@ fun dismissAndContinueTracking() {
     if (activity != null) {
         try {
             // Use broadcast receiver to dismiss and continue tracking
-            val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+            val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -315,7 +315,7 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
     println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
     try {
         // Use reflection to call the accessibility service method safely
-        val serviceClass = Class.forName("com.myapplication.ForegroundAppAccessibilityService")
+        val serviceClass = Class.forName("com.prismappsau.screengo.ForegroundAppAccessibilityService")
         val companionClass = serviceClass.getDeclaredClasses().find { it.simpleName == "Companion" }
         if (companionClass != null) {
             val companionInstance = companionClass.getDeclaredField("INSTANCE").get(null)
@@ -327,6 +327,27 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
         }
     } catch (e: Exception) {
         println("DEBUG: updateAccessibilityServiceBlockedState - error updating accessibility service: ${e.message}")
+    }
+}
+
+actual fun openEmailClient(recipient: String) {
+    val activity = currentActivityRef?.get() ?: return
+    try {
+        val intent = Intent(Intent.ACTION_SENDTO).apply {
+            data = android.net.Uri.parse("mailto:$recipient")
+        }
+        if (intent.resolveActivity(activity.packageManager) != null) {
+            activity.startActivity(intent)
+        } else {
+            // Fallback to generic email intent if no email app is available
+            val fallbackIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_EMAIL, arrayOf(recipient))
+            }
+            activity.startActivity(Intent.createChooser(fallbackIntent, "Send Email"))
+        }
+    } catch (e: Exception) {
+        println("DEBUG: openEmailClient - error opening email client: ${e.message}")
     }
 }
 
@@ -394,7 +415,7 @@ private var appContextRef: Context? = null
 private fun ensureReceiverRegistered(context: Context) {
     if (receiverRegistered) return
     try {
-        val filter = IntentFilter("com.myapplication.FOREGROUND_APP_CHANGED")
+        val filter = IntentFilter("com.prismappsau.screengo.FOREGROUND_APP_CHANGED")
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 val pkg = intent?.getStringExtra("pkg")

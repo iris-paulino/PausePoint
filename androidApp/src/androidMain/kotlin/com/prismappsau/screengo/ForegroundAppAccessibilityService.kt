@@ -1,4 +1,4 @@
-package com.myapplication
+package com.prismappsau.screengo
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
@@ -95,7 +95,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         if (!isIgnoredPackage(pkg)) {
             currentForegroundPackage = pkg
             println("DEBUG: ForegroundAppAccessibilityService - New foreground app: $pkg (event=${event?.eventType})")
-            val intent = android.content.Intent("com.myapplication.FOREGROUND_APP_CHANGED").apply {
+            val intent = android.content.Intent("com.prismappsau.screengo.FOREGROUND_APP_CHANGED").apply {
                 putExtra("pkg", pkg)
                 setPackage(applicationContext.packageName)
             }
@@ -145,8 +145,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
 
     private fun registerOverlayReceiver() {
         try {
-            val showFilter = IntentFilter("com.myapplication.SHOW_BLOCKING_OVERLAY")
-            val hideFilter = IntentFilter("com.myapplication.HIDE_BLOCKING_OVERLAY")
+            val showFilter = IntentFilter("com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY")
+            val hideFilter = IntentFilter("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY")
 
             println("DEBUG: registerOverlayReceiver - registering receivers")
             registerReceiver(object : BroadcastReceiver() {
@@ -222,7 +222,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 text = "Dismiss"
                 setOnClickListener { 
                     // Send dismiss broadcast to trigger the dismiss callback
-                    val intent = Intent("com.myapplication.RESET_TIMER_AND_CONTINUE").apply {
+                    val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
                         setPackage(applicationContext.packageName)
                     }
                     applicationContext.sendBroadcast(intent)

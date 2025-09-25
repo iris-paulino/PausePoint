@@ -1,4 +1,6 @@
 import androidx.compose.ui.window.ComposeUIViewController
+import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composable
 import platform.AVFoundation.AVCaptureDevice
 import platform.AVFoundation.AVCaptureDeviceDiscoverySession
 import platform.AVFoundation.AVCaptureDeviceTypeBuiltInWideAngleCamera
@@ -64,7 +66,8 @@ actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
     return suspendCancellableCoroutine { cont ->
         val controller = SimpleQrScannerController { qrText ->
             val storage = createAppStorage()
-            kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            // Use runBlocking to handle the suspend function call
+            kotlinx.coroutines.runBlocking {
                 val match = if (qrText != null) storage.validateQrCode(qrText) else null
                 cont.resume(match != null && match.message == expectedMessage)
             }
@@ -104,4 +107,26 @@ actual fun getCurrentForegroundApp(): String? {
     // Screen Time APIs are not publicly available
     // For now, return null to indicate no foreground app detection
     return null
+}
+
+actual fun dismissBlockingOverlay() {
+    // No-op on iOS for now
+}
+
+actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
+    // No-op on iOS for now
+}
+
+actual fun openEmailClient(recipient: String) {
+    // Could open Mail app with pre-filled recipient
+    // For now, this is a placeholder
+}
+
+@Composable
+actual fun QrCodeDisplay(
+    text: String,
+    modifier: Modifier
+) {
+    // This would be implemented as a Compose component
+    // For now, this is a placeholder
 }
