@@ -888,7 +888,6 @@ private fun AppRoot() {
                     AppLogo(size = 120.dp)
                     Spacer(modifier = Modifier.height(24.dp))
                     Text("Loading...", color = Color.White)
-                    Text("Checking onboarding status...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                 }
             }
         }
@@ -1633,20 +1632,16 @@ private fun OnboardingFlow(
         pages = listOf(
             OnboardingPage(
                 title = "Welcome to ScreenGo",
-                description = "Take mindful breaks and set healthy limits on your app usage.",
+                description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
             OnboardingPage(
-                title = "Take Mindful Breaks",
-                description = "Set limits on your app usage and take meaningful pauses when you reach them."
-            ),
-            OnboardingPage(
                 title = "Walk to Unlock Apps",
-                description = "Print QR codes and place them around your home. When time is up, you'll need to physically walk to scan them."
+                description = "Print QR codes and place them around your home and office. When time is up, you'll need to physically walk to scan them."
             ),
             OnboardingPage(
                 title = "Pause Partners",
-                description = "Add trusted contacts as pause partners. They can generate QR codes to help you unlock apps.",
+                description = "Ask trusted persons to be digital break partners. They can save the QR codes to help you unlock apps.",
                 primaryCta = "Get Started"
             )
         ),
@@ -1733,7 +1728,7 @@ private fun OnboardingPager(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset { IntOffset(offsetX.roundToInt(), 0) },
-                backgroundColor = Color(0xFF222625),
+				backgroundColor = Color(0xFF1E3A5F),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 val page = pages[index]
@@ -1741,17 +1736,36 @@ private fun OnboardingPager(
                     modifier = Modifier.padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Show logo on first page, otherwise show illustration
-                    if (page.showLogo) {
-                        AppLogo(size = 200.dp)
-                    } else {
-                        // Illustration - person walking on path through hills
-                        Image(
-                            painter = painterResource("images/onboarding/mindful_breaks.png"),
-                            contentDescription = "Mindful breaks illustration",
-                            modifier = Modifier.size(200.dp)
-                        )
-                    }
+					// Visual per page
+					if (page.showLogo) {
+						// First page
+						Image(
+							painter = painterResource("images/onboarding/footsteps_correct_colour.png"),
+							contentDescription = "Welcome footsteps",
+							modifier = Modifier.size(200.dp)
+						)
+					} else if (index == 1) {
+						// Second page - walking image
+						Image(
+							painter = painterResource("images/onboarding/walking_right_colour.png"),
+							contentDescription = "Walking illustration",
+							modifier = Modifier.size(200.dp)
+						)
+					} else if (index == 2) {
+						// Third page - meditation image
+						Image(
+							painter = painterResource("images/onboarding/meditation_right_colour.png"),
+							contentDescription = "Meditation illustration",
+							modifier = Modifier.size(200.dp)
+						)
+					} else {
+						// Other pages - default illustration
+						Image(
+							painter = painterResource("images/onboarding/mindful_breaks.png"),
+							contentDescription = "Mindful breaks illustration",
+							modifier = Modifier.size(200.dp)
+						)
+					}
                     
                     Spacer(Modifier.height(24.dp))
                     
@@ -2008,10 +2022,50 @@ private fun QrGeneratorContent(
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            Text("?", color = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text("Don't have a printer?", color = Color.White, fontWeight = FontWeight.Bold)
+			Text("Don't have a printer?", color = Color.White, fontWeight = FontWeight.Bold)
         }
+		
+		// Dialog for Don't have a printer?
+		if (showAccountabilityDialog) {
+			androidx.compose.material.AlertDialog(
+				onDismissRequest = { showAccountabilityDialog = false },
+				title = {
+					Row(
+						verticalAlignment = Alignment.CenterVertically
+					) {
+						Text("👥", fontSize = 24.sp)
+						Spacer(Modifier.width(12.dp))
+						Text(
+							"Coming Soon",
+							fontSize = 18.sp,
+							fontWeight = FontWeight.Bold,
+							color = Color.White
+						)
+					}
+				},
+				text = {
+					Column {
+						Text(
+							"Invite a family member, friend, or housemate to be your digital pause partner! Share your QR code and scan it from their device whenever you need to unlock your apps. They can help keep you on track — plus it’s a little extra social time together.",
+							color = Color.White,
+							fontSize = 14.sp
+						)
+						Spacer(Modifier.height(12.dp))
+					}
+				},
+				confirmButton = {
+					Button(
+						onClick = { showAccountabilityDialog = false },
+						colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
+						shape = RoundedCornerShape(8.dp)
+					) {
+						Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
+					}
+				},
+				backgroundColor = Color(0xFF1A1A1A),
+				contentColor = Color.White
+			)
+		}
         
         Spacer(Modifier.height(32.dp))
         
@@ -2500,7 +2554,7 @@ private fun DashboardContent(
                     Text("👥", fontSize = 24.sp)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Coming Soon: Pause Partners",
+                        "Coming Soon",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -2510,25 +2564,21 @@ private fun DashboardContent(
             text = {
                 Column {
                     Text(
-                        "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
+                        "We are working on a feature where you can scan a QR code from your assigned trusted contact so that your trusted contact can help you with accountability.",
                         color = Color.White,
                         fontSize = 14.sp
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
+                    
                 }
             },
             confirmButton = {
                 Button(
                     onClick = { showAccountabilityDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
