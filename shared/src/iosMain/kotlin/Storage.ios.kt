@@ -15,6 +15,12 @@ class IOSAppStorage : AppStorage {
     private val trackingStartTimeKey = "tracking_start_time"
     private val usageAccessAllowedKey = "usage_access_allowed"
     private val accessibilityAccessAllowedKey = "accessibility_access_allowed"
+    private val usageDayEpochKey = "usage_day_epoch"
+    private val blockedStateKey = "blocked_state"
+    private val timesUnblockedTodayKey = "times_unblocked_today"
+    private val timesDismissedTodayKey = "times_dismissed_today"
+    private val sessionAppUsageTimesKey = "session_app_usage_times"
+    private val sessionStartTimeKey = "session_start_time"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -307,7 +313,7 @@ class IOSAppStorage : AppStorage {
 
     override suspend fun saveBlockedState(isBlocked: Boolean) {
         try {
-            userDefaults.setBool(isBlocked, "blocked_state")
+            userDefaults.setBool(isBlocked, blockedStateKey)
             userDefaults.synchronize()
         } catch (e: Exception) {
             // ignore
@@ -316,7 +322,7 @@ class IOSAppStorage : AppStorage {
 
     override suspend fun getBlockedState(): Boolean {
         return try {
-            userDefaults.boolForKey("blocked_state")
+            userDefaults.boolForKey(blockedStateKey)
         } catch (e: Exception) {
             false
         }
@@ -324,7 +330,7 @@ class IOSAppStorage : AppStorage {
 
     override suspend fun saveUsageDayEpoch(epochDay: Long) {
         try {
-            userDefaults.setDouble(epochDay.toDouble(), "usage_day_epoch")
+            userDefaults.setDouble(epochDay.toDouble(), usageDayEpochKey)
             userDefaults.synchronize()
         } catch (e: Exception) {
             // ignore
@@ -333,7 +339,81 @@ class IOSAppStorage : AppStorage {
 
     override suspend fun getUsageDayEpoch(): Long {
         return try {
-            userDefaults.doubleForKey("usage_day_epoch").toLong()
+            userDefaults.doubleForKey(usageDayEpochKey).toLong()
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    override suspend fun saveTimesUnblockedToday(count: Int) {
+        try {
+            userDefaults.setInteger(count.toLong(), timesUnblockedTodayKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getTimesUnblockedToday(): Int {
+        return try {
+            userDefaults.integerForKey(timesUnblockedTodayKey).toInt()
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveTimesDismissedToday(count: Int) {
+        try {
+            userDefaults.setInteger(count.toLong(), timesDismissedTodayKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getTimesDismissedToday(): Int {
+        return try {
+            userDefaults.integerForKey(timesDismissedTodayKey).toInt()
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveSessionAppUsageTimes(usageTimes: Map<String, Long>) {
+        try {
+            val jsonString = serializeUsageTimes(usageTimes)
+            userDefaults.setObject(jsonString, sessionAppUsageTimesKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getSessionAppUsageTimes(): Map<String, Long> {
+        return try {
+            val jsonString = userDefaults.stringForKey(sessionAppUsageTimesKey)
+            if (jsonString != null) {
+                deserializeUsageTimes(jsonString)
+            } else {
+                emptyMap()
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    override suspend fun saveSessionStartTime(startTime: Long) {
+        try {
+            userDefaults.setDouble(startTime.toDouble(), sessionStartTimeKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getSessionStartTime(): Long {
+        return try {
+            userDefaults.doubleForKey(sessionStartTimeKey).toLong()
         } catch (e: Exception) {
             0L
         }
