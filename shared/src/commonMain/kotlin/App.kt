@@ -67,7 +67,7 @@ import androidx.compose.ui.unit.Dp
 fun AppLogo(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
-    contentDescription: String = "ScreenGo Logo"
+    contentDescription: String = "ScrollFree Logo"
 ) {
     Image(
         painter = painterResource("images/scrollfree_1.png"),
@@ -1746,7 +1746,7 @@ private fun OnboardingFlow(
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
-                title = "Welcome to ScreenGo",
+                title = "Welcome to ScrollFree",
                 description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
@@ -2215,7 +2215,7 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("ScreenGo", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("ScrollFree", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
@@ -2781,7 +2781,7 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { openEmailClient("contact.screengo@gmail.com") },
+                .clickable { openEmailClient("contact.scrollfree@gmail.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -3449,7 +3449,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "ScreenGo (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
+                    "ScrollFree (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3561,7 +3561,7 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
-                    "Email: contact.screengo@gmail.com",
+                    "Email: contact.scrollfree@gmail.com",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp

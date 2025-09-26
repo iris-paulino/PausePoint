@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">ScreenGo</string>
-    <string name="accessibility_service_description">This service helps track app usage and show pause overlays when time limits are reached.</string>
+    <string name="app_name">ScrollFree</string>
+    <string name="accessibility_service_description">ScrollFree accessibility service helps track app usage and show pause overlays when time limits are reached.</string>
 </resources>

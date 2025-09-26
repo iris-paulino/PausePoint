@@ -1,4 +1,4 @@
-rootProject.name = "ScreenGo"
+rootProject.name = "ScrollFree"
 
 include(":androidApp")
 include(":shared")
