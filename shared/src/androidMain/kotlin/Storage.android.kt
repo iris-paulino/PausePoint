@@ -19,6 +19,10 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val ACCESSIBILITY_ACCESS_ALLOWED_KEY = "accessibility_access_allowed"
     private val USAGE_DAY_EPOCH_KEY = "usage_day_epoch"
     private val BLOCKED_STATE_KEY = "blocked_state"
+    private val TIMES_UNBLOCKED_TODAY_KEY = "times_unblocked_today"
+    private val TIMES_DISMISSED_TODAY_KEY = "times_dismissed_today"
+    private val SESSION_APP_USAGE_TIMES_KEY = "session_app_usage_times"
+    private val SESSION_START_TIME_KEY = "session_start_time"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -232,6 +236,76 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
             false
         }
     }
+
+    override suspend fun saveTimesUnblockedToday(count: Int) {
+        try {
+            prefs.edit().putInt(TIMES_UNBLOCKED_TODAY_KEY, count).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getTimesUnblockedToday(): Int {
+        return try {
+            prefs.getInt(TIMES_UNBLOCKED_TODAY_KEY, 0)
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveTimesDismissedToday(count: Int) {
+        try {
+            prefs.edit().putInt(TIMES_DISMISSED_TODAY_KEY, count).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getTimesDismissedToday(): Int {
+        return try {
+            prefs.getInt(TIMES_DISMISSED_TODAY_KEY, 0)
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveSessionAppUsageTimes(usageTimes: Map<String, Long>) {
+        try {
+            val jsonString = serializeUsageTimes(usageTimes)
+            prefs.edit().putString(SESSION_APP_USAGE_TIMES_KEY, jsonString).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getSessionAppUsageTimes(): Map<String, Long> {
+        return try {
+            val jsonString = prefs.getString(SESSION_APP_USAGE_TIMES_KEY, null)
+            if (jsonString != null) {
+                deserializeUsageTimes(jsonString)
+            } else {
+                emptyMap()
+            }
+        } catch (e: Exception) {
+            emptyMap()
+        }
+    }
+
+    override suspend fun saveSessionStartTime(startTime: Long) {
+        try {
+            prefs.edit().putLong(SESSION_START_TIME_KEY, startTime).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getSessionStartTime(): Long {
+        return try {
+            prefs.getLong(SESSION_START_TIME_KEY, 0L)
+        } catch (e: Exception) {
+            0L
+        }
+    }
     
     // Simple JSON serialization functions
     private fun serializeQrCodes(codes: List<SavedQrCode>): String {
@@ -443,6 +517,38 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getBlockedState(): Boolean {
         return false
+    }
+
+    override suspend fun saveTimesUnblockedToday(count: Int) {
+        // No-op for fallback
+    }
+
+    override suspend fun getTimesUnblockedToday(): Int {
+        return 0
+    }
+
+    override suspend fun saveTimesDismissedToday(count: Int) {
+        // No-op for fallback
+    }
+
+    override suspend fun getTimesDismissedToday(): Int {
+        return 0
+    }
+
+    override suspend fun saveSessionAppUsageTimes(usageTimes: Map<String, Long>) {
+        // No-op for fallback
+    }
+
+    override suspend fun getSessionAppUsageTimes(): Map<String, Long> {
+        return emptyMap()
+    }
+
+    override suspend fun saveSessionStartTime(startTime: Long) {
+        // No-op for fallback
+    }
+
+    override suspend fun getSessionStartTime(): Long {
+        return 0L
     }
 }
 

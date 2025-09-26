@@ -70,7 +70,7 @@ fun AppLogo(
     contentDescription: String = "ScreenGo Logo"
 ) {
     Image(
-        painter = painterResource("images/Untitled design (1).png"),
+        painter = painterResource("images/scrollfree_1.png"),
         contentDescription = contentDescription,
         modifier = modifier.size(size),
         contentScale = ContentScale.Fit
@@ -225,6 +225,7 @@ private fun AppRoot() {
             coroutineScope.launch {
                 storage.saveTrackingState(true)
                 storage.saveTrackingStartTime(trackingStartTime)
+                storage.saveSessionStartTime(sessionStartTime)
             }
             
             // Start platform-specific usage tracking
@@ -379,6 +380,16 @@ private fun AppRoot() {
                     
                     sessionAppUsageTimes = updatedSessionUsage
                     println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
+                    
+                    // Persist session data
+                    coroutineScope.launch {
+                        try { 
+                            storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
+                            println("DEBUG: Saved session app usage times to storage")
+                        } catch (e: Exception) {
+                            println("DEBUG: Error saving session app usage times: ${e.message}")
+                        }
+                    }
                 } else {
                     // Real foreground app detection using accessibility service
                     println("DEBUG: Using real foreground app detection")
@@ -415,6 +426,16 @@ private fun AppRoot() {
                     
                     sessionAppUsageTimes = updatedSessionUsage
                     println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
+                    
+                    // Persist session data
+                    coroutineScope.launch {
+                        try { 
+                            storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
+                            println("DEBUG: Saved session app usage times to storage")
+                        } catch (e: Exception) {
+                            println("DEBUG: Error saving session app usage times: ${e.message}")
+                        }
+                    }
                 }
                 
                 // Check if session usage has reached the limit based on actual accumulated session usage
@@ -527,6 +548,16 @@ private fun AppRoot() {
                 timesUnblockedToday += 1
                 println("DEBUG: Incremented times walked counter to: $timesUnblockedToday")
                 
+                // Persist the updated counter
+                coroutineScope.launch {
+                    try { 
+                        storage.saveTimesUnblockedToday(timesUnblockedToday)
+                        println("DEBUG: Saved times unblocked counter to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving times unblocked counter: ${e.message}")
+                    }
+                }
+                
                 // 3. Reset session tracking state when QR scanning (same as dismiss)
                 isTracking = false
                 isBlocked = false
@@ -545,6 +576,17 @@ private fun AppRoot() {
                 sessionStartTime = 0L
                 sessionElapsedSeconds = 0L
                 println("DEBUG: Reset session timer and unblocked user")
+                
+                // Persist reset session data
+                coroutineScope.launch {
+                    try { 
+                        storage.saveSessionAppUsageTimes(emptyMap())
+                        storage.saveSessionStartTime(0L)
+                        println("DEBUG: Saved reset session data to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving reset session data: ${e.message}")
+                    }
+                }
                 
                 // 4. Navigate back to dashboard (same as dismiss)
                 route = Route.Dashboard
@@ -572,6 +614,16 @@ private fun AppRoot() {
                 timesDismissedToday += 1
                 println("DEBUG: Incremented times dismissed counter to: $timesDismissedToday")
                 
+                // Persist the updated counter
+                coroutineScope.launch {
+                    try { 
+                        storage.saveTimesDismissedToday(timesDismissedToday)
+                        println("DEBUG: Saved times dismissed counter to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving times dismissed counter: ${e.message}")
+                    }
+                }
+                
                 // 3. Reset session tracking state when dismissing (same as QR scan)
                 isTracking = false
                 isBlocked = false
@@ -590,6 +642,17 @@ private fun AppRoot() {
                 sessionStartTime = 0L
                 sessionElapsedSeconds = 0L
                 println("DEBUG: Reset session timer and unblocked user")
+                
+                // Persist reset session data
+                coroutineScope.launch {
+                    try { 
+                        storage.saveSessionAppUsageTimes(emptyMap())
+                        storage.saveSessionStartTime(0L)
+                        println("DEBUG: Saved reset session data to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving reset session data: ${e.message}")
+                    }
+                }
                 
                 // 4. Navigate back to dashboard (same as QR scan)
                 route = Route.Dashboard
@@ -613,6 +676,10 @@ private fun AppRoot() {
             val savedTrackingStartTime = withTimeoutOrNull(3000) { storage.getTrackingStartTime() } ?: 0L
             val savedUsageDay = withTimeoutOrNull(3000) { storage.getUsageDayEpoch() } ?: 0L
             val savedBlockedState = withTimeoutOrNull(3000) { storage.getBlockedState() } ?: false
+            val savedTimesUnblockedToday = withTimeoutOrNull(3000) { storage.getTimesUnblockedToday() } ?: 0
+            val savedTimesDismissedToday = withTimeoutOrNull(3000) { storage.getTimesDismissedToday() } ?: 0
+            val savedSessionAppUsageTimes = withTimeoutOrNull(3000) { storage.getSessionAppUsageTimes() } ?: emptyMap()
+            val savedSessionStartTime = withTimeoutOrNull(3000) { storage.getSessionStartTime() } ?: 0L
             val todayEpochDay = currentEpochDayUtc()
             
             // Restore tracking state
@@ -620,6 +687,12 @@ private fun AppRoot() {
             appUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
             isBlocked = savedBlockedState
+            
+            // Restore dashboard counters and session data
+            timesUnblockedToday = savedTimesUnblockedToday
+            timesDismissedToday = savedTimesDismissedToday
+            sessionAppUsageTimes = savedSessionAppUsageTimes
+            sessionStartTime = savedSessionStartTime
             
             // Update accessibility service with restored blocked state
             if (isBlocked) {
@@ -638,9 +711,15 @@ private fun AppRoot() {
                 appUsageTimes = emptyMap()
                 timesUnblockedToday = 0
                 timesDismissedToday = 0
+                sessionAppUsageTimes = emptyMap()
+                sessionStartTime = 0L
                 withTimeoutOrNull(2000) {
                     storage.saveAppUsageTimes(appUsageTimes)
                     storage.saveUsageDayEpoch(todayEpochDay)
+                    storage.saveTimesUnblockedToday(0)
+                    storage.saveTimesDismissedToday(0)
+                    storage.saveSessionAppUsageTimes(emptyMap())
+                    storage.saveSessionStartTime(0L)
                 }
             }
             
@@ -1633,21 +1712,19 @@ private fun OnboardingFlow(
         pages = listOf(
             OnboardingPage(
                 title = "Welcome to ScreenGo",
-                description = "Take mindful breaks and set healthy limits on your app usage.",
+                description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
             OnboardingPage(
-                title = "Take Mindful Breaks",
-                description = "Set limits on your app usage and take meaningful pauses when you reach them."
-            ),
-            OnboardingPage(
                 title = "Walk to Unlock Apps",
-                description = "Print QR codes and place them around your home. When time is up, you'll need to physically walk to scan them."
+                description = "Print QR codes and place them around your home and office. When time is up, you'll need to physically walk to scan them.",
+                imagePath = "images/onboarding/walking_onboarding.png"
             ),
             OnboardingPage(
                 title = "Pause Partners",
-                description = "Add trusted contacts as pause partners. They can generate QR codes to help you unlock apps.",
-                primaryCta = "Get Started"
+                description = "Ask trusted persons to be digital break partners. They can save the QR codes to help you unlock apps.",
+                primaryCta = "Get Started",
+                imagePath = "images/onboarding/two_people.png"
             )
         ),
         onDone = onGetStarted,
@@ -1660,7 +1737,8 @@ private data class OnboardingPage(
     val title: String,
     val description: String,
     val primaryCta: String = "Next",
-    val showLogo: Boolean = false
+    val showLogo: Boolean = false,
+    val imagePath: String? = null
 )
 
 @OptIn(ExperimentalResourceApi::class)
@@ -1733,7 +1811,7 @@ private fun OnboardingPager(
                 modifier = Modifier
                     .fillMaxWidth()
                     .offset { IntOffset(offsetX.roundToInt(), 0) },
-                backgroundColor = Color(0xFF222625),
+                backgroundColor = Color(0xFF1E3A5F),
                 shape = RoundedCornerShape(16.dp)
             ) {
                 val page = pages[index]
@@ -1744,8 +1822,15 @@ private fun OnboardingPager(
                     // Show logo on first page, otherwise show illustration
                     if (page.showLogo) {
                         AppLogo(size = 200.dp)
+                    } else if (page.imagePath != null) {
+                        // Show custom image for the page
+                        Image(
+                            painter = painterResource(page.imagePath),
+                            contentDescription = "Onboarding illustration",
+                            modifier = Modifier.size(200.dp)
+                        )
                     } else {
-                        // Illustration - person walking on path through hills
+                        // Fallback illustration
                         Image(
                             painter = painterResource("images/onboarding/mindful_breaks.png"),
                             contentDescription = "Mindful breaks illustration",
@@ -1845,7 +1930,7 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(if (isSetupMode) "Set Up: QR Code Generator" else "QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Create QR codes to place around your home", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("Create QR codes to place around your home or share with your digital pause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
         
@@ -1858,7 +1943,7 @@ private fun QrGeneratorContent(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(13.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -1935,7 +2020,7 @@ private fun QrGeneratorContent(
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp)
+                modifier = Modifier.padding(13.dp)
             ) {
                 Text("Customize Message", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(12.dp))
@@ -1981,7 +2066,7 @@ private fun QrGeneratorContent(
             Text(
                 if (downloadSuccess) {
                     if (isSetupMode) "Done" else "Go to Dashboard"
-                } else "Save and Download PDF for printing", 
+                } else "Save QR Code", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
@@ -1998,148 +2083,35 @@ private fun QrGeneratorContent(
             )
         }
         
-        Spacer(Modifier.height(12.dp))
-        
-        // Don't have a printer? Button
-        Button(
-            onClick = { showAccountabilityDialog = true },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C2C2C)),
-            shape = RoundedCornerShape(12.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
-        ) {
-            Text("?", color = Color.White)
-            Spacer(Modifier.width(8.dp))
-            Text("Don't have a printer?", color = Color.White, fontWeight = FontWeight.Bold)
-        }
-        
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(24.dp))
         
         // How Physical Movement Unlocks Work Section
         Card(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp)
+                modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    "How Physical Movement Unlocks Work:",
-                    fontSize = 18.sp,
+                    "How ScrollFree QR Code Works:",
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 
-                Spacer(Modifier.height(16.dp))
-                
-                // Step 1
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        "1.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.width(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Download and print this QR code",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
                 Spacer(Modifier.height(12.dp))
                 
-                // Step 2
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        "2.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.width(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Place it somewhere you need to walk to (kitchen, bedroom, upstairs, etc.)",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                Spacer(Modifier.height(12.dp))
-                
-                // Step 3
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        "3.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.width(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "When your app time limit is reached, you'll need to physically get up and scan this code to unlock your apps",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                Spacer(Modifier.height(12.dp))
-                
-                // Step 4
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        "4.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.width(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "This forces you to move your body and step away from your phone, creating a natural pause",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                
-                Spacer(Modifier.height(12.dp))
-                
-                // Step 5
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        "5.",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        modifier = Modifier.width(24.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "The physical effort makes you consider if you really need more screen time",
-                        fontSize = 16.sp,
-                        color = Color.White,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
+                Text(
+                    "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
+                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your Digital Pause partner—and ask them to keep it on their phone.\n\n" +
+                    "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
+                    "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                    fontSize = 14.sp,
+                    color = Color(0xFFD1D5DB),
+                    lineHeight = 20.sp
+                )
             }
         }
     }
@@ -2248,9 +2220,11 @@ private fun DashboardContent(
                         // Debug logging
                         println("DEBUG: Time remaining - totalTrackedAppUsageSeconds: $totalTrackedAppUsageSeconds, totalTrackedAppUsageMinutes: $totalTrackedAppUsageMinutes, remaining: $remaining")
                         Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        Text("minutes remaining until pause time", fontSize = 14.sp, color = Color.White)
+                        val minuteLabel = if (remaining == 1) "minute" else "minutes"
+                        Text("$minuteLabel remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Time Limit: ${timeLimitMinutes} minutes", fontSize = 12.sp, color = Color.White)
+                            val timeLimitLabel = if (timeLimitMinutes == 1) "minute" else "minutes"
+                            Text("Time Limit: ${timeLimitMinutes} $timeLimitLabel", fontSize = 12.sp, color = Color.White)
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = "✏",
@@ -2846,7 +2820,7 @@ private fun SavedQrCodesScreen(
                     items(savedQrCodes) { qrCode ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
-                            backgroundColor = Color(0xFF222625),
+                            backgroundColor = Color(0xFF1E3A5F),
                             shape = RoundedCornerShape(16.dp)
                         ) {
                             Column(modifier = Modifier.padding(16.dp)) {
@@ -2917,7 +2891,11 @@ private fun SavedQrCodesScreen(
                                 Button(
                                     onClick = {
                                         coroutineScope.launch {
-                                            try { saveQrPdf(qrText = qrCode.qrText, message = qrCode.message) } catch (_: Exception) {}
+                                            try { 
+                                                saveQrPdf(qrText = qrCode.qrText, message = qrCode.message)
+                                                // Note: In a real implementation, you might want to show a toast or notification here
+                                                // indicating the file was saved to the Downloads folder
+                                            } catch (_: Exception) {}
                                         }
                                     },
                                     modifier = Modifier.fillMaxWidth(),
@@ -2927,7 +2905,7 @@ private fun SavedQrCodesScreen(
                                 ) {
                                     Text("⇩", color = Color.White)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Download This QR Code", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("Download this QR code", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -2953,7 +2931,10 @@ private fun SavedQrCodesScreen(
                                 onClick = {
                                     coroutineScope.launch {
                                         savedQrCodes.forEach { code ->
-                                            try { saveQrPdf(qrText = code.qrText, message = code.message) } catch (_: Exception) {}
+                                            try { 
+                                                saveQrPdf(qrText = code.qrText, message = code.message)
+                                                // Note: Each QR code PDF will be saved to the Downloads folder
+                                            } catch (_: Exception) {}
                                         }
                                     }
                                 },
@@ -3534,11 +3515,14 @@ private fun DurationSettingScreen(
                         color = Color(0xFF1E3A5F)
                     )
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        "minutes",
-                        fontSize = 16.sp,
-                        color = Color.White
-                    )
+                    run {
+                        val currentLimitLabel = if (timeLimitMinutes == 1) "minute" else "minutes"
+                        Text(
+                            currentLimitLabel,
+                            fontSize = 16.sp,
+                            color = Color.White
+                        )
+                    }
                 }
                 
                 Spacer(Modifier.height(16.dp))

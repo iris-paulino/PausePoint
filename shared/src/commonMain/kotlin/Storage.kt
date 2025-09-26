@@ -154,6 +154,46 @@ interface AppStorage {
      * Retrieve blocked state. Return false if unset.
      */
     suspend fun getBlockedState(): Boolean
+
+    /**
+     * Persist times unblocked today counter
+     */
+    suspend fun saveTimesUnblockedToday(count: Int)
+
+    /**
+     * Retrieve times unblocked today counter. Return 0 if unset.
+     */
+    suspend fun getTimesUnblockedToday(): Int
+
+    /**
+     * Persist times dismissed today counter
+     */
+    suspend fun saveTimesDismissedToday(count: Int)
+
+    /**
+     * Retrieve times dismissed today counter. Return 0 if unset.
+     */
+    suspend fun getTimesDismissedToday(): Int
+
+    /**
+     * Persist session app usage times (for persistence across app restarts)
+     */
+    suspend fun saveSessionAppUsageTimes(usageTimes: Map<String, Long>)
+
+    /**
+     * Retrieve session app usage times. Return empty map if unset.
+     */
+    suspend fun getSessionAppUsageTimes(): Map<String, Long>
+
+    /**
+     * Persist session start time
+     */
+    suspend fun saveSessionStartTime(startTime: Long)
+
+    /**
+     * Retrieve session start time. Return 0 if unset.
+     */
+    suspend fun getSessionStartTime(): Long
 }
 
 /**
