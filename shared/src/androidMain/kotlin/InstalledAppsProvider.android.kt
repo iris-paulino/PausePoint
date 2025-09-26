@@ -1,4 +1,6 @@
 import android.content.Context
+import android.content.Intent
+import android.content.pm.ResolveInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -68,40 +70,31 @@ class AndroidInstalledAppsProvider(private val context: Context) : InstalledApps
     
     override suspend fun getInstalledApps(): List<InstalledApp> {
         return try {
-            val allApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-            println("DEBUG: Total installed apps: ${allApps.size}")
-            
-            val installedApps = allApps
-                .filter { appInfo ->
-                    val isThisApp = appInfo.packageName == context.packageName
-                    val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                    val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                    
-                    // Include user-installed apps and updated system apps (like Gmail, Chrome, etc.)
-                    // Exclude core system services but include user-facing system apps
-                    val shouldInclude = !isThisApp && (
-                        !isSystemApp || // Include all non-system apps
-                        isUpdatedSystemApp || // Include updated system apps (user-installed updates)
-                        isUserFacingSystemApp(appInfo) // Include specific user-facing system apps
-                    )
-                    
-                    if (shouldInclude) {
-                        println("DEBUG: Including app: ${packageManager.getApplicationLabel(appInfo)} (${appInfo.packageName}) - System: $isSystemApp, Updated: $isUpdatedSystemApp")
-                    }
-                    shouldInclude
-                }
-                .take(100) // Limit to first 100 apps to avoid overwhelming the UI
-                .map { appInfo ->
+            // Use launcher intent query so we don't require QUERY_ALL_PACKAGES on Android 11+
+            val launcherIntent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_LAUNCHER)
+            }
+            val resolveInfos: List<ResolveInfo> = packageManager.queryIntentActivities(launcherIntent, 0)
+            println("DEBUG: Total launchable apps: ${resolveInfos.size}")
+
+            val installedApps = resolveInfos
+                .mapNotNull { resolveInfo ->
+                    val appInfo = resolveInfo.activityInfo?.applicationInfo ?: return@mapNotNull null
+                    val packageName = appInfo.packageName
+                    if (packageName == context.packageName) return@mapNotNull null
+
                     val appName = packageManager.getApplicationLabel(appInfo).toString()
-                    val emoji = appEmojiMap[appName] ?: getDefaultEmojiForCategory(getAppCategory(appInfo))
-                    
+                    val category = getAppCategory(appInfo)
+                    val emoji = appEmojiMap[appName] ?: getDefaultEmojiForCategory(category)
+
                     InstalledApp(
-                        packageName = appInfo.packageName,
+                        packageName = packageName,
                         appName = appName,
                         icon = emoji,
-                        category = getAppCategory(appInfo)
+                        category = category
                     )
                 }
+                .distinctBy { it.packageName }
                 .sortedBy { it.appName }
             
             println("DEBUG: Returning ${installedApps.size} apps")

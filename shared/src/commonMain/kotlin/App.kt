@@ -59,6 +59,7 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import androidx.compose.material.Switch
 import androidx.compose.material.SwitchDefaults
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 
@@ -67,12 +68,14 @@ import androidx.compose.ui.unit.Dp
 fun AppLogo(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
-    contentDescription: String = "ScrollFree Logo"
+    contentDescription: String = "AntiScroll Logo"
 ) {
     Image(
-        painter = painterResource("images/scrollfree_1.png"),
+        painter = painterResource("images/bigger_logo.png"),
         contentDescription = contentDescription,
-        modifier = modifier.size(size),
+        modifier = modifier
+            .size(size)
+            .clip(RoundedCornerShape(16.dp)),
         contentScale = ContentScale.Fit
     )
 }
@@ -1746,7 +1749,7 @@ private fun OnboardingFlow(
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
-                title = "Welcome to ScrollFree",
+                title = "Welcome to AntiScroll",
                 description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
@@ -2215,7 +2218,7 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("ScrollFree", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("AntiScroll", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
@@ -2781,7 +2784,7 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { openEmailClient("contact.scrollfree@gmail.com") },
+                .clickable { openEmailClient("contact.antiscroll@gmail.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -2897,7 +2900,7 @@ private fun SavedQrCodesScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            "How ScrollFree QR Code Works:",
+                    "How AntiScroll QR Code Works:",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -3070,7 +3073,7 @@ private fun SavedQrCodesScreen(
                         }
                     }
                     
-                    // How ScrollFree QR Code Works Section
+                    // How AntiScroll QR Code Works Section
                     item {
                         Spacer(Modifier.height(16.dp))
                         Card(
@@ -3082,7 +3085,7 @@ private fun SavedQrCodesScreen(
                                 modifier = Modifier.padding(16.dp)
                             ) {
                                 Text(
-                                    "How ScrollFree QR Code Works:",
+                                    "How AntiScroll QR Code Works:",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -3449,7 +3452,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "ScrollFree (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
+                    "AntiScroll (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3561,7 +3564,7 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
-                    "Email: contact.scrollfree@gmail.com",
+                    "Email: contact.antiscroll@gmail.com",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp

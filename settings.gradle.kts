@@ -1,4 +1,4 @@
-rootProject.name = "ScrollFree"
+rootProject.name = "AntiScroll"
 
 include(":androidApp")
 include(":shared")

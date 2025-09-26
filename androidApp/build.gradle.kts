@@ -1,3 +1,7 @@
+
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     kotlin("multiplatform")
     id("com.android.application")
@@ -30,6 +34,30 @@ android {
         versionCode = 2
         versionName = "1.0"
     }
+    
+    signingConfigs {
+        create("release") {
+            val file = rootProject.file("androidApp/keystore.properties")
+            if (file.exists()) {
+                val props = Properties().apply {
+                    load(FileInputStream(file))
+                }
+                keyAlias = props["keyAlias"] as String
+                keyPassword = props["keyPassword"] as String
+                storeFile = file(props["storeFile"] as String)
+                storePassword = props["storePassword"] as String
+            }
+        }
+    }
+    
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -37,4 +65,5 @@ android {
     kotlin {
         jvmToolchain(17)
     }
+
 }
