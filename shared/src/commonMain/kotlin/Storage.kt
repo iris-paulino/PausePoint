@@ -136,6 +136,16 @@ interface AppStorage {
     suspend fun getAccessibilityAccessAllowed(): Boolean
 
     /**
+     * Persist whether user has visited QR generator screen before
+     */
+    suspend fun saveQrGeneratorVisited(visited: Boolean)
+
+    /**
+     * Retrieve whether user has visited QR generator screen before. Return false if unset.
+     */
+    suspend fun getQrGeneratorVisited(): Boolean
+
+    /**
      * Persist the epoch day (UTC) that current usage totals correspond to
      */
     suspend fun saveUsageDayEpoch(epochDay: Long)

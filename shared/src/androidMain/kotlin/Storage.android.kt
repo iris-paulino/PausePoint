@@ -23,6 +23,7 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val TIMES_DISMISSED_TODAY_KEY = "times_dismissed_today"
     private val SESSION_APP_USAGE_TIMES_KEY = "session_app_usage_times"
     private val SESSION_START_TIME_KEY = "session_start_time"
+    private val QR_GENERATOR_VISITED_KEY = "qr_generator_visited"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -306,6 +307,22 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
             0L
         }
     }
+
+    override suspend fun saveQrGeneratorVisited(visited: Boolean) {
+        try {
+            prefs.edit().putBoolean(QR_GENERATOR_VISITED_KEY, visited).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getQrGeneratorVisited(): Boolean {
+        return try {
+            prefs.getBoolean(QR_GENERATOR_VISITED_KEY, false)
+        } catch (e: Exception) {
+            false
+        }
+    }
     
     // Simple JSON serialization functions
     private fun serializeQrCodes(codes: List<SavedQrCode>): String {
@@ -549,6 +566,14 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getSessionStartTime(): Long {
         return 0L
+    }
+
+    override suspend fun saveQrGeneratorVisited(visited: Boolean) {
+        // No-op for fallback
+    }
+
+    override suspend fun getQrGeneratorVisited(): Boolean {
+        return false
     }
 }
 

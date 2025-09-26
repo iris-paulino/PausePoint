@@ -21,6 +21,7 @@ class IOSAppStorage : AppStorage {
     private val timesDismissedTodayKey = "times_dismissed_today"
     private val sessionAppUsageTimesKey = "session_app_usage_times"
     private val sessionStartTimeKey = "session_start_time"
+    private val qrGeneratorVisitedKey = "qr_generator_visited"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -416,6 +417,22 @@ class IOSAppStorage : AppStorage {
             userDefaults.doubleForKey(sessionStartTimeKey).toLong()
         } catch (e: Exception) {
             0L
+        }
+    }
+
+    override suspend fun saveQrGeneratorVisited(visited: Boolean) {
+        try {
+            userDefaults.setBool(visited, qrGeneratorVisitedKey)
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getQrGeneratorVisited(): Boolean {
+        return try {
+            userDefaults.boolForKey(qrGeneratorVisitedKey)
+        } catch (e: Exception) {
+            false
         }
     }
 }
