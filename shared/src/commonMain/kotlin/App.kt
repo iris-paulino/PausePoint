@@ -191,12 +191,12 @@ private fun AppRoot() {
             return
         }
         
-        // Credit ALL apps that have at least 60 seconds this session
+        // Credit ALL apps that have any usage this session
         trackedApps = trackedApps.map { app ->
             val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
-            val sessionMinutes = (sessionSeconds / 60L).toInt()
-            if (sessionMinutes > 0) {
-                println("DEBUG: Crediting ${sessionMinutes} min to ${app.name}")
+            if (sessionSeconds > 0) {
+                val sessionMinutes = (sessionSeconds / 60L).toInt()
+                println("DEBUG: Crediting ${sessionSeconds} seconds (${sessionMinutes} min) to ${app.name}")
                 app.copy(minutesUsed = app.minutesUsed + sessionMinutes)
             } else app
         }
@@ -213,7 +213,11 @@ private fun AppRoot() {
         }
         appUsageTimes = updatedLifetimeSeconds
         
+        // Clear session usage after finalizing to prevent double counting
+        sessionAppUsageTimes = emptyMap()
+        
         println("DEBUG: appUsageTimes after: $appUsageTimes")
+        println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
     }
 
     // Track individual app usage when tracking is active
@@ -407,9 +411,20 @@ private fun AppRoot() {
                                 val expectedPackage = when (app.name.lowercase()) {
                                     "chrome" -> "com.android.chrome"
                                     "youtube" -> "com.google.android.youtube"
+                                    "youtube music" -> "com.google.android.apps.youtube.music"
                                     "messages" -> "com.google.android.apps.messaging"
                                     "gmail" -> "com.google.android.gm"
-                                    else -> app.name.lowercase().replace(" ", "")
+                                    "maps" -> "com.google.android.apps.maps"
+                                    "whatsapp" -> "com.whatsapp"
+                                    "jira" -> "com.atlassian.android.jira.core"
+                                    "kttipay" -> "com.kttipay"
+                                    else -> {
+                                        // Try to find the package name from availableApps
+                                        val matchingApp = availableApps.find { availableApp ->
+                                            availableApp.name.equals(app.name, ignoreCase = true)
+                                        }
+                                        matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
+                                    }
                                 }
                                 currentForegroundApp == expectedPackage
                             }
@@ -683,6 +698,10 @@ private fun AppRoot() {
             val savedSessionStartTime = withTimeoutOrNull(3000) { storage.getSessionStartTime() } ?: 0L
             val todayEpochDay = currentEpochDayUtc()
             
+            // Debug logging for app usage data loading
+            println("DEBUG: App startup - savedAppUsageTimes: $savedAppUsageTimes")
+            println("DEBUG: App startup - savedUsageDay: $savedUsageDay, todayEpochDay: $todayEpochDay")
+            
             // Restore tracking state
             isTracking = savedTrackingState
             appUsageTimes = savedAppUsageTimes
@@ -730,6 +749,7 @@ private fun AppRoot() {
                 // Load persisted selections and time limit
                 val savedTime = withTimeoutOrNull(3000) { storage.getTimeLimitMinutes() } ?: 15
                 timeLimitMinutes = savedTime
+                println("DEBUG: Loaded time limit from storage: $timeLimitMinutes minutes")
 
                 val savedPackages = withTimeoutOrNull(3000) { storage.getSelectedAppPackages() } ?: emptyList()
                 if (savedPackages.isNotEmpty()) {
@@ -738,11 +758,15 @@ private fun AppRoot() {
                         val selected = installed.filter { it.packageName in savedPackages.toSet() }
                         trackedApps = selected.map { TrackedApp(it.appName, 0, timeLimitMinutes) }
                         // Rehydrate minutes used for today from persisted seconds
+                        println("DEBUG: Rehydrating tracked apps - appUsageTimes: $appUsageTimes")
+                        println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                         trackedApps = trackedApps.map { app ->
                             val seconds = appUsageTimes[app.name] ?: 0L
-                            val minutes = (seconds / 60L).toInt().coerceAtMost(app.limitMinutes)
+                            val minutes = (seconds / 60L).toInt() // Remove the cap - show actual usage
+                            println("DEBUG: App ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                             app.copy(minutesUsed = minutes)
                         }
+                        println("DEBUG: Rehydrated tracked apps: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                         // Pre-populate available apps to reflect saved selection when opening selection screen later
                         availableApps = installed.map { installedApp ->
                             val selectedSet = savedPackages.toSet()
@@ -762,11 +786,15 @@ private fun AppRoot() {
                     // No saved selection: set up defaults
                     setupDefaultApps()
                     // Rehydrate minutes used for today from persisted seconds
+                    println("DEBUG: Rehydrating default tracked apps - appUsageTimes: $appUsageTimes")
+                    println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                     trackedApps = trackedApps.map { app ->
                         val seconds = appUsageTimes[app.name] ?: 0L
-                        val minutes = (seconds / 60L).toInt().coerceAtMost(app.limitMinutes)
+                        val minutes = (seconds / 60L).toInt() // Remove the cap - show actual usage
+                        println("DEBUG: Default app ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                         app.copy(minutesUsed = minutes)
                     }
+                    println("DEBUG: Rehydrated default tracked apps: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
                 }
                 
                 // Check if notifications are disabled and show permission dialog
@@ -2708,6 +2736,27 @@ private fun SettingsScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Camera Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("📷", fontSize = 24.sp, color = Color(0xFF1E3A5F))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Camera permission is required to scan QR codes for pause functionality. When you first scan a QR code, you'll be prompted to allow camera access. You can change this permission anytime in your device's app settings.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
