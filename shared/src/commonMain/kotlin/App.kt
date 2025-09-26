@@ -146,6 +146,7 @@ private fun AppRoot() {
     var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
     var showNoQrCodeDialog by remember { mutableStateOf(false) }
     var showUsageAccessDialog by remember { mutableStateOf(false) }
+    var fromNoQrCodeDialog by remember { mutableStateOf(false) }
     var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
     var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
     var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
@@ -967,7 +968,6 @@ private fun AppRoot() {
                     AppLogo(size = 120.dp)
                     Spacer(modifier = Modifier.height(24.dp))
                     Text("Loading...", color = Color.White)
-                    Text("Checking onboarding status...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                 }
             }
         }
@@ -996,8 +996,12 @@ private fun AppRoot() {
                 qrId = id
                 route = Route.AppSelection
             },
-            onClose = { route = Route.Dashboard },
-            isSetupMode = isSetupMode
+            onClose = { 
+                fromNoQrCodeDialog = false
+                route = Route.Dashboard 
+            },
+            isSetupMode = isSetupMode,
+            fromNoQrCodeDialog = fromNoQrCodeDialog
         )
         Route.Dashboard -> DashboardScreen(
             qrId = qrId,
@@ -1504,6 +1508,7 @@ private fun AppRoot() {
                     onClick = {
                         showNoQrCodeDialog = false
                         pendingStartTracking = false
+                        fromNoQrCodeDialog = true
                         route = Route.QrGenerator
                     },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
@@ -1570,7 +1575,8 @@ private fun QrGeneratorScreen(
     onMessageChange: (String) -> Unit,
     onQrCreated: (String) -> Unit,
     onClose: () -> Unit,
-    isSetupMode: Boolean
+    isSetupMode: Boolean,
+    fromNoQrCodeDialog: Boolean = false
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -1603,7 +1609,8 @@ private fun QrGeneratorScreen(
             onQrCreated(id)
         },
         onClose = onClose,
-        isSetupMode = isSetupMode
+        isSetupMode = isSetupMode,
+        fromNoQrCodeDialog = fromNoQrCodeDialog
     )
 }
 
@@ -1901,13 +1908,27 @@ private fun QrGeneratorContent(
     onDownloadPdf: (String) -> Unit,
     onGenerate: () -> Unit,
     onClose: () -> Unit,
-    isSetupMode: Boolean
+    isSetupMode: Boolean,
+    fromNoQrCodeDialog: Boolean = false
 ) {
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
     var qrVersion by remember { mutableStateOf(1) } // Start at 1 so QR shows initially
     var hasGeneratedQr by remember { mutableStateOf(true) } // Auto-generate QR on page load
     var downloadSuccess by remember { mutableStateOf(false) }
     var showAccountabilityDialog by remember { mutableStateOf(false) }
+    var isFirstVisit by remember { mutableStateOf(true) }
     val qrText = remember(message, qrVersion) { "QR:$message:v$qrVersion" }
+
+    // Check if this is the first visit
+    LaunchedEffect(Unit) {
+        isFirstVisit = !storage.getQrGeneratorVisited()
+        if (isFirstVisit) {
+            coroutineScope.launch {
+                storage.saveQrGeneratorVisited(true)
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -2066,7 +2087,7 @@ private fun QrGeneratorContent(
             Text(
                 if (downloadSuccess) {
                     if (isSetupMode) "Done" else "Go to Dashboard"
-                } else "Save QR Code", 
+                } else if (isFirstVisit) "Save QR Code" else "Download", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
             )
@@ -2076,7 +2097,7 @@ private fun QrGeneratorContent(
         if (downloadSuccess) {
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "✓ QR code saved to Downloads folder",
+                text = if (isFirstVisit) "✓ QR code saved to Downloads folder" else "✓ QR code downloaded",
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -2085,12 +2106,13 @@ private fun QrGeneratorContent(
         
         Spacer(Modifier.height(24.dp))
         
-        // How Physical Movement Unlocks Work Section
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(12.dp)
-        ) {
+        // How ScrollFree QR Code Works Section - show for first visit or when coming from no QR code dialog
+        if (isFirstVisit || fromNoQrCodeDialog) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = Color(0xFF2C2C2C),
+                shape = RoundedCornerShape(12.dp)
+            ) {
             Column(
                 modifier = Modifier.padding(16.dp)
             ) {
@@ -2105,7 +2127,7 @@ private fun QrGeneratorContent(
                 
                 Text(
                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
-                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your Digital Pause partner—and ask them to keep it on their phone.\n\n" +
+                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
                     "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
                     "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
                     fontSize = 14.sp,
@@ -2113,6 +2135,7 @@ private fun QrGeneratorContent(
                     lineHeight = 20.sp
                 )
             }
+        }
         }
     }
     
@@ -2749,6 +2772,8 @@ private fun SavedQrCodesScreen(
     val coroutineScope = rememberCoroutineScope()
     var savedQrCodes by remember { mutableStateOf<List<SavedQrCode>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var downloadConfirmations by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var downloadAllConfirmation by remember { mutableStateOf(false) }
 
     fun refreshList() {
         coroutineScope.launch {
@@ -2809,6 +2834,38 @@ private fun SavedQrCodesScreen(
                     Text("＋", color = Color.White)
                     Spacer(Modifier.width(8.dp))
                     Text("Add New", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // How ScrollFree QR Code Works Section
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = Color(0xFF2C2C2C),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp)
+                    ) {
+                        Text(
+                            "How ScrollFree QR Code Works:",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        
+                        Spacer(Modifier.height(12.dp))
+                        
+                        Text(
+                            "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
+                            "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
+                            "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
+                            "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                            fontSize = 14.sp,
+                            color = Color(0xFFD1D5DB),
+                            lineHeight = 20.sp
+                        )
+                    }
                 }
             }
             else -> {
@@ -2893,8 +2950,10 @@ private fun SavedQrCodesScreen(
                                         coroutineScope.launch {
                                             try { 
                                                 saveQrPdf(qrText = qrCode.qrText, message = qrCode.message)
-                                                // Note: In a real implementation, you might want to show a toast or notification here
-                                                // indicating the file was saved to the Downloads folder
+                                                downloadConfirmations = downloadConfirmations + qrCode.id
+                                                // Hide confirmation after 3 seconds
+                                                kotlinx.coroutines.delay(3000)
+                                                downloadConfirmations = downloadConfirmations - qrCode.id
                                             } catch (_: Exception) {}
                                         }
                                     },
@@ -2903,9 +2962,13 @@ private fun SavedQrCodesScreen(
                                     shape = RoundedCornerShape(10.dp),
                                     contentPadding = PaddingValues(vertical = 12.dp)
                                 ) {
-                                    Text("⇩", color = Color.White)
+                                    Text(if (qrCode.id in downloadConfirmations) "✓" else "⇩", color = Color.White)
                                     Spacer(Modifier.width(8.dp))
-                                    Text("Download this QR code", color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        if (qrCode.id in downloadConfirmations) "Downloaded" else "Download this QR code", 
+                                        color = Color.White, 
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                         }
@@ -2936,6 +2999,10 @@ private fun SavedQrCodesScreen(
                                                 // Note: Each QR code PDF will be saved to the Downloads folder
                                             } catch (_: Exception) {}
                                         }
+                                        downloadAllConfirmation = true
+                                        // Hide confirmation after 3 seconds
+                                        kotlinx.coroutines.delay(3000)
+                                        downloadAllConfirmation = false
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
@@ -2943,9 +3010,46 @@ private fun SavedQrCodesScreen(
                                 shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(vertical = 14.dp)
                             ) {
-                                Text("⇩", color = Color.White)
+                                Text(if (downloadAllConfirmation) "✓" else "⇩", color = Color.White)
                                 Spacer(Modifier.width(8.dp))
-                                Text("Download all", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(
+                                    if (downloadAllConfirmation) "All downloaded" else "Download all", 
+                                    color = Color.White, 
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                    
+                    // How ScrollFree QR Code Works Section
+                    item {
+                        Spacer(Modifier.height(16.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            backgroundColor = Color(0xFF2C2C2C),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "How ScrollFree QR Code Works:",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                
+                                Spacer(Modifier.height(12.dp))
+                                
+                                Text(
+                                    "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
+                                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
+                                    "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
+                                    "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                                    fontSize = 14.sp,
+                                    color = Color(0xFFD1D5DB),
+                                    lineHeight = 20.sp
+                                )
                             }
                         }
                     }
