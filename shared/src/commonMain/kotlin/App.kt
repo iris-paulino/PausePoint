@@ -75,7 +75,7 @@ fun AppLogo(
     contentDescription: String = "Scroll Pause Logo"
 ) {
     Image(
-        painter = painterResource("images/scrollpause logo.png"),
+        painter = painterResource("images/scrollpause_new_logo.png"),
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
