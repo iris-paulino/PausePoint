@@ -1,4 +1,4 @@
-package com.prismappsau.screengo
+package com.luminoprisma.scrollpause
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -69,7 +69,7 @@ class PauseOverlayActivity : ComponentActivity() {
         val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
 
         // Register receiver to close when HIDE is sent
-        val filter = IntentFilter("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY")
+        val filter = IntentFilter("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY")
         try {
             if (Build.VERSION.SDK_INT >= 33) {
                 registerReceiver(hideReceiver, filter, Context.RECEIVER_NOT_EXPORTED)

@@ -204,6 +204,17 @@ interface AppStorage {
      * Retrieve session start time. Return 0 if unset.
      */
     suspend fun getSessionStartTime(): Long
+
+    /**
+     * Retrieve whether the congratulation dialog should be suppressed.
+     * Return false if unset (i.e., show dialog by default).
+     */
+    suspend fun getDoNotShowCongratulationAgain(): Boolean
+
+    /**
+     * Persist preference to suppress congratulation dialog.
+     */
+    suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean)
 }
 
 /**

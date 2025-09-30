@@ -22,6 +22,7 @@ class IOSAppStorage : AppStorage {
     private val sessionAppUsageTimesKey = "session_app_usage_times"
     private val sessionStartTimeKey = "session_start_time"
     private val qrGeneratorVisitedKey = "qr_generator_visited"
+    private val doNotShowCongratsKey = "do_not_show_congratulation_again"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -418,6 +419,16 @@ class IOSAppStorage : AppStorage {
         } catch (e: Exception) {
             0L
         }
+    }
+
+    override suspend fun getDoNotShowCongratulationAgain(): Boolean {
+        val exists = userDefaults.objectForKey(doNotShowCongratsKey) != null
+        return if (!exists) false else userDefaults.boolForKey(doNotShowCongratsKey)
+    }
+
+    override suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean) {
+        userDefaults.setBool(doNotShow, doNotShowCongratsKey)
+        userDefaults.synchronize()
     }
 
     override suspend fun saveQrGeneratorVisited(visited: Boolean) {

@@ -23,16 +23,16 @@ kotlin {
 
 android {
     compileSdk = (findProperty("android.compileSdk") as String).toInt()
-    namespace = "com.prismappsau.screengo"
+    namespace = "com.luminoprisma.scrollpause"
 
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
 
     defaultConfig {
-        applicationId = "com.prismappsau.screengo"
+        applicationId = "com.luminoprisma.scrollpause"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = 4
+        versionName = "1.2"
     }
     
     signingConfigs {
