@@ -1,4 +1,4 @@
-package com.prismappsau.screengo
+package com.luminoprisma.scrollpause
 
 import MainView
 import android.Manifest

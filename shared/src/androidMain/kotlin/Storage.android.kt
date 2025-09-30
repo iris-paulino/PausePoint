@@ -24,6 +24,7 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val SESSION_APP_USAGE_TIMES_KEY = "session_app_usage_times"
     private val SESSION_START_TIME_KEY = "session_start_time"
     private val QR_GENERATOR_VISITED_KEY = "qr_generator_visited"
+    private val DO_NOT_SHOW_CONGRATS_KEY = "do_not_show_congratulation_again"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -308,6 +309,18 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
         }
     }
 
+    override suspend fun getDoNotShowCongratulationAgain(): Boolean {
+        return try {
+            prefs.getBoolean(DO_NOT_SHOW_CONGRATS_KEY, false)
+        } catch (_: Exception) { false }
+    }
+
+    override suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean) {
+        try {
+            prefs.edit().putBoolean(DO_NOT_SHOW_CONGRATS_KEY, doNotShow).apply()
+        } catch (_: Exception) {}
+    }
+
     override suspend fun saveQrGeneratorVisited(visited: Boolean) {
         try {
             prefs.edit().putBoolean(QR_GENERATOR_VISITED_KEY, visited).apply()
@@ -566,6 +579,14 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getSessionStartTime(): Long {
         return 0L
+    }
+
+    override suspend fun getDoNotShowCongratulationAgain(): Boolean {
+        return false
+    }
+
+    override suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean) {
+        // No-op for fallback
     }
 
     override suspend fun saveQrGeneratorVisited(visited: Boolean) {

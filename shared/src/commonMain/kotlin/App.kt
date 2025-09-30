@@ -10,6 +10,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.statusBarsPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -53,6 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.Icon
 import androidx.compose.material.IconButton
+import androidx.compose.material.RadioButton
+import androidx.compose.material.RadioButtonDefaults
+import androidx.compose.material.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -68,10 +72,10 @@ import androidx.compose.ui.unit.Dp
 fun AppLogo(
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
-    contentDescription: String = "AntiScroll Logo"
+    contentDescription: String = "Scroll Pause Logo"
 ) {
     Image(
-        painter = painterResource("images/bigger_logo.png"),
+        painter = painterResource("images/scrollpause logo.png"),
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
@@ -105,7 +109,7 @@ fun App() {
                 ),
             color = Color.Transparent
         ) {
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().statusBarsPadding()) {
                 AppRoot()
             }
         }
@@ -150,6 +154,8 @@ private fun AppRoot() {
     var showNoQrCodeDialog by remember { mutableStateOf(false) }
     var showUsageAccessDialog by remember { mutableStateOf(false) }
     var fromNoQrCodeDialog by remember { mutableStateOf(false) }
+    var showCongratulationDialog by remember { mutableStateOf(false) }
+    var doNotShowCongratulationAgain by remember { mutableStateOf(false) }
     var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
     var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
     var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
@@ -221,6 +227,32 @@ private fun AppRoot() {
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
+    }
+
+    // Helper function to handle QR scan success
+    fun handleQrScanSuccess() {
+        // Finalize session usage before resetting (same as Dismiss)
+        println("DEBUG: PauseScreen onScanQr called - finalizing session usage")
+        finalizeSessionUsage()
+        println("DEBUG: trackedApps after finalize (QR): ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
+        
+        // Reset session tracking state and increment unblocked counter
+        isTracking = false
+        isBlocked = false
+        // Update accessibility service with unblocked state
+        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+        // Save unblocked state to storage
+        coroutineScope.launch {
+            storage.saveBlockedState(false)
+        }
+        sessionAppUsageTimes = emptyMap()
+        sessionStartTime = 0L
+        sessionElapsedSeconds = 0L
+        timesUnblockedToday += 1
+        route = Route.Dashboard
+        
+        // Dismiss any blocking overlays
+        dismissBlockingOverlay()
     }
 
     // Track individual app usage when tracking is active
@@ -552,70 +584,42 @@ private fun AppRoot() {
     // Check onboarding completion status on app start
     LaunchedEffect(Unit) {
         try {
-            // Register timer reset callback for QR scan
+            // Register timer reset callback for QR scan (overlay or anywhere)
             setOnTimerResetCallback {
                 println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
-                println("DEBUG: Current state - isBlocked: $isBlocked, isTracking: $isTracking")
-                println("DEBUG: sessionAppUsageTimes before: $sessionAppUsageTimes")
-                println("DEBUG: timesUnblockedToday before: $timesUnblockedToday")
-                
-                // 1. Finalize session usage before resetting (same as Dismiss)
-                finalizeSessionUsage()
-                println("DEBUG: Finalized session usage after QR scan")
-                
-                // 2. Increment times walked counter (different from dismiss)
-                timesUnblockedToday += 1
-                println("DEBUG: Incremented times walked counter to: $timesUnblockedToday")
-                
-                // Persist the updated counter
-                coroutineScope.launch {
-                    try { 
-                        storage.saveTimesUnblockedToday(timesUnblockedToday)
-                        println("DEBUG: Saved times unblocked counter to storage")
-                    } catch (e: Exception) {
-                        println("DEBUG: Error saving times unblocked counter: ${e.message}")
-                    }
-                }
-                
-                // 3. Reset session tracking state when QR scanning (same as dismiss)
-                isTracking = false
+                // Ensure overlays are dismissed and user is not considered blocked anymore
                 isBlocked = false
-                // Update accessibility service with unblocked state
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
-                // Save unblocked state to storage
-                coroutineScope.launch {
-                    try { 
-                        storage.saveBlockedState(false)
-                        println("DEBUG: Saved unblocked state to storage")
-                    } catch (e: Exception) {
-                        println("DEBUG: Error saving unblocked state: ${e.message}")
-                    }
-                }
-                sessionAppUsageTimes = emptyMap()
-                sessionStartTime = 0L
-                sessionElapsedSeconds = 0L
-                println("DEBUG: Reset session timer and unblocked user")
-                
-                // Persist reset session data
-                coroutineScope.launch {
-                    try { 
-                        storage.saveSessionAppUsageTimes(emptyMap())
-                        storage.saveSessionStartTime(0L)
-                        println("DEBUG: Saved reset session data to storage")
-                    } catch (e: Exception) {
-                        println("DEBUG: Error saving reset session data: ${e.message}")
-                    }
-                }
-                
-                // 4. Navigate back to dashboard (same as dismiss)
-                route = Route.Dashboard
-                println("DEBUG: Set route to Dashboard")
-                
-                // 5. Dismiss any blocking overlays (same as dismiss)
                 dismissBlockingOverlay()
-                println("DEBUG: Dismissed blocking overlays")
-                
-                println("DEBUG: ===== TIMER RESET CALLBACK COMPLETED (QR SCAN) =====")
+                println("DEBUG: QR scan callback - cleared blocked state and dismissed overlay")
+
+                coroutineScope.launch {
+                    // 1) Finalize current session usage to credit minutes, then clear session
+                    println("DEBUG: QR scan callback - finalizing session usage before dialog")
+                    finalizeSessionUsage()
+
+                    // 2) Increment and persist times walked counter
+                    timesUnblockedToday += 1
+                    println("DEBUG: QR scan callback - incremented times walked to: $timesUnblockedToday")
+                    try {
+                        storage.saveTimesUnblockedToday(timesUnblockedToday)
+                        println("DEBUG: QR scan callback - saved times walked to storage")
+                    } catch (_: Exception) {}
+
+                    val doNotShow = try {
+                        storage.getDoNotShowCongratulationAgain()
+                    } catch (_: Exception) { false }
+                    println("DEBUG: QR scan callback - doNotShowCongratulationAgain=$doNotShow")
+
+                    if (!doNotShow) {
+                        showCongratulationDialog = true
+                        println("DEBUG: QR scan callback - showing congratulations dialog")
+                    } else {
+                        println("DEBUG: QR scan callback - preference set to skip dialog; restarting tracking")
+                        // Restart tracking immediately
+                        isTracking = true
+                        route = Route.Dashboard
+                    }
+                }
             }
             
             // Register timer reset callback for dismiss button
@@ -992,7 +996,7 @@ private fun AppRoot() {
         null -> {
             // Show loading state while checking onboarding status
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().statusBarsPadding(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1205,29 +1209,18 @@ private fun AppRoot() {
                 onScanQr = {
                     coroutineScope.launch {
                         val ok = scanQrAndDismiss(qrMessage)
+                        println("DEBUG: onScanQr - scan result ok=$ok")
                         if (ok) {
-                            // Finalize session usage before resetting (same as Dismiss)
-                            println("DEBUG: PauseScreen onScanQr called - finalizing session usage")
-                            finalizeSessionUsage()
-                            println("DEBUG: trackedApps after finalize (QR): ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
-                            
-                            // Reset session tracking state and increment unblocked counter
-                            isTracking = false
-                            isBlocked = false
-                            // Update accessibility service with unblocked state
-                            updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
-                            // Save unblocked state to storage
-                            coroutineScope.launch {
-                                storage.saveBlockedState(false)
+                            val doNotShow = try {
+                                storage.getDoNotShowCongratulationAgain()
+                            } catch (e: Exception) {
+                                false
                             }
-                            sessionAppUsageTimes = emptyMap()
-                            sessionStartTime = 0L
-                            sessionElapsedSeconds = 0L
-                            timesUnblockedToday += 1
-                            route = Route.Dashboard
-                            
-                            // Dismiss any blocking overlays
-                            dismissBlockingOverlay()
+                            println("DEBUG: onScanQr - doNotShowCongratulationAgain=$doNotShow")
+
+                            // Force show for now to confirm UX; preference still saved from dialog
+                            showCongratulationDialog = true
+                            println("DEBUG: onScanQr - showCongratulationDialog set to true")
                         }
                     }
                 },
@@ -1596,6 +1589,98 @@ private fun AppRoot() {
             contentColor = Color.White
         )
     }
+    
+    // Congratulatory Dialog
+    if (showCongratulationDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = { 
+                showCongratulationDialog = false
+                if (doNotShowCongratulationAgain) {
+                    coroutineScope.launch {
+                        storage.saveDoNotShowCongratulationAgain(true)
+                    }
+                }
+                handleQrScanSuccess()
+            },
+            title = {
+                Text(
+                    "🎉 Great Job!",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Congratulations on taking a mindful pause from doomscrolling! You've successfully completed your break and can now return to your apps.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { 
+                            doNotShowCongratulationAgain = !doNotShowCongratulationAgain 
+                        }
+                    ) {
+                        RadioButton(
+                            selected = doNotShowCongratulationAgain,
+                            onClick = { doNotShowCongratulationAgain = !doNotShowCongratulationAgain },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Color(0xFF4A90E2),
+                                unselectedColor = Color(0xFF9CA3AF)
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Do not show again",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { 
+                        showCongratulationDialog = false
+                        if (doNotShowCongratulationAgain) {
+                            coroutineScope.launch {
+                                storage.saveDoNotShowCongratulationAgain(true)
+                            }
+                        }
+                        // Restart tracking and go to Dashboard
+                        isTracking = true
+                        route = Route.Dashboard
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Restart Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { 
+                        showCongratulationDialog = false
+                        if (doNotShowCongratulationAgain) {
+                            coroutineScope.launch {
+                                storage.saveDoNotShowCongratulationAgain(true)
+                            }
+                        }
+                        // Go to Dashboard without restarting
+                        isTracking = false
+                        route = Route.Dashboard
+                    }
+                ) {
+                    Text("Dismiss", color = Color(0xFF9CA3AF))
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
 }
 
 
@@ -1749,7 +1834,7 @@ private fun OnboardingFlow(
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
-                title = "Welcome to AntiScroll",
+                title = "Welcome to Scroll Pause",
                 description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
@@ -1793,6 +1878,7 @@ private fun OnboardingPager(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -1965,6 +2051,7 @@ private fun QrGeneratorContent(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -2208,6 +2295,7 @@ private fun DashboardContent(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -2218,7 +2306,7 @@ private fun DashboardContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
-                Text("AntiScroll", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Scroll Pause", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Text("Monday, Sep 22", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
             Row {
@@ -2585,6 +2673,7 @@ private fun SettingsScreen(
                     )
                 )
             )
+            .statusBarsPadding()
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -2759,7 +2848,7 @@ private fun SettingsScreen(
                     Text("📷", fontSize = 24.sp, color = Color(0xFF1E3A5F))
                 }
                 Spacer(Modifier.height(8.dp))
-                Text("Camera permission is required to scan QR codes for pause functionality. When you first scan a QR code, you'll be prompted to allow camera access. You can change this permission anytime in your device's app settings.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Text("Required to scan QR codes for pause functionality.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
@@ -2784,7 +2873,7 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { openEmailClient("contact.antiscroll@gmail.com") },
+                .clickable { openEmailClient("hello@scroll-pause.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -2841,6 +2930,7 @@ private fun SavedQrCodesScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
     ) {
         // Header
@@ -2900,7 +2990,7 @@ private fun SavedQrCodesScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                    "How AntiScroll QR Code Works:",
+                    "How Scroll Pause QR Code Works:",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
@@ -3085,7 +3175,7 @@ private fun SavedQrCodesScreen(
                                 modifier = Modifier.padding(16.dp)
                             ) {
                                 Text(
-                                    "How AntiScroll QR Code Works:",
+                                    "How Scroll Pause QR Code Works:",
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = Color.White
@@ -3121,7 +3211,8 @@ fun PauseScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF1A1A1A)),
+            .background(Color(0xFF1A1A1A))
+            .statusBarsPadding(),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -3232,7 +3323,7 @@ private fun AppSelectionScreen(
     // Show loading state if apps are being loaded
     if (isLoading || availableApps.isEmpty()) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().statusBarsPadding(),
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -3247,6 +3338,7 @@ private fun AppSelectionScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
     ) {
         // Header
@@ -3403,6 +3495,7 @@ private fun PrivacyPolicyScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
             .verticalScroll(rememberScrollState())
     ) {
@@ -3452,7 +3545,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "AntiScroll (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
+                    "Scroll Pause (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3564,7 +3657,7 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
-                    "Email: contact.antiscroll@gmail.com",
+                    "Email: hello@scroll-pause.com",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3603,6 +3696,7 @@ private fun DurationSettingScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
             .padding(24.dp)
     ) {
         // Header

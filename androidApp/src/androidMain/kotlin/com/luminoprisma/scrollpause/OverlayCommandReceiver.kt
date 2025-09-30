@@ -1,4 +1,4 @@
-package com.prismappsau.screengo
+package com.luminoprisma.scrollpause
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -9,7 +9,7 @@ class OverlayCommandReceiver : BroadcastReceiver() {
         println("DEBUG: OverlayCommandReceiver.onReceive called - action: ${intent?.action}")
         val action = intent?.action ?: return
         when (action) {
-            "com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY" -> {
+            "com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY" -> {
                 val message = intent.getStringExtra("message") ?: "Take a mindful pause"
                 println("DEBUG: OverlayCommandReceiver - SHOW received, message='$message'")
                 ForegroundAppAccessibilityService.setPendingShow(message)
@@ -30,13 +30,13 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                     println("DEBUG: OverlayCommandReceiver - error launching activity: ${e.message}")
                 }
             }
-            "com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY" -> {
+            "com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY" -> {
                 println("DEBUG: OverlayCommandReceiver - HIDE received")
                 ForegroundAppAccessibilityService.setPendingHide()
                 // If fallback activity is showing, ensure it closes
                 // Activity registers a receiver to finish on this signal
             }
-            "com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE" -> {
+            "com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE" -> {
                 println("DEBUG: OverlayCommandReceiver - RESET_TIMER_AND_CONTINUE received")
                 // This will be handled by the main app's broadcast receiver
                 // Just hide the overlay for now

@@ -49,8 +49,8 @@
             android:name=".OverlayCommandReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY" />
-                <action android:name="com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY" />
+                <action android:name="com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY" />
+                <action android:name="com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY" />
             </intent-filter>
         </receiver>
 

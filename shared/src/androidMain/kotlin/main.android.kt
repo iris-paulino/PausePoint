@@ -101,7 +101,7 @@ actual fun saveQrPdf(qrText: String, message: String): String {
     }
     
     // Title
-    canvas.drawText("AntiScroll QR Code", 72f, 96f, paint)
+    canvas.drawText("Scroll Pause QR Code", 72f, 96f, paint)
     
     // Message
     paint.textSize = 20f
@@ -164,7 +164,7 @@ actual fun showBlockingOverlay(message: String) {
     if (activity != null) {
         try {
             // Use broadcast receiver to show the overlay
-            val intent = Intent("com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY").apply {
+            val intent = Intent("com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY").apply {
                 putExtra("message", message)
                 setPackage(activity.packageName) // Explicitly set the package
             }
@@ -184,7 +184,7 @@ actual fun dismissBlockingOverlay() {
     if (activity != null) {
         try {
             // Use broadcast receiver to hide the overlay
-            val intent = Intent("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY").apply {
+            val intent = Intent("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -207,7 +207,7 @@ fun resetTimerAndContinueTracking() {
     if (activity != null) {
         try {
             // Use broadcast receiver to reset timer and continue tracking
-            val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
+            val intent = Intent("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -230,7 +230,7 @@ fun dismissAndContinueTracking() {
     if (activity != null) {
         try {
             // Use broadcast receiver to dismiss and continue tracking
-            val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
+            val intent = Intent("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
@@ -293,9 +293,35 @@ private var onTimerResetCallback: (() -> Unit)? = null
 private var onDismissCallback: (() -> Unit)? = null
 
 actual suspend fun scanQrAndDismiss(expectedMessage: String): Boolean {
-    // QR scanning is handled directly by PauseOverlayActivity
-    // This function is not used in the current implementation
-    return false
+    val activity = currentActivityRef?.get() ?: return false
+
+    return suspendCancellableCoroutine { cont ->
+        try {
+            // Receiver to capture scan result
+            val filter = IntentFilter("com.luminoprisma.scrollpause.QR_SCAN_RESULT")
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    try {
+                        activity.unregisterReceiver(this)
+                    } catch (_: Exception) {}
+
+                    val qrText = intent?.getStringExtra("qr_text")
+                    // Treat any non-empty QR text as a valid scan
+                    val ok = !qrText.isNullOrEmpty()
+                    if (!cont.isCompleted) cont.resume(ok) {}
+                }
+            }
+            activity.registerReceiver(receiver, filter)
+
+            // Launch QR scanner activity and pass expected message for validation
+            val intent = Intent(activity, Class.forName("com.luminoprisma.scrollpause.QrScanActivity")).apply {
+                putExtra("expected_message", expectedMessage)
+            }
+            activity.startActivity(intent)
+        } catch (e: Exception) {
+            if (!cont.isCompleted) cont.resume(false) {}
+        }
+    }
 }
 
 
@@ -315,7 +341,7 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
     println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
     try {
         // Use reflection to call the accessibility service method safely
-        val serviceClass = Class.forName("com.prismappsau.screengo.ForegroundAppAccessibilityService")
+        val serviceClass = Class.forName("com.luminoprisma.scrollpause.ForegroundAppAccessibilityService")
         val companionClass = serviceClass.getDeclaredClasses().find { it.simpleName == "Companion" }
         if (companionClass != null) {
             val companionInstance = companionClass.getDeclaredField("INSTANCE").get(null)
@@ -381,22 +407,36 @@ actual fun isAccessibilityServiceEnabled(): Boolean {
     // cache application context for receiver registration later
     appContextRef = activity.applicationContext
     val pkg = activity.packageName
-    val expected = ComponentName(pkg, "$pkg.ForegroundAppAccessibilityService")
+    
+    // Create both possible component name formats that Android might use
+    val expectedWithDot = ComponentName(pkg, ".ForegroundAppAccessibilityService")
+    val expectedWithFullPackage = ComponentName(pkg, "$pkg.ForegroundAppAccessibilityService")
+    
     val enabledServices = Settings.Secure.getString(activity.contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES)
-    println("DEBUG: isAccessibilityServiceEnabled - pkg: $pkg, expected: $expected, enabledServices: $enabledServices")
+    println("DEBUG: isAccessibilityServiceEnabled - pkg: $pkg")
+    println("DEBUG: isAccessibilityServiceEnabled - expectedWithDot: ${expectedWithDot.flattenToString()}")
+    println("DEBUG: isAccessibilityServiceEnabled - expectedWithFullPackage: ${expectedWithFullPackage.flattenToString()}")
+    println("DEBUG: isAccessibilityServiceEnabled - enabledServices: $enabledServices")
+    
     if (enabledServices.isNullOrEmpty()) {
         println("DEBUG: isAccessibilityServiceEnabled - no enabled services, returning false")
         return false
     }
+    
     val colonSplitter = TextUtils.SimpleStringSplitter(':')
     colonSplitter.setString(enabledServices)
     while (colonSplitter.hasNext()) {
         val componentName = colonSplitter.next()
-        if (componentName.equals(expected.flattenToString(), ignoreCase = true) ||
+        println("DEBUG: isAccessibilityServiceEnabled - checking component: $componentName")
+        
+        // Check for exact matches with both formats
+        if (componentName.equals(expectedWithDot.flattenToString(), ignoreCase = true) ||
+            componentName.equals(expectedWithFullPackage.flattenToString(), ignoreCase = true) ||
+            // Also check for partial matches as fallback
             componentName.endsWith("/ForegroundAppAccessibilityService", ignoreCase = true) ||
-            componentName.contains(pkg, ignoreCase = true) && componentName.contains("ForegroundAppAccessibilityService", ignoreCase = true)
+            (componentName.contains(pkg, ignoreCase = true) && componentName.contains("ForegroundAppAccessibilityService", ignoreCase = true))
         ) {
-            println("DEBUG: isAccessibilityServiceEnabled - found matching service, returning true")
+            println("DEBUG: isAccessibilityServiceEnabled - found matching service: $componentName, returning true")
             return true
         }
     }
@@ -415,7 +455,7 @@ private var appContextRef: Context? = null
 private fun ensureReceiverRegistered(context: Context) {
     if (receiverRegistered) return
     try {
-        val filter = IntentFilter("com.prismappsau.screengo.FOREGROUND_APP_CHANGED")
+        val filter = IntentFilter("com.luminoprisma.scrollpause.FOREGROUND_APP_CHANGED")
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context?, intent: Intent?) {
                 val pkg = intent?.getStringExtra("pkg")
