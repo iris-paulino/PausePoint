@@ -182,6 +182,8 @@ private fun AppRoot() {
     var sessionStartTime by remember { mutableStateOf(0L) }
     var sessionAppUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var sessionElapsedSeconds by remember { mutableStateOf(0L) }
+    // Tracks how many whole minutes have already been credited to each app during the current session
+    var sessionCreditedMinutes by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
     
     // Counter for times unblocked today
     var timesUnblockedToday by remember { mutableStateOf(0) }
@@ -200,13 +202,17 @@ private fun AppRoot() {
             return
         }
         
-        // Credit ALL apps that have any usage this session
+        // Credit remaining uncredited minutes for all apps with any usage this session
         trackedApps = trackedApps.map { app ->
             val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
             if (sessionSeconds > 0) {
-                val sessionMinutes = (sessionSeconds / 60L).toInt()
-                println("DEBUG: Crediting ${sessionSeconds} seconds (${sessionMinutes} min) to ${app.name}")
-                app.copy(minutesUsed = app.minutesUsed + sessionMinutes)
+                val totalSessionMinutes = (sessionSeconds / 60L).toInt()
+                val creditedSoFar = sessionCreditedMinutes[app.name] ?: 0
+                val remaining = (totalSessionMinutes - creditedSoFar).coerceAtLeast(0)
+                if (remaining > 0) {
+                    println("DEBUG: Finalize crediting remaining $remaining min to ${app.name}")
+                }
+                app.copy(minutesUsed = app.minutesUsed + remaining)
             } else app
         }
         
@@ -224,6 +230,7 @@ private fun AppRoot() {
         
         // Clear session usage after finalizing to prevent double counting
         sessionAppUsageTimes = emptyMap()
+        sessionCreditedMinutes = emptyMap()
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
@@ -247,6 +254,7 @@ private fun AppRoot() {
         }
         sessionAppUsageTimes = emptyMap()
         sessionStartTime = 0L
+        sessionCreditedMinutes = emptyMap()
         sessionElapsedSeconds = 0L
         timesUnblockedToday += 1
         route = Route.Dashboard
@@ -420,6 +428,24 @@ private fun AppRoot() {
                     
                     sessionAppUsageTimes = updatedSessionUsage
                     println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
+                    // Per-minute rollover: credit newly completed minutes to trackedApps
+                    var creditedMap = sessionCreditedMinutes.toMutableMap()
+                    var updatedTrackedApps = trackedApps
+                    for (app in trackedApps) {
+                        val seconds = sessionAppUsageTimes[app.name] ?: 0L
+                        val totalMinutes = (seconds / 60L).toInt()
+                        val creditedSoFar = creditedMap[app.name] ?: 0
+                        val delta = totalMinutes - creditedSoFar
+                        if (delta > 0) {
+                            println("DEBUG: Rollover credit $delta min to ${app.name} (totalMinutes=$totalMinutes, creditedSoFar=$creditedSoFar)")
+                            updatedTrackedApps = updatedTrackedApps.map { a -> if (a.name == app.name) a.copy(minutesUsed = a.minutesUsed + delta) else a }
+                            creditedMap[app.name] = totalMinutes
+                        }
+                    }
+                    if (updatedTrackedApps !== trackedApps) {
+                        trackedApps = updatedTrackedApps
+                    }
+                    sessionCreditedMinutes = creditedMap
                     
                     // Persist session data
                     coroutineScope.launch {
@@ -477,6 +503,24 @@ private fun AppRoot() {
                     
                     sessionAppUsageTimes = updatedSessionUsage
                     println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
+                    // Per-minute rollover: credit newly completed minutes to trackedApps
+                    var creditedMap = sessionCreditedMinutes.toMutableMap()
+                    var updatedTrackedApps = trackedApps
+                    for (app in trackedApps) {
+                        val seconds = sessionAppUsageTimes[app.name] ?: 0L
+                        val totalMinutes = (seconds / 60L).toInt()
+                        val creditedSoFar = creditedMap[app.name] ?: 0
+                        val delta = totalMinutes - creditedSoFar
+                        if (delta > 0) {
+                            println("DEBUG: Rollover credit $delta min to ${app.name} (totalMinutes=$totalMinutes, creditedSoFar=$creditedSoFar)")
+                            updatedTrackedApps = updatedTrackedApps.map { a -> if (a.name == app.name) a.copy(minutesUsed = a.minutesUsed + delta) else a }
+                            creditedMap[app.name] = totalMinutes
+                        }
+                    }
+                    if (updatedTrackedApps !== trackedApps) {
+                        trackedApps = updatedTrackedApps
+                    }
+                    sessionCreditedMinutes = creditedMap
                     
                     // Persist session data
                     coroutineScope.launch {
@@ -740,6 +784,7 @@ private fun AppRoot() {
                 timesDismissedToday = 0
                 sessionAppUsageTimes = emptyMap()
                 sessionStartTime = 0L
+                sessionCreditedMinutes = emptyMap()
                 withTimeoutOrNull(2000) {
                     storage.saveAppUsageTimes(appUsageTimes)
                     storage.saveUsageDayEpoch(todayEpochDay)
