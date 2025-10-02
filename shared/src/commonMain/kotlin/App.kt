@@ -75,7 +75,7 @@ fun AppLogo(
     contentDescription: String = "Scroll Pause Logo"
 ) {
     Image(
-        painter = painterResource("images/scrollpause_new_logo.png"),
+        painter = painterResource("images/scrollpause_maybe_final_logo.png"),
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
@@ -3021,7 +3021,7 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { openEmailClient("hello@scroll-pause.com") },
+                .clickable { openEmailClient("contact@scroll-pause.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -3805,7 +3805,7 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
-                    "Email: hello@scroll-pause.com",
+                    "Email: contact@scroll-pause.com",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3910,7 +3910,7 @@ private fun DurationSettingScreen(
                         text = timeLimitMinutes.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E3A5F)
+                        color = Color.White
                     )
                     Spacer(Modifier.width(8.dp))
                     run {
