@@ -23,6 +23,8 @@ class IOSAppStorage : AppStorage {
     private val sessionStartTimeKey = "session_start_time"
     private val qrGeneratorVisitedKey = "qr_generator_visited"
     private val doNotShowCongratsKey = "do_not_show_congratulation_again"
+    private val doNotShowDismissKey = "do_not_show_dismiss_again"
+    private val autoRestartOnDismissKey = "auto_restart_on_dismiss"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -428,6 +430,26 @@ class IOSAppStorage : AppStorage {
 
     override suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean) {
         userDefaults.setBool(doNotShow, doNotShowCongratsKey)
+        userDefaults.synchronize()
+    }
+
+    override suspend fun getDoNotShowDismissAgain(): Boolean {
+        val exists = userDefaults.objectForKey(doNotShowDismissKey) != null
+        return if (!exists) false else userDefaults.boolForKey(doNotShowDismissKey)
+    }
+
+    override suspend fun saveDoNotShowDismissAgain(doNotShow: Boolean) {
+        userDefaults.setBool(doNotShow, doNotShowDismissKey)
+        userDefaults.synchronize()
+    }
+
+    override suspend fun getAutoRestartOnDismiss(): Boolean {
+        val exists = userDefaults.objectForKey(autoRestartOnDismissKey) != null
+        return if (!exists) false else userDefaults.boolForKey(autoRestartOnDismissKey)
+    }
+
+    override suspend fun saveAutoRestartOnDismiss(autoRestart: Boolean) {
+        userDefaults.setBool(autoRestart, autoRestartOnDismissKey)
         userDefaults.synchronize()
     }
 

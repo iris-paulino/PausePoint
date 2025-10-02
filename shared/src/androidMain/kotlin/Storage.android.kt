@@ -25,6 +25,8 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val SESSION_START_TIME_KEY = "session_start_time"
     private val QR_GENERATOR_VISITED_KEY = "qr_generator_visited"
     private val DO_NOT_SHOW_CONGRATS_KEY = "do_not_show_congratulation_again"
+    private val DO_NOT_SHOW_DISMISS_KEY = "do_not_show_dismiss_again"
+    private val AUTO_RESTART_ON_DISMISS_KEY = "auto_restart_on_dismiss"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -321,6 +323,26 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
         } catch (_: Exception) {}
     }
 
+    override suspend fun getDoNotShowDismissAgain(): Boolean {
+        return try { prefs.getBoolean(DO_NOT_SHOW_DISMISS_KEY, false) } catch (_: Exception) { false }
+    }
+
+    override suspend fun saveDoNotShowDismissAgain(doNotShow: Boolean) {
+        try {
+            prefs.edit().putBoolean(DO_NOT_SHOW_DISMISS_KEY, doNotShow).apply()
+        } catch (_: Exception) {}
+    }
+
+    override suspend fun getAutoRestartOnDismiss(): Boolean {
+        return try { prefs.getBoolean(AUTO_RESTART_ON_DISMISS_KEY, false) } catch (_: Exception) { false }
+    }
+
+    override suspend fun saveAutoRestartOnDismiss(autoRestart: Boolean) {
+        try {
+            prefs.edit().putBoolean(AUTO_RESTART_ON_DISMISS_KEY, autoRestart).apply()
+        } catch (_: Exception) {}
+    }
+
     override suspend fun saveQrGeneratorVisited(visited: Boolean) {
         try {
             prefs.edit().putBoolean(QR_GENERATOR_VISITED_KEY, visited).apply()
@@ -586,6 +608,22 @@ class FallbackAppStorage : AppStorage {
     }
 
     override suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean) {
+        // No-op for fallback
+    }
+
+    override suspend fun getDoNotShowDismissAgain(): Boolean {
+        return false
+    }
+
+    override suspend fun saveDoNotShowDismissAgain(doNotShow: Boolean) {
+        // No-op for fallback
+    }
+
+    override suspend fun getAutoRestartOnDismiss(): Boolean {
+        return false
+    }
+
+    override suspend fun saveAutoRestartOnDismiss(autoRestart: Boolean) {
         // No-op for fallback
     }
 

@@ -215,6 +215,28 @@ interface AppStorage {
      * Persist preference to suppress congratulation dialog.
      */
     suspend fun saveDoNotShowCongratulationAgain(doNotShow: Boolean)
+
+    /**
+     * Retrieve whether the dismiss dialog should be suppressed.
+     * Return false if unset (i.e., show dialog by default).
+     */
+    suspend fun getDoNotShowDismissAgain(): Boolean
+
+    /**
+     * Persist preference to suppress dismiss dialog.
+     */
+    suspend fun saveDoNotShowDismissAgain(doNotShow: Boolean)
+
+    /**
+     * Retrieve the user's preference for auto-restarting tracking when dismissing.
+     * Return false if unset (i.e., do not auto-restart by default).
+     */
+    suspend fun getAutoRestartOnDismiss(): Boolean
+
+    /**
+     * Persist the user's preference for auto-restarting tracking when dismissing.
+     */
+    suspend fun saveAutoRestartOnDismiss(autoRestart: Boolean)
 }
 
 /**
