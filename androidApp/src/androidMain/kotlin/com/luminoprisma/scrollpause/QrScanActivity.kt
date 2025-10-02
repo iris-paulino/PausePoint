@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import com.journeyapps.barcodescanner.CaptureActivity
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import setQrScanningActive
 
 class QrScanActivity : AppCompatActivity() {
     private var expectedMessage: String? = null // no longer used for validation; any QR counts
@@ -31,6 +32,8 @@ class QrScanActivity : AppCompatActivity() {
                 } catch (_: Exception) { false }
 
                 if (isValid) {
+                    // End scanning session on success
+                    setQrScanningActive(false)
                     data.putExtra("qr_text", scanned)
                     setResult(Activity.RESULT_OK, data)
                     try {
@@ -44,10 +47,14 @@ class QrScanActivity : AppCompatActivity() {
                 } else {
                     Toast.makeText(this@QrScanActivity, "Invalid QR code. Please scan a valid Pause QR.", Toast.LENGTH_SHORT).show()
                     // Relaunch scanner without finishing, so the camera stays open
+                    // Keep scanning active between attempts
+                    setQrScanningActive(true)
                     launchQrScanner()
                 }
             }
         } else {
+            // End scanning session on cancel/no result
+            setQrScanningActive(false)
             setResult(Activity.RESULT_CANCELED)
             try {
                 val intent = Intent("com.luminoprisma.scrollpause.QR_SCAN_RESULT").apply {
@@ -73,6 +80,8 @@ class QrScanActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Mark scanning active for the entire session of the embedded CaptureActivity
+        setQrScanningActive(true)
         expectedMessage = intent?.getStringExtra("expected_message")
         
         // Check camera permission before launching scanner
@@ -84,6 +93,12 @@ class QrScanActivity : AppCompatActivity() {
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    override fun onDestroy() {
+        // Safety: ensure we clear the flag if the activity is destroyed unexpectedly
+        setQrScanningActive(false)
+        super.onDestroy()
     }
     
     private fun launchQrScanner() {
