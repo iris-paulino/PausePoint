@@ -156,6 +156,9 @@ private fun AppRoot() {
     var fromNoQrCodeDialog by remember { mutableStateOf(false) }
     var showCongratulationDialog by remember { mutableStateOf(false) }
     var doNotShowCongratulationAgain by remember { mutableStateOf(false) }
+    var showDismissDialog by remember { mutableStateOf(false) }
+    var doNotShowDismissAgain by remember { mutableStateOf(false) }
+    var autoRestartOnDismiss by remember { mutableStateOf(false) }
     var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
     var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
     var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
@@ -190,6 +193,19 @@ private fun AppRoot() {
     // Counter for times dismissed today
     var timesDismissedToday by remember { mutableStateOf(0) }
     var isSetupMode by remember { mutableStateOf(false) }
+
+    // Load persisted preferences on first composition
+    LaunchedEffect(Unit) {
+        try {
+            doNotShowCongratulationAgain = storage.getDoNotShowCongratulationAgain()
+        } catch (_: Exception) {}
+        try {
+            doNotShowDismissAgain = storage.getDoNotShowDismissAgain()
+        } catch (_: Exception) {}
+        try {
+            autoRestartOnDismiss = storage.getAutoRestartOnDismiss()
+        } catch (_: Exception) {}
+    }
 
     // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
     fun finalizeSessionUsage() {
@@ -1271,35 +1287,38 @@ private fun AppRoot() {
                 },
                 onClose = { 
                     println("DEBUG: PauseScreen onClose called")
-                    println("DEBUG: trackedApps before finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
-                    println("DEBUG: sessionAppUsageTimes before finalize: $sessionAppUsageTimes")
-                    
-                    // Finalize session usage before resetting (same as QR code)
+                    // Always finalize
                     finalizeSessionUsage()
-                    
-                    println("DEBUG: trackedApps after finalize: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
-                    
-                    // Increment dismiss counter
+                    // Count dismiss
                     timesDismissedToday += 1
-                    
-                    // Reset session tracking state when dismissing (no counter increment)
-                    isTracking = false
-                    isBlocked = false
-                    // Update accessibility service with unblocked state
-                    updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
-                    // Save unblocked state to storage
+                    coroutineScope.launch { try { storage.saveTimesDismissedToday(timesDismissedToday) } catch (_: Exception) {} }
+
+                    // If user opted to suppress dialog, follow preference; else show dialog
                     coroutineScope.launch {
+                        val skipDialog = try { storage.getDoNotShowDismissAgain() } catch (_: Exception) { false }
+                        val autoRestartPref = try { storage.getAutoRestartOnDismiss() } catch (_: Exception) { false }
+                        if (skipDialog) {
+                            if (autoRestartPref) {
+                                // Restart tracking immediately and return to last route (dashboard shows tracked apps)
+                                isTracking = true
+                                route = Route.Dashboard
+                            } else {
+                                // Do not auto-start; go back to Pause screen parent (Dashboard)
+                                isTracking = false
+                                route = Route.Dashboard
+                            }
+                        } else {
+                            showDismissDialog = true
+                        }
+                        // Clear blocked state and overlays in either case
+                        isBlocked = false
+                        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                         storage.saveBlockedState(false)
+                        sessionAppUsageTimes = emptyMap()
+                        sessionStartTime = 0L
+                        sessionElapsedSeconds = 0L
+                        dismissBlockingOverlay()
                     }
-                    sessionAppUsageTimes = emptyMap()
-                    sessionStartTime = 0L
-                    sessionElapsedSeconds = 0L
-                    
-                    println("DEBUG: trackedApps after reset: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
-                    route = Route.Dashboard 
-                    
-                    // Dismiss any blocking overlays
-                    dismissBlockingOverlay()
                 }
             )
         }
@@ -1720,6 +1739,90 @@ private fun AppRoot() {
                     }
                 ) {
                     Text("Dismiss", color = Color(0xFF9CA3AF))
+                }
+            },
+            backgroundColor = Color(0xFF1A1A1A),
+            contentColor = Color.White
+        )
+    }
+
+    // Dismiss Dialog
+    if (showDismissDialog) {
+        androidx.compose.material.AlertDialog(
+            onDismissRequest = {
+                showDismissDialog = false
+            },
+            title = {
+                Text(
+                    "Dismiss Pause?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        "Do you want the app to auto-restart tracking after dismissing?",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable { doNotShowDismissAgain = !doNotShowDismissAgain }
+                    ) {
+                        RadioButton(
+                            selected = doNotShowDismissAgain,
+                            onClick = { doNotShowDismissAgain = !doNotShowDismissAgain },
+                            colors = RadioButtonDefaults.colors(
+                                selectedColor = Color(0xFF4A90E2),
+                                unselectedColor = Color(0xFF9CA3AF)
+                            )
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Do not show again", color = Color.White, fontSize = 14.sp)
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.material.Checkbox(
+                            checked = autoRestartOnDismiss,
+                            onCheckedChange = { checked -> autoRestartOnDismiss = checked },
+                            colors = androidx.compose.material.CheckboxDefaults.colors(checkedColor = Color(0xFF4A90E2), uncheckedColor = Color(0xFF9CA3AF))
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text("Auto-restart tracking after dismiss", color = Color.White, fontSize = 14.sp)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDismissDialog = false
+                        coroutineScope.launch {
+                            try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
+                            try { storage.saveAutoRestartOnDismiss(autoRestartOnDismiss) } catch (_: Exception) {}
+                        }
+                        if (autoRestartOnDismiss) {
+                            isTracking = true
+                        } else {
+                            isTracking = false
+                        }
+                        route = Route.Dashboard
+                    },
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDismissDialog = false
+                    }
+                ) {
+                    Text("Cancel", color = Color(0xFF9CA3AF))
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
