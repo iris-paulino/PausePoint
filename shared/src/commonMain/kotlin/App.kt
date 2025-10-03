@@ -75,7 +75,7 @@ fun AppLogo(
     contentDescription: String = "Scroll Pause Logo"
 ) {
     Image(
-        painter = painterResource("images/scrollpause_maybe_final_logo.png"),
+        painter = painterResource("images/scrollpause_new_logo.png"),
         contentDescription = contentDescription,
         modifier = modifier
             .size(size)
@@ -1714,8 +1714,9 @@ private fun AppRoot() {
                                 storage.saveDoNotShowCongratulationAgain(true)
                             }
                         }
-                        // Restart tracking and go to Dashboard
-                        isTracking = true
+                        // Finalize session and clear blocked state, then start normal start flow
+                        handleQrScanSuccess()
+                        pendingStartTracking = true
                         route = Route.Dashboard
                     },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
@@ -1733,7 +1734,8 @@ private fun AppRoot() {
                                 storage.saveDoNotShowCongratulationAgain(true)
                             }
                         }
-                        // Go to Dashboard without restarting
+                        // Finalize session and remain paused
+                        handleQrScanSuccess()
                         isTracking = false
                         route = Route.Dashboard
                     }
@@ -1801,13 +1803,9 @@ private fun AppRoot() {
                         showDismissDialog = false
                         coroutineScope.launch {
                             try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
-                            try { storage.saveAutoRestartOnDismiss(autoRestartOnDismiss) } catch (_: Exception) {}
                         }
-                        if (autoRestartOnDismiss) {
-                            isTracking = true
-                        } else {
-                            isTracking = false
-                        }
+                        // Use the normal Start Tracking pipeline so we only accrue when foregrounded
+                        pendingStartTracking = true
                         route = Route.Dashboard
                     },
                     colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
@@ -3021,7 +3019,7 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { openEmailClient("contact@scroll-pause.com") },
+                .clickable { openEmailClient("hello@scroll-pause.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
@@ -3805,7 +3803,7 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "If you have any questions about this Privacy Policy, please contact us at:\n\n" +
-                    "Email: contact@scroll-pause.com",
+                    "Email: hello@scroll-pause.com",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3910,7 +3908,7 @@ private fun DurationSettingScreen(
                         text = timeLimitMinutes.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = Color(0xFF1E3A5F)
                     )
                     Spacer(Modifier.width(8.dp))
                     run {
