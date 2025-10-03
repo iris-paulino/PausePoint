@@ -248,9 +248,9 @@ actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
     
     println("DEBUG: checkAndShowOverlayIfBlocked called - isBlocked: $isBlocked, isQrScanningActive: $isQrScanningActive")
     
-    // Don't show overlay if QR scanning is currently active
+    // Suppress overlay while QR scanner is active to avoid bouncing back to pause screen
     if (isQrScanningActive) {
-        println("DEBUG: checkAndShowOverlayIfBlocked - QR scanning is active, not showing overlay")
+        println("DEBUG: checkAndShowOverlayIfBlocked - scanning active, suppressing overlay")
         return
     }
     
