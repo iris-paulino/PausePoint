@@ -53,8 +53,9 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     private fun isIgnoredPackage(pkg: String?): Boolean {
         if (pkg.isNullOrBlank()) return true
         val self = applicationContext.packageName
-        return pkg == self ||
-            pkg.startsWith("com.google.android.inputmethod") ||
+        // Do NOT ignore our own app – we need to broadcast when our UI is foregrounded
+        if (pkg == self) return false
+        return pkg.startsWith("com.google.android.inputmethod") ||
             pkg.startsWith("com.android.inputmethod") ||
             pkg.startsWith("com.google.android.gms") ||
             pkg.startsWith("com.android.systemui")
