@@ -80,7 +80,7 @@ class QrScanActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // Mark scanning active for the entire session of the embedded CaptureActivity
+        // Mark scanning active; lifecycle methods will keep this accurate
         setQrScanningActive(true)
         expectedMessage = intent?.getStringExtra("expected_message")
         
@@ -93,6 +93,18 @@ class QrScanActivity : AppCompatActivity() {
         } else {
             cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Scanner is visible/interactive
+        setQrScanningActive(true)
+    }
+
+    override fun onPause() {
+        // Scanner is no longer in the foreground; allow overlays on tracked apps
+        setQrScanningActive(false)
+        super.onPause()
     }
 
     override fun onDestroy() {
