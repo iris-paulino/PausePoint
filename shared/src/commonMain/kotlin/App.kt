@@ -2009,7 +2009,7 @@ private fun OnboardingFlow(
             ),
             OnboardingPage(
                 title = "Pause Partners",
-                description = "Ask trusted persons to be digital break partners. They can save the QR codes to help you unlock apps.",
+                description = "Ask trusted persons to be Scroll Pause partners. They can save the QR codes to help you unlock apps.",
                 primaryCta = "Get Started",
                 imagePath = "images/onboarding/two_people.png"
             )
@@ -2176,7 +2176,7 @@ private fun OnboardingPager(
                         .align(Alignment.CenterHorizontally)
                         .clickable { onSkip() },
                     color = Color(0xFFD1D5DB),
-                    fontSize = 15.sp
+                    fontSize = 14.sp
                 )
             }
         }
@@ -2234,7 +2234,7 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(if (isSetupMode) "Set Up: QR Code Generator" else "QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Create QR codes to place around your home or share with your digital pause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("Create QR codes to place around your home or share with your ScrollPause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
         
@@ -2413,9 +2413,9 @@ private fun QrGeneratorContent(
                 
                 Text(
                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
-                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
+                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                     "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                    "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                    "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
                     fontSize = 14.sp,
                     color = Color(0xFFD1D5DB),
                     lineHeight = 18.sp
@@ -2855,12 +2855,29 @@ private fun SettingsScreen(
             Spacer(Modifier.width(16.dp))
             Column {
                 Text("Settings", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Customize your digital wellness experience", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("Customize your ScrollPause experience", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
         Spacer(Modifier.height(24.dp))
 
         // Saved QR Codes at top
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenSavedQrCodes() },
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Manage, share, and protect your QR codes", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Notifications
         Card(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color(0xFF2C2C2C),
@@ -3061,22 +3078,6 @@ private fun SettingsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenSavedQrCodes() },
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            Column(modifier = Modifier.padding(24.dp)) {
-                Text("Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(Modifier.height(8.dp))
-                Text("Manage, share, and protect your QR codes", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
                 .clickable { openEmailClient("hello@scroll-pause.com") },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
@@ -3204,9 +3205,9 @@ private fun SavedQrCodesScreen(
                         
                         Text(
                             "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
-                            "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
+                            "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                             "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                            "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                            "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
                             fontSize = 14.sp,
                             color = Color(0xFFD1D5DB),
                             lineHeight = 20.sp
@@ -3389,9 +3390,9 @@ private fun SavedQrCodesScreen(
                                 
                                 Text(
                                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
-                                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your digital pause partner—and ask them to keep it on their phone.\n\n" +
+                                    "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                                     "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                                    "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
+                                    "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
                                     fontSize = 14.sp,
                                     color = Color(0xFFD1D5DB),
                                     lineHeight = 20.sp
@@ -3749,7 +3750,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Scroll Pause (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our digital wellness application.",
+                    "Scroll Pause (\"we,\" \"our,\" or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our application.",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -3765,7 +3766,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "• App Usage Data: We track which apps you use and for how long to help you manage your digital wellness\n" +
+                    "• App Usage Data: We track which apps you use and for how long to help you manage your digital pause\n" +
                     "• Device Information: Basic device information necessary for app functionality\n" +
                     "• QR Code Data: QR codes you generate and scan for pause functionality\n" +
                     "• Settings Preferences: Your app settings and preferences",
@@ -3784,7 +3785,7 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "• Provide digital wellness tracking and pause functionality\n" +
+                    "• Provide apps tracking and pause functionality\n" +
                     "• Generate and manage QR codes for your pause system\n" +
                     "• Send notifications when time limits are reached\n" +
                     "• Improve app performance and user experience",
