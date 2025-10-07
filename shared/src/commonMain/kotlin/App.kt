@@ -174,7 +174,7 @@ private fun QrDetailScreen(
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, QrDetail, PrivacyPolicy }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, QrDetail, PrivacyPolicy, Permissions }
 
 // Enable simulated app usage increments for testing; rely on platform-specific tracking instead
 private const val ENABLE_USAGE_SIMULATION: Boolean = true
@@ -1236,7 +1236,8 @@ private fun AppRoot() {
             onBack = { route = Route.Dashboard },
             onOpenSavedQrCodes = { route = Route.SavedQrCodes },
             onNotificationsTurnedOff = { },
-            onOpenPrivacyPolicy = { route = Route.PrivacyPolicy }
+            onOpenPrivacyPolicy = { route = Route.PrivacyPolicy },
+            onOpenPermissions = { route = Route.Permissions }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
@@ -1404,6 +1405,9 @@ private fun AppRoot() {
             )
         }
         Route.PrivacyPolicy -> PrivacyPolicyScreen(
+            onBack = { route = Route.Settings }
+        )
+        Route.Permissions -> PermissionsScreen(
             onBack = { route = Route.Settings }
         )
     }
@@ -2900,7 +2904,8 @@ private fun SettingsScreen(
     onBack: () -> Unit,
     onOpenSavedQrCodes: () -> Unit,
     onNotificationsTurnedOff: () -> Unit,
-    onOpenPrivacyPolicy: () -> Unit
+    onOpenPrivacyPolicy: () -> Unit,
+    onOpenPermissions: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -2949,199 +2954,18 @@ private fun SettingsScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // Notifications
+        // Permissions
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            var notificationsEnabled by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                try {
-                    notificationsEnabled = storage.getNotificationsEnabled()
-                } catch (_: Exception) { notificationsEnabled = false }
-            }
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Notifications", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = { enabled ->
-                            notificationsEnabled = enabled
-                            // Persist change
-                            coroutineScope.launch {
-                                try { storage.saveNotificationsEnabled(enabled) } catch (_: Exception) {}
-                            }
-                            // Do not trigger permission dialog here; prompts appear only
-                            // on app start, landing on Dashboard, or when starting tracking
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Push Notifications — Get notified when you reach time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            var usageAccessAllowed by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                try {
-                    usageAccessAllowed = storage.getUsageAccessAllowed()
-                } catch (_: Exception) { usageAccessAllowed = false }
-            }
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Allow App Usage Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Switch(
-                        checked = usageAccessAllowed,
-                        onCheckedChange = { enabled ->
-                            usageAccessAllowed = enabled
-                            // Persist change
-                            coroutineScope.launch {
-                                try { storage.saveUsageAccessAllowed(enabled) } catch (_: Exception) {}
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Permit the app to access your app usage to enable tracking.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            var accessibilityAccessAllowed by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                try {
-                    // Check actual system permission status instead of app preference
-                    accessibilityAccessAllowed = isAccessibilityServiceEnabled()
-                } catch (_: Exception) { accessibilityAccessAllowed = false }
-            }
-            
-            // Periodically check system status to catch changes when user returns from settings
-            LaunchedEffect(Unit) {
-                while (true) {
-                    kotlinx.coroutines.delay(2000) // Check every 2 seconds
-                    try {
-                        val actualStatus = isAccessibilityServiceEnabled()
-                        // Always update to match actual system state
-                        accessibilityAccessAllowed = actualStatus
-                        // Update storage to match actual system state
-                        coroutineScope.launch {
-                            try { storage.saveAccessibilityAccessAllowed(actualStatus) } catch (_: Exception) {}
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Allow Accessibility Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Switch(
-                        checked = accessibilityAccessAllowed,
-                        onCheckedChange = { enabled ->
-                            // Always open system settings - let user manage the permission there
-                            // The toggle will reflect actual system state when user returns
-                            openAccessibilitySettings()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenPermissions() },
             backgroundColor = Color(0xFF2C2C2C),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Camera Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    var cameraAllowed by remember { mutableStateOf(false) }
-                    val scope = rememberCoroutineScope()
-                    LaunchedEffect(Unit) {
-                        // Initialize and then poll to reflect async permission changes
-                        cameraAllowed = hasCameraPermission()
-                        while (true) {
-                            kotlinx.coroutines.delay(500)
-                            val current = try { hasCameraPermission() } catch (_: Exception) { false }
-                            if (cameraAllowed != current) cameraAllowed = current
-                        }
-                    }
-                    Switch(
-                        checked = cameraAllowed,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                scope.launch {
-                                    // Request permission if not granted
-                                    if (!hasCameraPermission()) {
-                                        requestCameraPermission()
-                                    }
-                                    // state will update via polling loop
-                                }
-                            } else {
-                                // Cannot revoke permission programmatically; guide user to settings
-                                openAppSettingsForCamera()
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
+                Text("Permissions", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(8.dp))
-                Text("Required to scan QR codes for pause functionality.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Text("Manage app permissions and access settings", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
@@ -4205,6 +4029,242 @@ private fun DurationSettingScreen(
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp
             )
+        }
+    }
+}
+
+@Composable
+private fun PermissionsScreen(
+    onBack: () -> Unit
+) {
+    val storage = remember { createAppStorage() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1A1A1A),
+                        Color(0xFF2A2A2A)
+                    )
+                )
+            )
+            .statusBarsPadding()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text("Permissions", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Manage app permissions and access settings", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+
+        // Notifications
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            var notificationsEnabled by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                try {
+                    notificationsEnabled = storage.getNotificationsEnabled()
+                } catch (_: Exception) { notificationsEnabled = false }
+            }
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Notifications", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            notificationsEnabled = enabled
+                            // Persist change
+                            coroutineScope.launch {
+                                try { storage.saveNotificationsEnabled(enabled) } catch (_: Exception) {}
+                            }
+                            // Do not trigger permission dialog here; prompts appear only
+                            // on app start, landing on Dashboard, or when starting tracking
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Push Notifications — Get notified when you reach time limits", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Allow App Usage Access
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            var usageAccessAllowed by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                try {
+                    usageAccessAllowed = storage.getUsageAccessAllowed()
+                } catch (_: Exception) { usageAccessAllowed = false }
+            }
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Allow App Usage Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = usageAccessAllowed,
+                        onCheckedChange = { enabled ->
+                            usageAccessAllowed = enabled
+                            // Persist change
+                            coroutineScope.launch {
+                                try { storage.saveUsageAccessAllowed(enabled) } catch (_: Exception) {}
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Permit the app to access your app usage to enable tracking.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Allow Accessibility Access
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            var accessibilityAccessAllowed by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                try {
+                    // Check actual system permission status instead of app preference
+                    accessibilityAccessAllowed = isAccessibilityServiceEnabled()
+                } catch (_: Exception) { accessibilityAccessAllowed = false }
+            }
+            
+            // Periodically check system status to catch changes when user returns from settings
+            LaunchedEffect(Unit) {
+                while (true) {
+                    kotlinx.coroutines.delay(2000) // Check every 2 seconds
+                    try {
+                        val actualStatus = isAccessibilityServiceEnabled()
+                        // Always update to match actual system state
+                        accessibilityAccessAllowed = actualStatus
+                        // Update storage to match actual system state
+                        coroutineScope.launch {
+                            try { storage.saveAccessibilityAccessAllowed(actualStatus) } catch (_: Exception) {}
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Allow Accessibility Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = accessibilityAccessAllowed,
+                        onCheckedChange = { enabled ->
+                            // Always open system settings - let user manage the permission there
+                            // The toggle will reflect actual system state when user returns
+                            openAccessibilitySettings()
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Camera Access
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            var cameraAllowed by remember { mutableStateOf(false) }
+            val scope = rememberCoroutineScope()
+            LaunchedEffect(Unit) {
+                // Initialize and then poll to reflect async permission changes
+                cameraAllowed = hasCameraPermission()
+                while (true) {
+                    kotlinx.coroutines.delay(500)
+                    val current = try { hasCameraPermission() } catch (_: Exception) { false }
+                    if (cameraAllowed != current) cameraAllowed = current
+                }
+            }
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Camera Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Switch(
+                        checked = cameraAllowed,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                scope.launch {
+                                    // Request permission if not granted
+                                    if (!hasCameraPermission()) {
+                                        requestCameraPermission()
+                                    }
+                                    // state will update via polling loop
+                                }
+                            } else {
+                                // Cannot revoke permission programmatically; guide user to settings
+                                openAppSettingsForCamera()
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text("Required to scan QR codes for pause functionality.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
         }
     }
 }
