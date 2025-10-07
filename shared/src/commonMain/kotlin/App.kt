@@ -50,6 +50,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material.Icon
@@ -1351,31 +1352,29 @@ private fun AppRoot() {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showNotificationDialog = false; pendingStartTracking = false },
             title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🔔", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Enable Notifications?",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    "🔔 Enable Notifications?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             },
             text = {
                 Column {
                     Text(
                         "Stay informed about your app usage limits and take mindful breaks when needed.",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "You can change this setting anytime in Settings.",
                         color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Start
                     )
                 }
             },
@@ -1391,23 +1390,24 @@ private fun AppRoot() {
                             pendingStartTracking = true
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                Button(
+                TextButton(
                     onClick = { showNotificationDialog = false; pendingStartTracking = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1416,31 +1416,29 @@ private fun AppRoot() {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showUsageAccessDialog = false; pendingStartTracking = false },
             title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("📈", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Allow App Usage Access?",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    "📈 Allow App Usage Access?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             },
             text = {
                 Column {
                     Text(
                         "We need permission to read your app usage so tracking works.",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "You can change this anytime in Settings.",
                         color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Start
                     )
                 }
             },
@@ -1456,23 +1454,24 @@ private fun AppRoot() {
                             pendingStartTracking = true
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                Button(
+                TextButton(
                     onClick = { showUsageAccessDialog = false; pendingStartTracking = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1481,31 +1480,29 @@ private fun AppRoot() {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
             title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("🧩", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Enable Accessibility?",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    "🧩 Enable Accessibility?",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             },
             text = {
                 Column {
                     Text(
                         "We use Accessibility to detect which app is in the foreground for accurate tracking.",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
                     )
                     Spacer(Modifier.height(12.dp))
                     Text(
                         "You can turn this off anytime in Settings.",
                         color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        textAlign = TextAlign.Start
                     )
                 }
             },
@@ -1513,27 +1510,26 @@ private fun AppRoot() {
                 Button(
                     onClick = {
                         openAccessibilitySettings()
-                        // Don't save the preference yet - let the user actually enable it in settings
-                        // The toggle will reflect the actual system state when they return
                         showAccessibilityConsentDialog = false 
                         if (pendingStartTracking) {
                             // Continue Start Tracking flow
                             pendingStartTracking = true
                         }
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) { Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold) }
             },
             dismissButton = {
-                Button(
+                TextButton(
                     onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Not now", color = Color.White, fontWeight = FontWeight.Bold) }
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("Not now", color = Color.White, textAlign = TextAlign.Center) }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1543,47 +1539,48 @@ private fun AppRoot() {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showNoTrackedAppsDialog = false },
             title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("📱", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "No tracked apps",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    "📱 No tracked apps",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             },
             text = {
                 Text(
                     "You haven't selected any apps to track yet. Choose which apps to track to start.",
                     color = Color.White,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Start
                 )
             },
             confirmButton = {
                 Button(
                     onClick = {
                         showNoTrackedAppsDialog = false
+                        pendingStartTracking = false
                         route = Route.AppSelection
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Choose apps", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                Button(
-                    onClick = { showNoTrackedAppsDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                    shape = RoundedCornerShape(8.dp)
+                TextButton(
+                    onClick = { showNoTrackedAppsDialog = false; pendingStartTracking = false },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1592,22 +1589,21 @@ private fun AppRoot() {
         androidx.compose.material.AlertDialog(
             onDismissRequest = { showNoQrCodeDialog = false },
             title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("🧾", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "QR code required",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                Text(
+                    "🧾 QR code required",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
+                )
             },
             text = {
                 Text(
                     "You need a QR code to track your apps. Generate one to get started.",
                     color = Color.White,
-                    fontSize = 14.sp
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Start
                 )
             },
             confirmButton = {
@@ -1618,26 +1614,27 @@ private fun AppRoot() {
                         fromNoQrCodeDialog = true
                         route = Route.QrGenerator
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Create QR code", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
-                Button(
+                TextButton(
                     onClick = { 
                         showNoQrCodeDialog = false 
                         pendingStartTracking = false
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4B5563)),
-                    shape = RoundedCornerShape(8.dp)
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Not now", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
     
@@ -1690,7 +1687,9 @@ private fun AppRoot() {
                     "🎉 Great Job!",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
                 )
             },
             text = {
@@ -1698,7 +1697,8 @@ private fun AppRoot() {
                     Text(
                         "Congratulations on taking a mindful pause from doomscrolling! You've successfully completed your break and can now return to your apps.",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
                     )
                     Spacer(Modifier.height(16.dp))
                     Row(
@@ -1711,7 +1711,7 @@ private fun AppRoot() {
                             selected = doNotShowCongratulationAgain,
                             onClick = { doNotShowCongratulationAgain = !doNotShowCongratulationAgain },
                             colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF4A90E2),
+                                selectedColor = Color(0xFF2C4877),
                                 unselectedColor = Color(0xFF9CA3AF)
                             )
                         )
@@ -1738,8 +1738,9 @@ private fun AppRoot() {
                         pendingStartTracking = true
                         route = Route.Dashboard
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Restart Tracking", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -1757,13 +1758,15 @@ private fun AppRoot() {
                         handleQrScanSuccess()
                         isTracking = false
                         route = Route.Dashboard
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Dismiss", color = Color(0xFF9CA3AF))
+                    Text("Dismiss", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 
@@ -1778,7 +1781,9 @@ private fun AppRoot() {
                     "Dismiss Pause?",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
+                    fontSize = 24.sp,
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center
                 )
             },
             text = {
@@ -1786,7 +1791,8 @@ private fun AppRoot() {
                     Text(
                         "Do you want the app to auto-restart tracking after dismissing?",
                         color = Color.White,
-                        fontSize = 14.sp
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
                     )
                     Spacer(Modifier.height(16.dp))
                     Row(
@@ -1797,7 +1803,7 @@ private fun AppRoot() {
                             selected = doNotShowDismissAgain,
                             onClick = { doNotShowDismissAgain = !doNotShowDismissAgain },
                             colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF4A90E2),
+                                selectedColor = Color(0xFF2C4877),
                                 unselectedColor = Color(0xFF9CA3AF)
                             )
                         )
@@ -1809,7 +1815,7 @@ private fun AppRoot() {
                         androidx.compose.material.Checkbox(
                             checked = autoRestartOnDismiss,
                             onCheckedChange = { checked -> autoRestartOnDismiss = checked },
-                            colors = androidx.compose.material.CheckboxDefaults.colors(checkedColor = Color(0xFF4A90E2), uncheckedColor = Color(0xFF9CA3AF))
+                            colors = androidx.compose.material.CheckboxDefaults.colors(checkedColor = Color(0xFF2C4877), uncheckedColor = Color(0xFF9CA3AF))
                         )
                         Spacer(Modifier.width(8.dp))
                         Text("Auto-restart tracking after dismiss", color = Color.White, fontSize = 14.sp)
@@ -1827,8 +1833,9 @@ private fun AppRoot() {
                         pendingStartTracking = true
                         route = Route.Dashboard
                     },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
-                    shape = RoundedCornerShape(8.dp)
+                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -1837,13 +1844,15 @@ private fun AppRoot() {
                 TextButton(
                     onClick = {
                         showDismissDialog = false
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Cancel", color = Color(0xFF9CA3AF))
+                    Text("Cancel", color = Color.White, textAlign = TextAlign.Center)
                 }
             },
             backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
+            contentColor = Color.White,
+            shape = RoundedCornerShape(16.dp)
         )
     }
 }
@@ -2238,7 +2247,7 @@ private fun QrGeneratorContent(
             }
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
         
         // QR Code Card
         Card(
@@ -2263,7 +2272,7 @@ private fun QrGeneratorContent(
                 // QR Code - only shows after generation
                 Box(
                     modifier = Modifier
-                        .size(200.dp)
+                        .size(160.dp)
                         .background(Color.White, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -2281,7 +2290,7 @@ private fun QrGeneratorContent(
                 }
                 
                 if (hasGeneratedQr) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     Text(message, color = Color.White, fontSize = 16.sp)
                     
                     Spacer(Modifier.height(8.dp))
@@ -2293,7 +2302,7 @@ private fun QrGeneratorContent(
                         Text("⧉", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                     }
                     
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     
                     // Generate New QR Code Button inside the card
                     Button(
@@ -2317,33 +2326,36 @@ private fun QrGeneratorContent(
         
         Spacer(Modifier.height(16.dp))
         
-        // Customize Message Card
+        // Customize Message Card (more condensed)
         Card(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
+            shape = RoundedCornerShape(12.dp)
         ) {
             Column(
-                modifier = Modifier.padding(13.dp)
+                modifier = Modifier.padding(8.dp)
             ) {
-                Text("Customize Message", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Spacer(Modifier.height(12.dp))
+                Text("Customize Message", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
                     value = message,
                     onValueChange = onMessageChange,
                     modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    maxLines = 1,
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp),
                     colors = TextFieldDefaults.outlinedTextFieldColors(
                         focusedBorderColor = Color(0xFF1E3A5F),
                         unfocusedBorderColor = Color(0xFF4B5563),
                         textColor = Color.White,
                         cursorColor = Color(0xFF1E3A5F)
                     ),
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(6.dp)
                 )
             }
         }
         
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         
         // Download Button - only enabled when QR is generated
         Button(
@@ -2369,7 +2381,7 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(8.dp))
             Text(
                 if (downloadSuccess) {
-                    if (isSetupMode) "Done" else "Go to Dashboard"
+                    if (isSetupMode) "Continue" else "Go to Dashboard"
                 } else if (isFirstVisit) "Save QR Code" else "Download", 
                 color = Color.White, 
                 fontWeight = FontWeight.Bold
@@ -2387,7 +2399,7 @@ private fun QrGeneratorContent(
             )
         }
         
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
         
         // How ScrollFree QR Code Works Section - show for first visit or when coming from no QR code dialog
         if (isFirstVisit || fromNoQrCodeDialog) {
@@ -2397,7 +2409,7 @@ private fun QrGeneratorContent(
                 shape = RoundedCornerShape(12.dp)
             ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier.padding(12.dp)
             ) {
                 Text(
                     "How ScrollPause QR Code Works:",
@@ -2406,7 +2418,7 @@ private fun QrGeneratorContent(
                     color = Color.White
                 )
                 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
                 
                 Text(
                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
@@ -2415,7 +2427,7 @@ private fun QrGeneratorContent(
                     "4. This makes you step away from your phone for a natural pause, and if scanning from your digital pause partner, adds a little extra social time!",
                     fontSize = 14.sp,
                     color = Color(0xFFD1D5DB),
-                    lineHeight = 20.sp
+                    lineHeight = 18.sp
                 )
             }
         }
