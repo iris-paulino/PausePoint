@@ -1999,7 +1999,7 @@ private fun OnboardingFlow(
     OnboardingPager(
         pages = listOf(
             OnboardingPage(
-                title = "Welcome to Scroll Pause",
+                title = "Welcome to\nScroll Pause",
                 description = "Create boundaries for your app time, and walk or move around when you hit them.",
                 showLogo = true
             ),
@@ -2400,7 +2400,7 @@ private fun QrGeneratorContent(
                 modifier = Modifier.padding(16.dp)
             ) {
                 Text(
-                    "How ScrollFree QR Code Works:",
+                    "How ScrollPause QR Code Works:",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -3927,7 +3927,7 @@ private fun DurationSettingScreen(
                         text = timeLimitMinutes.toString(),
                         fontSize = 48.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF1E3A5F)
+                        color = Color.White
                     )
                     Spacer(Modifier.width(8.dp))
                     run {

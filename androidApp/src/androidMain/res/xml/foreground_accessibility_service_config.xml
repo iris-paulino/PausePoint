@@ -9,6 +9,6 @@
     android:canRequestFilterKeyEvents="false"
     android:description="@string/app_name"
     android:settingsActivity=""
-    android:summary="Detect foreground app for DoomDrop tracking" />
+    android:summary="Detect foreground app for ScrollPause tracking" />
 
 

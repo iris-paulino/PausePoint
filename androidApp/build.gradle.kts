@@ -31,8 +31,8 @@ android {
         applicationId = "com.luminoprisma.scrollpause"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 4
-        versionName = "1.2"
+        versionCode = 5
+        versionName = "1.3"
     }
     
     signingConfigs {
