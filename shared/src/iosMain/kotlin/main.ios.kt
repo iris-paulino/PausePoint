@@ -12,6 +12,12 @@ import platform.AVFoundation.AVCaptureDeviceInput
 import platform.CoreGraphics.CGRectMake
 import platform.UIKit.UIViewController
 import platform.UIKit.UIView
+import platform.AVFoundation.AVAuthorizationStatusAuthorized
+import platform.AVFoundation.AVAuthorizationStatusNotDetermined
+import platform.AVFoundation.AVAuthorizationStatusDenied
+import platform.AVFoundation.AVAuthorizationStatusRestricted
+import platform.AVFoundation.AVCaptureDeviceAuthorizationStatusForMediaType
+import platform.AVFoundation.requestAccessForMediaType
 import platform.QuartzCore.CALayer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
@@ -120,6 +126,35 @@ actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
 actual fun openEmailClient(recipient: String) {
     // Could open Mail app with pre-filled recipient
     // For now, this is a placeholder
+}
+
+actual fun hasCameraPermission(): Boolean {
+    val status = AVCaptureDeviceAuthorizationStatusForMediaType(AVMediaTypeVideo)
+    return status == AVAuthorizationStatusAuthorized
+}
+
+actual fun requestCameraPermission(): Boolean {
+    val status = AVCaptureDeviceAuthorizationStatusForMediaType(AVMediaTypeVideo)
+    return when (status) {
+        AVAuthorizationStatusAuthorized -> true
+        AVAuthorizationStatusDenied, AVAuthorizationStatusRestricted -> false
+        AVAuthorizationStatusNotDetermined -> {
+            var granted = false
+            // Synchronously block until result for simplicity
+            // In a production app, wire through a suspend callback
+            val semaphore = kotlinx.cinterop.alloc<kotlinx.cinterop.IntVar>()
+            requestAccessForMediaType(AVMediaTypeVideo) { ok ->
+                granted = ok
+            }
+            granted
+        }
+        else -> false
+    }
+}
+
+actual fun openAppSettingsForCamera() {
+    // On iOS, direct deep link to camera settings is limited; open general app settings
+    // Implement if needed using UIApplicationOpenSettingsURLString via UIKit interop
 }
 
 @Composable

@@ -1148,17 +1148,6 @@ private fun AppRoot() {
                 route = Route.QrGenerator 
             },
             onOpenAppSelection = { route = Route.AppSelection },
-            onScanQrCode = {
-                // Trigger QR code scanning to unblock apps
-                coroutineScope.launch {
-                    val isValid = scanQrAndDismiss(qrMessage)
-                    if (isValid) {
-                        // QR code is valid, unblock apps
-                        // In a real implementation, this would dismiss the blocking overlay
-                        // and allow app usage to continue
-                    }
-                }
-            },
             onOpenPause = { route = Route.Pause },
             onOpenDurationSetting = { route = Route.DurationSetting },
             onOpenSettings = { route = Route.Settings },
@@ -1919,7 +1908,6 @@ private fun DashboardScreen(
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
-    onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -1939,7 +1927,6 @@ private fun DashboardScreen(
         onToggleTracking = onToggleTracking,
         onOpenQrGenerator = onOpenQrGenerator,
         onOpenAppSelection = onOpenAppSelection,
-        onScanQrCode = onScanQrCode,
         onOpenPause = onOpenPause,
         onOpenDurationSetting = onOpenDurationSetting,
         onOpenSettings = onOpenSettings,
@@ -1966,6 +1953,9 @@ expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
 expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
 expect fun openEmailClient(recipient: String)
+expect fun hasCameraPermission(): Boolean
+expect fun requestCameraPermission(): Boolean
+expect fun openAppSettingsForCamera()
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {
@@ -2185,7 +2175,8 @@ private fun OnboardingPager(
                     modifier = Modifier
                         .align(Alignment.CenterHorizontally)
                         .clickable { onSkip() },
-                    color = Color(0xFFD1D5DB)
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 15.sp
                 )
             }
         }
@@ -2450,7 +2441,6 @@ private fun DashboardContent(
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
     onOpenAppSelection: () -> Unit,
-    onScanQrCode: () -> Unit,
     onOpenPause: () -> Unit,
     onOpenDurationSetting: () -> Unit,
     onOpenSettings: () -> Unit,
@@ -2626,6 +2616,9 @@ private fun DashboardContent(
         }
         
         Spacer(Modifier.height(24.dp))
+
+        // Saved QR Codes at top
+        
         
         // Ready to Walk Card (show only if no saved QR codes after load)
         if (savedQrLoaded && savedQrCodes.isEmpty()) {
@@ -2867,6 +2860,7 @@ private fun SettingsScreen(
         }
         Spacer(Modifier.height(24.dp))
 
+        // Saved QR Codes at top
         Card(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = Color(0xFF2C2C2C),
@@ -3022,7 +3016,40 @@ private fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Camera Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("📷", fontSize = 24.sp, color = Color(0xFF1E3A5F))
+                    var cameraAllowed by remember { mutableStateOf(false) }
+                    val scope = rememberCoroutineScope()
+                    LaunchedEffect(Unit) {
+                        // Initialize and then poll to reflect async permission changes
+                        cameraAllowed = hasCameraPermission()
+                        while (true) {
+                            kotlinx.coroutines.delay(500)
+                            val current = try { hasCameraPermission() } catch (_: Exception) { false }
+                            if (cameraAllowed != current) cameraAllowed = current
+                        }
+                    }
+                    Switch(
+                        checked = cameraAllowed,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                scope.launch {
+                                    // Request permission if not granted
+                                    if (!hasCameraPermission()) {
+                                        requestCameraPermission()
+                                    }
+                                    // state will update via polling loop
+                                }
+                            } else {
+                                // Cannot revoke permission programmatically; guide user to settings
+                                openAppSettingsForCamera()
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF1A1A1A),
+                            checkedTrackColor = Color(0xFF1E3A5F),
+                            uncheckedThumbColor = Color(0xFF1A1A1A),
+                            uncheckedTrackColor = Color(0xFF4B5563)
+                        )
+                    )
                 }
                 Spacer(Modifier.height(8.dp))
                 Text("Required to scan QR codes for pause functionality.", color = Color(0xFFD1D5DB), fontSize = 14.sp)

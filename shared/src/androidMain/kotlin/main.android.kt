@@ -30,6 +30,10 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
 import android.os.Build
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import android.net.Uri
 
 actual fun getPlatformName(): String = "Android"
 
@@ -375,6 +379,38 @@ actual fun openEmailClient(recipient: String) {
     } catch (e: Exception) {
         println("DEBUG: openEmailClient - error opening email client: ${e.message}")
     }
+}
+
+actual fun hasCameraPermission(): Boolean {
+    val activity = currentActivityRef?.get() ?: return false
+    return ContextCompat.checkSelfPermission(activity, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+}
+
+actual fun requestCameraPermission(): Boolean {
+    val activity = currentActivityRef?.get() ?: return false
+    return try {
+        // Delegate to MainActivity helper if available to use ActivityResult API
+        val method = activity::class.java.methods.firstOrNull { it.name == "requestCameraPermissionIfNeeded" && it.parameterTypes.isEmpty() }
+        if (method != null) {
+            val result = method.invoke(activity) as? Boolean
+            result ?: false
+        } else {
+            // Fallback: if not granted, cannot synchronously request here; return current status
+            hasCameraPermission()
+        }
+    } catch (_: Exception) {
+        hasCameraPermission()
+    }
+}
+
+actual fun openAppSettingsForCamera() {
+    val activity = currentActivityRef?.get() ?: return
+    try {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.fromParts("package", activity.packageName, null)
+        }
+        activity.startActivity(intent)
+    } catch (_: Exception) {}
 }
 
 actual fun openAccessibilitySettings() {
