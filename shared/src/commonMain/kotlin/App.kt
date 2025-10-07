@@ -1,4 +1,5 @@
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
@@ -117,8 +118,63 @@ fun App() {
     }
 }
 
+@Composable
+private fun QrDetailScreen(
+    qrText: String,
+    message: String,
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
+            .padding(24.dp)
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Start,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    Text("QR Code", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(message, fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Large QR display (square, using available width)
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(maxWidth)
+                    .background(Color.White, RoundedCornerShape(16.dp))
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                QrCodeDisplay(text = qrText, modifier = Modifier.fillMaxSize())
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        Text(
+            text = message,
+            color = Color.White,
+            fontSize = 16.sp
+        )
+    }
+}
+
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, PrivacyPolicy }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, QrDetail, PrivacyPolicy }
 
 // Enable simulated app usage increments for testing; rely on platform-specific tracking instead
 private const val ENABLE_USAGE_SIMULATION: Boolean = true
@@ -149,6 +205,9 @@ private fun AppRoot() {
     var route by remember { mutableStateOf<Route?>(null) } // Start with null to show loading
     var qrMessage by remember { mutableStateOf("Take a mindful pause") }
     var qrId by remember { mutableStateOf<String?>(null) }
+    var viewedQrId by remember { mutableStateOf<String?>(null) }
+    var viewedQrText by remember { mutableStateOf<String?>(null) }
+    var viewedQrMessage by remember { mutableStateOf<String?>(null) }
     var showNotificationDialog by remember { mutableStateOf(false) }
     var showTimeRemainingInfoDialog by remember { mutableStateOf(false) }
     var showNoTrackedAppsDialog by remember { mutableStateOf(false) }
@@ -1181,7 +1240,20 @@ private fun AppRoot() {
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
-            onOpenQrGenerator = { route = Route.QrGenerator }
+            onOpenQrGenerator = { route = Route.QrGenerator },
+            onViewQr = { id, text, message ->
+                viewedQrId = id
+                viewedQrText = text
+                viewedQrMessage = message
+                route = Route.QrDetail
+            }
+        )
+        Route.QrDetail -> QrDetailScreen(
+            qrText = viewedQrText.orEmpty(),
+            message = viewedQrMessage.orEmpty(),
+            onBack = {
+                route = Route.SavedQrCodes
+            }
         )
         Route.AppSelection -> AppSelectionScreen(
             availableApps = availableApps,
@@ -3112,7 +3184,8 @@ private fun SettingsScreen(
 @Composable
 private fun SavedQrCodesScreen(
     onBack: () -> Unit,
-    onOpenQrGenerator: () -> Unit
+    onOpenQrGenerator: () -> Unit,
+    onViewQr: (id: String, qrText: String, message: String) -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -3291,6 +3364,22 @@ private fun SavedQrCodesScreen(
                                 }
 
                                 Spacer(Modifier.height(12.dp))
+
+                                Button(
+                                    onClick = { onViewQr(qrCode.id, qrCode.qrText, qrCode.message) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4A90E2)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp)
+                                ) {
+                                    Text("👁", color = Color.White)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "View",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
 
                                 Button(
                                     onClick = {
