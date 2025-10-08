@@ -38,6 +38,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
@@ -490,7 +491,7 @@ private fun AppRoot() {
             
             // Minimal polling only for time limit checks and accessibility monitoring
             while (isTracking) {
-                delay(10000) // Check every 10 seconds for time limits and accessibility status
+                delay(30000) // Check every 30 seconds for time limits and accessibility status
                 println("DEBUG: Time limit check - isTracking: $isTracking")
 
                 // If Pause screen is active or blocking overlay is shown, do not accrue usage for any apps
@@ -2087,8 +2088,7 @@ private fun OnboardingPager(
             .fillMaxSize()
             .background(Color(0xFF1A1A1A))
             .statusBarsPadding()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.SpaceBetween
+            .padding(24.dp)
     ) {
         // Progress indicators at top
         Row(
@@ -2108,6 +2108,8 @@ private fun OnboardingPager(
                 if (i < pages.lastIndex) Spacer(Modifier.width(8.dp))
             }
         }
+
+        Spacer(Modifier.height(32.dp))
 
         // Swipeable content area (centered)
         Box(
@@ -2194,6 +2196,8 @@ private fun OnboardingPager(
             }
         }
 
+        Spacer(Modifier.height(24.dp))
+
         // Action buttons at bottom
         Column(modifier = Modifier.fillMaxWidth()) {
             Button(
@@ -2223,6 +2227,10 @@ private fun OnboardingPager(
                     fontSize = 14.sp
                 )
             }
+            
+            // Add spacer at bottom to push buttons up (1/8 of screen height)
+            val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+            Spacer(Modifier.height(screenHeight / 8))
         }
     }
 }
