@@ -987,10 +987,6 @@ private fun AppRoot() {
     // On first landing on Dashboard per app launch, prompt for disabled permissions
     LaunchedEffect(route) {
         if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
-            val enabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-            if (!enabled) {
-                showNotificationDialog = true
-            }
             val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
             if (!usageAllowed) {
                 showUsageAccessDialog = true
@@ -1010,16 +1006,7 @@ private fun AppRoot() {
         // If any dialog is currently open, wait until user acts
         if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog || showAccessibilityConsentDialog) return@LaunchedEffect
 
-        // 1) Notifications
-        val notificationsEnabled = withTimeoutOrNull(2000) { storage.getNotificationsEnabled() } ?: false
-        println("DEBUG: Checking notifications - enabled: $notificationsEnabled")
-        if (!notificationsEnabled) {
-            println("DEBUG: Notifications not enabled, showing dialog")
-            showNotificationDialog = true
-            return@LaunchedEffect
-        }
-
-        // 2) Usage access
+        // 1) Usage access
         val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
         println("DEBUG: Checking usage access - allowed: $usageAllowed")
         if (!usageAllowed) {
@@ -1028,7 +1015,7 @@ private fun AppRoot() {
             return@LaunchedEffect
         }
 
-        // 3) Accessibility access
+        // 2) Accessibility access
         val accessibilityAllowed = isAccessibilityServiceEnabled()
         println("DEBUG: Checking accessibility - enabled: $accessibilityAllowed")
         if (!accessibilityAllowed) {
@@ -1037,7 +1024,7 @@ private fun AppRoot() {
             return@LaunchedEffect
         }
 
-        // 4) QR code - allow existing saved codes to satisfy this
+        // 3) QR code - allow existing saved codes to satisfy this
         run {
             val hasAnySavedQr = withTimeoutOrNull(2000) {
                 storage.getSavedQrCodes().isNotEmpty()
@@ -1050,7 +1037,7 @@ private fun AppRoot() {
             }
         }
 
-        // 5) Also ensure there are tracked apps
+        // 4) Also ensure there are tracked apps
         println("DEBUG: Checking tracked apps - count: ${trackedApps.size}")
         if (trackedApps.isEmpty()) {
             println("DEBUG: No tracked apps, showing dialog")
