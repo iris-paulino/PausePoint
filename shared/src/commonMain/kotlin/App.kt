@@ -353,6 +353,7 @@ private fun AppRoot() {
         if (isTracking) {
             trackingStartTime = getCurrentTimeMillis()
             sessionStartTime = getCurrentTimeMillis() // Start new session
+            println("DEBUG: *** TRACKING STARTED *** trackingStartTime set to: $trackingStartTime")
             
             // Save tracking state and start time to storage
             coroutineScope.launch {
@@ -360,6 +361,12 @@ private fun AppRoot() {
                 storage.saveTrackingStartTime(trackingStartTime)
                 storage.saveSessionStartTime(sessionStartTime)
             }
+            
+            // Update tracked apps with current time limit before starting tracking
+            trackedApps = trackedApps.map { app ->
+                app.copy(limitMinutes = timeLimitMinutes)
+            }
+            println("DEBUG: Updated tracked apps with current time limit: $timeLimitMinutes minutes")
             
             // Start platform-specific usage tracking
             val trackedPackages = trackedApps.map { app ->
@@ -409,62 +416,91 @@ private fun AppRoot() {
         if (isBlocked) {
             // Check periodically if user is trying to use a tracked app while blocked
             while (isBlocked) {
-                delay(2000) // Check every 2 seconds
+                delay(5000) // Check every 5 seconds for better battery life
                 checkAndShowOverlayIfBlocked(trackedApps.map { it.name }, isBlocked, timeLimitMinutes)
             }
         }
     }
 
-    // Real-time tracking update while tracking is active
+    // Track the current foreground app and when it became active
+    var currentForegroundApp by remember { mutableStateOf<String?>(null) }
+    var appActiveSince by remember { mutableStateOf(0L) }
+
+    // Function to update usage for currently active app
+    fun updateCurrentAppUsage() {
+        if (!isTracking || route == Route.Pause || isBlocked) return
+        if (currentForegroundApp == null || appActiveSince == 0L) return
+        
+        val currentTime = getCurrentTimeMillis()
+        val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
+        
+        if (timeSpent > 0) {
+            val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+            
+            // Find which tracked app is currently active and add the time
+            for (app in trackedApps) {
+                val expectedPackage = when (app.name.lowercase()) {
+                    "chrome" -> "com.android.chrome"
+                    "youtube" -> "com.google.android.youtube"
+                    "youtube music" -> "com.google.android.apps.youtube.music"
+                    "messages" -> "com.google.android.apps.messaging"
+                    "gmail" -> "com.google.android.gm"
+                    "maps" -> "com.google.android.apps.maps"
+                    "whatsapp" -> "com.whatsapp"
+                    "jira" -> "com.atlassian.android.jira.core"
+                    "kttipay" -> "com.kttipay"
+                    else -> {
+                        val matchingApp = availableApps.find { availableApp ->
+                            availableApp.name.equals(app.name, ignoreCase = true)
+                        }
+                        matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
+                    }
+                }
+                
+                if (currentForegroundApp == expectedPackage) {
+                    val currentUsage = updatedSessionUsage[app.name] ?: 0L
+                    updatedSessionUsage[app.name] = currentUsage + timeSpent
+                    println("DEBUG: Updated current app usage - Added $timeSpent seconds to ${app.name} (total: ${currentUsage + timeSpent})")
+                    
+                    // Reset the active time to avoid double counting
+                    appActiveSince = currentTime
+                    break
+                }
+            }
+            
+            sessionAppUsageTimes = updatedSessionUsage
+            
+            // Persist session data
+            coroutineScope.launch {
+                try { 
+                    storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
+                    println("DEBUG: Saved session app usage times to storage")
+                } catch (e: Exception) {
+                    println("DEBUG: Error saving session app usage times: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // Event-driven tracking: Handle app changes via accessibility service events
     LaunchedEffect(isTracking, trackingStartTime) {
+        println("DEBUG: *** LaunchedEffect triggered *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
         if (isTracking && trackingStartTime > 0) {
-            println("DEBUG: Starting tracking loop")
+            println("DEBUG: Starting event-driven tracking")
+            
+            // Minimal polling only for time limit checks and accessibility monitoring
             while (isTracking) {
-                delay(1000) // Update every second
-                println("DEBUG: Tracking loop iteration - isTracking: $isTracking")
+                delay(5000) // Check every 5 seconds for time limits and accessibility status
+                println("DEBUG: Time limit check - isTracking: $isTracking")
 
                 // If Pause screen is active or blocking overlay is shown, do not accrue usage for any apps
                 if (route == Route.Pause || isBlocked) {
                     continue
                 }
 
-                // If the dashboard app itself is the foreground app, do not accrue usage for any apps
-                val currentForegroundApp = getCurrentForegroundApp()
-                val isDashboardAppForeground = currentForegroundApp != null && (
-                    currentForegroundApp == "com.luminoprisma.scrollpause" || 
-                    currentForegroundApp == "com.prismappsau.screengo"
-                )
-                if (isDashboardAppForeground) {
-                    println("DEBUG: Dashboard app is foreground ($currentForegroundApp), skipping tracking")
-                    continue
-                }
-
-                // Session elapsed time should only count when tracked apps are active
-                // We'll calculate this based on the actual tracked app usage time
-                val totalTrackedAppUsageSeconds = sessionAppUsageTimes.values.sum()
-                sessionElapsedSeconds = totalTrackedAppUsageSeconds
-                
-                // If elapsed minutes reached limit, pause regardless of per-app accrual
-                val elapsedMinutes = (sessionElapsedSeconds / 60L).toInt()
-                if (elapsedMinutes >= timeLimitMinutes) {
-                    finalizeSessionUsage()
-                    isTracking = false
-                    isBlocked = true
-                    // Update accessibility service with blocked state
-                    updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
-                    // Save blocked state to storage
-                    coroutineScope.launch {
-                        storage.saveBlockedState(true)
-                    }
-                    route = Route.Pause
-                    // Show the blocking overlay to prevent further app usage
-                    showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
-                    continue
-                }
-
-                // If Accessibility is not enabled, stop tracking to maintain data integrity
+                // Check if Accessibility is still enabled
                 val isAccessibilityEnabled = isAccessibilityServiceEnabled()
-                println("DEBUG: *** TRACKING LOOP DEBUG *** isAccessibilityServiceEnabled: $isAccessibilityEnabled")
+                println("DEBUG: *** ACCESSIBILITY CHECK *** isAccessibilityServiceEnabled: $isAccessibilityEnabled")
                 if (!isAccessibilityEnabled) {
                     println("DEBUG: Accessibility disabled - stopping tracking to maintain data integrity")
                     // Finalize current session usage before stopping
@@ -488,82 +524,10 @@ private fun AppRoot() {
                     // Show notification to inform user
                     showAccessibilityDisabledNotification()
                     return@LaunchedEffect
-                } else {
-                    // Real foreground app detection using accessibility service
-                    println("DEBUG: Using real foreground app detection")
-                    val currentForegroundApp = getCurrentForegroundApp()
-                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
-                    
-                    for (app in trackedApps) {
-                        val currentSessionUsage = sessionAppUsageTimes[app.name] ?: 0L
-                        
-                        // Check if this app is currently in the foreground
-                        val isAppActive = when {
-                            currentForegroundApp != null -> {
-                                // Map app names to expected package names
-                                val expectedPackage = when (app.name.lowercase()) {
-                                    "chrome" -> "com.android.chrome"
-                                    "youtube" -> "com.google.android.youtube"
-                                    "youtube music" -> "com.google.android.apps.youtube.music"
-                                    "messages" -> "com.google.android.apps.messaging"
-                                    "gmail" -> "com.google.android.gm"
-                                    "maps" -> "com.google.android.apps.maps"
-                                    "whatsapp" -> "com.whatsapp"
-                                    "jira" -> "com.atlassian.android.jira.core"
-                                    "kttipay" -> "com.kttipay"
-                                    else -> {
-                                        // Try to find the package name from availableApps
-                                        val matchingApp = availableApps.find { availableApp ->
-                                            availableApp.name.equals(app.name, ignoreCase = true)
-                                        }
-                                        matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
-                                    }
-                                }
-                                currentForegroundApp == expectedPackage
-                            }
-                            else -> false // If we can't detect foreground app, don't give usage to any app
-                        }
-                        
-                        val usageIncrement = if (isAppActive) 1L else 0L
-                        updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
-                        
-                        if (usageIncrement > 0) {
-                            println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
-                        }
-                        println("DEBUG: App ${app.name} - isAppActive: $isAppActive, currentForegroundApp: $currentForegroundApp, currentSessionUsage: $currentSessionUsage")
-                    }
-                    
-                    sessionAppUsageTimes = updatedSessionUsage
-                    println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
-                    // Per-minute rollover: credit newly completed minutes to trackedApps
-                    var creditedMap = sessionCreditedMinutes.toMutableMap()
-                    var updatedTrackedApps = trackedApps
-                    for (app in trackedApps) {
-                        val seconds = sessionAppUsageTimes[app.name] ?: 0L
-                        val totalMinutes = (seconds / 60L).toInt()
-                        val creditedSoFar = creditedMap[app.name] ?: 0
-                        val delta = totalMinutes - creditedSoFar
-                        if (delta > 0) {
-                            println("DEBUG: Rollover credit $delta min to ${app.name} (totalMinutes=$totalMinutes, creditedSoFar=$creditedSoFar)")
-                            updatedTrackedApps = updatedTrackedApps.map { a -> if (a.name == app.name) a.copy(minutesUsed = a.minutesUsed + delta) else a }
-                            creditedMap[app.name] = totalMinutes
-                        }
-                    }
-                    if (updatedTrackedApps !== trackedApps) {
-                        trackedApps = updatedTrackedApps
-                    }
-                    sessionCreditedMinutes = creditedMap
-                    
-                    // Persist session data
-                    coroutineScope.launch {
-                        try { 
-                            storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
-                            println("DEBUG: Saved session app usage times to storage")
-                        } catch (e: Exception) {
-                            println("DEBUG: Error saving session app usage times: ${e.message}")
-                        }
-                    }
                 }
+                
+                // Update usage for currently active app (in case user stayed in same app)
+                updateCurrentAppUsage()
                 
                 // Check if session usage has reached the limit based on actual accumulated session usage
                 val totalSessionSeconds = sessionAppUsageTimes.values.sum()
@@ -584,6 +548,85 @@ private fun AppRoot() {
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
                 }
             }
+        }
+    }
+
+    // Function to handle app changes and update usage times
+    fun handleAppChange(newPackageName: String?) {
+        if (!isTracking || route == Route.Pause || isBlocked) return
+        
+        val currentTime = getCurrentTimeMillis()
+        
+        // If we were tracking a previous app, add the time spent to its usage
+        if (currentForegroundApp != null && appActiveSince > 0) {
+            val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
+            if (timeSpent > 0) {
+                val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                
+                // Find which tracked app was active and add the time
+                for (app in trackedApps) {
+                    val expectedPackage = when (app.name.lowercase()) {
+                        "chrome" -> "com.android.chrome"
+                        "youtube" -> "com.google.android.youtube"
+                        "youtube music" -> "com.google.android.apps.youtube.music"
+                        "messages" -> "com.google.android.apps.messaging"
+                        "gmail" -> "com.google.android.gm"
+                        "maps" -> "com.google.android.apps.maps"
+                        "whatsapp" -> "com.whatsapp"
+                        "jira" -> "com.atlassian.android.jira.core"
+                        "kttipay" -> "com.kttipay"
+                        else -> {
+                            val matchingApp = availableApps.find { availableApp ->
+                                availableApp.name.equals(app.name, ignoreCase = true)
+                            }
+                            matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
+                        }
+                    }
+                    
+                    if (currentForegroundApp == expectedPackage) {
+                        val currentUsage = updatedSessionUsage[app.name] ?: 0L
+                        updatedSessionUsage[app.name] = currentUsage + timeSpent
+                        println("DEBUG: Added $timeSpent seconds to ${app.name} (total: ${currentUsage + timeSpent})")
+                        break
+                    }
+                }
+                
+                sessionAppUsageTimes = updatedSessionUsage
+                
+                // Persist session data
+                coroutineScope.launch {
+                    try { 
+                        storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
+                        println("DEBUG: Saved session app usage times to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving session app usage times: ${e.message}")
+                    }
+                }
+            }
+        }
+        
+        // Update current app tracking
+        currentForegroundApp = newPackageName
+        appActiveSince = currentTime
+        
+        // If the dashboard app itself is the foreground app, do not accrue usage for any apps
+        val isDashboardAppForeground = newPackageName != null && (
+            newPackageName == "com.luminoprisma.scrollpause" || 
+            newPackageName == "com.prismappsau.screengo"
+        )
+        if (isDashboardAppForeground) {
+            println("DEBUG: Dashboard app is foreground ($newPackageName), skipping tracking")
+            return
+        }
+        
+        println("DEBUG: App changed to: $newPackageName at $currentTime")
+    }
+
+    // Event-driven app usage tracking: Update usage when app changes
+    LaunchedEffect(Unit) {
+        // Register callback to handle app changes from accessibility service
+        setOnAppChangeCallback { newPackageName ->
+            handleAppChange(newPackageName)
         }
     }
 
@@ -1956,6 +1999,7 @@ expect fun hasCameraPermission(): Boolean
 expect fun requestCameraPermission(): Boolean
 expect fun openAppSettingsForCamera()
 expect fun showAccessibilityDisabledNotification()
+expect fun setOnAppChangeCallback(callback: ((String?) -> Unit)?)
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

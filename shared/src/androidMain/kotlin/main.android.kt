@@ -497,6 +497,11 @@ private fun ensureReceiverRegistered(context: Context) {
                 val pkg = intent?.getStringExtra("pkg")
                 ForegroundAppCache.currentPackage = pkg
                 println("DEBUG: ForegroundAppCache - received pkg: $pkg")
+                println("DEBUG: ForegroundAppCache - appChangeCallback is null: ${appChangeCallback == null}")
+                
+                // Call the app change callback for event-driven tracking
+                appChangeCallback?.invoke(pkg)
+                println("DEBUG: ForegroundAppCache - callback invoked with pkg: $pkg")
             }
         }
         if (Build.VERSION.SDK_INT >= 33) {
@@ -568,5 +573,22 @@ actual fun showAccessibilityDisabledNotification() {
         println("DEBUG: showAccessibilityDisabledNotification - notification shown")
     } catch (e: Exception) {
         println("DEBUG: showAccessibilityDisabledNotification - error: ${e.message}")
+    }
+}
+
+private var appChangeCallback: ((String?) -> Unit)? = null
+
+actual fun setOnAppChangeCallback(callback: ((String?) -> Unit)?) {
+    appChangeCallback = callback
+    println("DEBUG: setOnAppChangeCallback - callback registered: ${callback != null}")
+    
+    // Also ensure receiver is registered when callback is set
+    val activity = currentActivityRef?.get()
+    val ctx = activity?.applicationContext ?: appContextRef
+    if (ctx != null) {
+        ensureReceiverRegistered(ctx)
+        println("DEBUG: setOnAppChangeCallback - ensured receiver is registered")
+    } else {
+        println("DEBUG: setOnAppChangeCallback - no context available to register receiver")
     }
 }

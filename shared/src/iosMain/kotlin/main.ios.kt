@@ -171,3 +171,9 @@ actual fun showAccessibilityDisabledNotification() {
     // In a real implementation, you might show a local notification or alert
     println("DEBUG: showAccessibilityDisabledNotification - iOS (no-op)")
 }
+
+actual fun setOnAppChangeCallback(callback: ((String?) -> Unit)?) {
+    // On iOS, this would be implemented using app lifecycle notifications
+    // For now, this is a no-op
+    println("DEBUG: setOnAppChangeCallback - iOS (no-op)")
+}
