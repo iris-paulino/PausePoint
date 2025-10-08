@@ -490,7 +490,7 @@ private fun AppRoot() {
             
             // Minimal polling only for time limit checks and accessibility monitoring
             while (isTracking) {
-                delay(5000) // Check every 5 seconds for time limits and accessibility status
+                delay(10000) // Check every 10 seconds for time limits and accessibility status
                 println("DEBUG: Time limit check - isTracking: $isTracking")
 
                 // If Pause screen is active or blocking overlay is shown, do not accrue usage for any apps
