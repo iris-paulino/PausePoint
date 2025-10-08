@@ -1381,511 +1381,580 @@ private fun AppRoot() {
     
     // Notification Permission Dialog
     if (showNotificationDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showNotificationDialog = false; pendingStartTracking = false },
-            title = {
-                Text(
-                    "🔔 Enable Notifications?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showNotificationDialog = false; pendingStartTracking = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
                     Text(
-                        "Stay informed about your app usage limits and take mindful breaks when needed.",
+                        "🔔 Enable Notifications?",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "You can change this setting anytime in Settings.",
-                        color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Start
-                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Column {
+                        Text(
+                            "Stay informed about your app usage limits and take mindful breaks when needed.",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "You can change this setting anytime in Settings.",
+                            color = Color(0xFFD1D5DB),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Start
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = { 
+                            coroutineScope.launch {
+                                try { storage.saveNotificationsEnabled(true) } catch (_: Exception) {}
+                            }
+                            showNotificationDialog = false 
+                            if (pendingStartTracking) {
+                                // Continue Start Tracking flow
+                                pendingStartTracking = true
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showNotificationDialog = false; pendingStartTracking = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Not now", color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        coroutineScope.launch {
-                            try { storage.saveNotificationsEnabled(true) } catch (_: Exception) {}
-                        }
-                        showNotificationDialog = false 
-                        if (pendingStartTracking) {
-                            // Continue Start Tracking flow
-                            pendingStartTracking = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Enable now", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showNotificationDialog = false; pendingStartTracking = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 
     // Usage Access Permission Dialog
     if (showUsageAccessDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showUsageAccessDialog = false; pendingStartTracking = false },
-            title = {
-                Text(
-                    "📈 Allow App Usage Access?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showUsageAccessDialog = false; pendingStartTracking = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
                     Text(
-                        "We need permission to read your app usage so tracking works.",
+                        "📈 Allow App Usage Access?",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "You can change this anytime in Settings.",
-                        color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Start
-                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Column {
+                        Text(
+                            "We need permission to read your app usage so tracking works.",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "You can change this anytime in Settings.",
+                            color = Color(0xFFD1D5DB),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Start
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                try { storage.saveUsageAccessAllowed(true) } catch (_: Exception) {}
+                            }
+                            showUsageAccessDialog = false
+                            if (pendingStartTracking) {
+                                // Continue Start Tracking flow
+                                pendingStartTracking = true
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showUsageAccessDialog = false; pendingStartTracking = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Not now", color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        coroutineScope.launch {
-                            try { storage.saveUsageAccessAllowed(true) } catch (_: Exception) {}
-                        }
-                        showUsageAccessDialog = false
-                        if (pendingStartTracking) {
-                            // Continue Start Tracking flow
-                            pendingStartTracking = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showUsageAccessDialog = false; pendingStartTracking = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 
     // Accessibility Consent Dialog (shown at end of Start Tracking flow)
     if (showAccessibilityConsentDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
-            title = {
-                Text(
-                    "🧩 Enable Accessibility?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showAccessibilityConsentDialog = false; pendingStartTracking = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
                     Text(
-                        "We use Accessibility to detect which app is in the foreground for accurate tracking.",
+                        "🧩 Enable Accessibility?",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "You can turn this off anytime in Settings.",
-                        color = Color(0xFFD1D5DB),
-                        fontSize = 12.sp,
-                        textAlign = TextAlign.Start
-                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Column {
+                        Text(
+                            "We use Accessibility to detect which app is in the foreground for accurate tracking.",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "You can turn this off anytime in Settings.",
+                            color = Color(0xFFD1D5DB),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Start
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = {
+                            openAccessibilitySettings()
+                            showAccessibilityConsentDialog = false 
+                            if (pendingStartTracking) {
+                                // Continue Start Tracking flow
+                                pendingStartTracking = true
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) { 
+                        Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold) 
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { 
+                        Text("Not now", color = Color.White, textAlign = TextAlign.Center) 
+                    }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        openAccessibilitySettings()
-                        showAccessibilityConsentDialog = false 
-                        if (pendingStartTracking) {
-                            // Continue Start Tracking flow
-                            pendingStartTracking = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) { Text("Not now", color = Color.White, textAlign = TextAlign.Center) }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 
 
     // No Tracked Apps Dialog
     if (showNoTrackedAppsDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showNoTrackedAppsDialog = false },
-            title = {
-                Text(
-                    "📱 No tracked apps",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Text(
-                    "You haven't selected any apps to track yet. Choose which apps to track to start.",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Start
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showNoTrackedAppsDialog = false
-                        pendingStartTracking = false
-                        route = Route.AppSelection
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showNoTrackedAppsDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Text("Choose apps", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        "📱 No tracked apps",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        "You haven't selected any apps to track yet. Choose which apps to track to start.",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = {
+                            showNoTrackedAppsDialog = false
+                            pendingStartTracking = false
+                            route = Route.AppSelection
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Choose apps", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showNoTrackedAppsDialog = false; pendingStartTracking = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Not now", color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showNoTrackedAppsDialog = false; pendingStartTracking = false },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 
     // No QR Code Dialog
     if (showNoQrCodeDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showNoQrCodeDialog = false },
-            title = {
-                Text(
-                    "🧾 QR code required",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Text(
-                    "You need a QR code to track your apps. Generate one to get started.",
-                    color = Color.White,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Start
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showNoQrCodeDialog = false
-                        pendingStartTracking = false
-                        fromNoQrCodeDialog = true
-                        route = Route.QrGenerator
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showNoQrCodeDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Text("Create QR code", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        "🧾 QR code required",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        "You need a QR code to track your apps. Generate one to get started.",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = {
+                            showNoQrCodeDialog = false
+                            pendingStartTracking = false
+                            fromNoQrCodeDialog = true
+                            route = Route.QrGenerator
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Create QR code", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { 
+                            showNoQrCodeDialog = false 
+                            pendingStartTracking = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Not now", color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { 
-                        showNoQrCodeDialog = false 
-                        pendingStartTracking = false
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Not now", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
     
     // Time Remaining Info Dialog
     if (showTimeRemainingInfoDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showTimeRemainingInfoDialog = false },
-            title = {
-                Text(
-                    "Time Remaining",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    "This is the time until your selected apps are blocked. When the time runs out, you will have to physically walk and scan your QR code to unblock your apps, then you can use them again.",
-                    color = Color.White,
-                    fontSize = 14.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showTimeRemainingInfoDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
-                    shape = RoundedCornerShape(8.dp)
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showTimeRemainingInfoDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Time Remaining",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        "This is the time until your selected apps are blocked. When the time runs out, you will have to physically walk and scan your QR code to unblock your apps, then you can use them again.",
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = { showTimeRemainingInfoDialog = false },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Got it", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
-        )
+            }
+        }
     }
     
     // Congratulatory Dialog
     if (showCongratulationDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { 
-                showCongratulationDialog = false
-                if (doNotShowCongratulationAgain) {
-                    coroutineScope.launch {
-                        storage.saveDoNotShowCongratulationAgain(true)
-                    }
+        androidx.compose.ui.window.Dialog(onDismissRequest = { 
+            showCongratulationDialog = false
+            if (doNotShowCongratulationAgain) {
+                coroutineScope.launch {
+                    storage.saveDoNotShowCongratulationAgain(true)
                 }
-                handleQrScanSuccess()
-            },
-            title = {
-                Text(
-                    "🎉 Great Job!",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column {
+            }
+            handleQrScanSuccess()
+        }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
                     Text(
-                        "Congratulations on taking a mindful pause from doomscrolling! You've successfully completed your break and can now return to your apps.",
+                        "🎉 Great Job!",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
+                    
                     Spacer(Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { 
-                            doNotShowCongratulationAgain = !doNotShowCongratulationAgain 
-                        }
-                    ) {
-                        RadioButton(
-                            selected = doNotShowCongratulationAgain,
-                            onClick = { doNotShowCongratulationAgain = !doNotShowCongratulationAgain },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF2C4877),
-                                unselectedColor = Color(0xFF9CA3AF)
-                            )
-                        )
-                        Spacer(Modifier.width(8.dp))
+                    
+                    Column {
                         Text(
-                            "Do not show again",
+                            "Congratulations on taking a mindful pause from doomscrolling! You've successfully completed your break and can now return to your apps.",
                             color = Color.White,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
                         )
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { 
+                                doNotShowCongratulationAgain = !doNotShowCongratulationAgain 
+                            }
+                        ) {
+                            RadioButton(
+                                selected = doNotShowCongratulationAgain,
+                                onClick = { doNotShowCongratulationAgain = !doNotShowCongratulationAgain },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Color(0xFF2C4877),
+                                    unselectedColor = Color(0xFF9CA3AF)
+                                )
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "Do not show again",
+                                color = Color.White,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = { 
+                            showCongratulationDialog = false
+                            if (doNotShowCongratulationAgain) {
+                                coroutineScope.launch {
+                                    storage.saveDoNotShowCongratulationAgain(true)
+                                }
+                            }
+                            // Finalize session and clear blocked state, then start normal start flow
+                            handleQrScanSuccess()
+                            pendingStartTracking = true
+                            route = Route.Dashboard
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Restart Tracking", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { 
+                            showCongratulationDialog = false
+                            if (doNotShowCongratulationAgain) {
+                                coroutineScope.launch {
+                                    storage.saveDoNotShowCongratulationAgain(true)
+                                }
+                            }
+                            // Finalize session and remain paused
+                            handleQrScanSuccess()
+                            isTracking = false
+                            route = Route.Dashboard
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Dismiss", color = Color.White, textAlign = TextAlign.Center)
                     }
                 }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { 
-                        showCongratulationDialog = false
-                        if (doNotShowCongratulationAgain) {
-                            coroutineScope.launch {
-                                storage.saveDoNotShowCongratulationAgain(true)
-                            }
-                        }
-                        // Finalize session and clear blocked state, then start normal start flow
-                        handleQrScanSuccess()
-                        pendingStartTracking = true
-                        route = Route.Dashboard
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Restart Tracking", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { 
-                        showCongratulationDialog = false
-                        if (doNotShowCongratulationAgain) {
-                            coroutineScope.launch {
-                                storage.saveDoNotShowCongratulationAgain(true)
-                            }
-                        }
-                        // Finalize session and remain paused
-                        handleQrScanSuccess()
-                        isTracking = false
-                        route = Route.Dashboard
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Dismiss", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 
     // Dismiss Dialog
     if (showDismissDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = {
-                showDismissDialog = false
-            },
-            title = {
-                Text(
-                    "Dismiss Pause?",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.Center
-                )
-            },
-            text = {
-                Column {
+        androidx.compose.ui.window.Dialog(onDismissRequest = {
+            showDismissDialog = false
+        }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
                     Text(
-                        "Do you want the app to auto-restart tracking after dismissing?",
+                        "Dismiss Pause?",
                         color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Start
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
                     )
+                    
                     Spacer(Modifier.height(16.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.clickable { doNotShowDismissAgain = !doNotShowDismissAgain }
-                    ) {
-                        RadioButton(
-                            selected = doNotShowDismissAgain,
-                            onClick = { doNotShowDismissAgain = !doNotShowDismissAgain },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color(0xFF2C4877),
-                                unselectedColor = Color(0xFF9CA3AF)
+                    
+                    Column {
+                        Text(
+                            "Do you want the app to auto-restart tracking after dismissing?",
+                            color = Color.White,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.clickable { doNotShowDismissAgain = !doNotShowDismissAgain }
+                        ) {
+                            RadioButton(
+                                selected = doNotShowDismissAgain,
+                                onClick = { doNotShowDismissAgain = !doNotShowDismissAgain },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Color(0xFF2C4877),
+                                    unselectedColor = Color(0xFF9CA3AF)
+                                )
                             )
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Do not show again", color = Color.White, fontSize = 14.sp)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material.Checkbox(
-                            checked = autoRestartOnDismiss,
-                            onCheckedChange = { checked -> autoRestartOnDismiss = checked },
-                            colors = androidx.compose.material.CheckboxDefaults.colors(checkedColor = Color(0xFF2C4877), uncheckedColor = Color(0xFF9CA3AF))
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text("Auto-restart tracking after dismiss", color = Color.White, fontSize = 14.sp)
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showDismissDialog = false
-                        coroutineScope.launch {
-                            try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
+                            Spacer(Modifier.width(8.dp))
+                            Text("Do not show again", color = Color.White, fontSize = 14.sp)
                         }
-                        // Use the normal Start Tracking pipeline so we only accrue when foregrounded
-                        pendingStartTracking = true
-                        route = Route.Dashboard
-                    },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                    shape = RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(12.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material.Checkbox(
+                                checked = autoRestartOnDismiss,
+                                onCheckedChange = { checked -> autoRestartOnDismiss = checked },
+                                colors = androidx.compose.material.CheckboxDefaults.colors(checkedColor = Color(0xFF2C4877), uncheckedColor = Color(0xFF9CA3AF))
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text("Auto-restart tracking after dismiss", color = Color.White, fontSize = 14.sp)
+                        }
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    // Buttons with custom 3dp spacing
+                    Button(
+                        onClick = {
+                            showDismissDialog = false
+                            coroutineScope.launch {
+                                try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
+                            }
+                            // Use the normal Start Tracking pipeline so we only accrue when foregrounded
+                            pendingStartTracking = true
+                            route = Route.Dashboard
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = {
+                            showDismissDialog = false
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Cancel", color = Color.White, textAlign = TextAlign.Center)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showDismissDialog = false
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Cancel", color = Color.White, textAlign = TextAlign.Center)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White,
-            shape = RoundedCornerShape(16.dp)
-        )
+            }
+        }
     }
 }
 
@@ -2829,49 +2898,57 @@ private fun DashboardContent(
     
     // Pause Partners Dialog
     if (showAccountabilityDialog) {
-        androidx.compose.material.AlertDialog(
-            onDismissRequest = { showAccountabilityDialog = false },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showAccountabilityDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
                 ) {
-                    Text("👥", fontSize = 24.sp)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "Coming Soon: Pause Partners",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("👥", fontSize = 24.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            "Coming Soon: Pause Partners",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Column {
+                        Text(
+                            "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = { showAccountabilityDialog = false },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
                 }
-            },
-            text = {
-                Column {
-                    Text(
-                        "We're working on a feature that lets someone you trust generate QR codes on their phone for you to scan.",
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Your pause partner can help you think twice about your app usage by being the \"gatekeeper\" of your unlock codes.",
-                        color = Color.White,
-                        fontSize = 14.sp
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { showAccountabilityDialog = false },
-                    colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text("Got it!", color = Color.White, fontWeight = FontWeight.Bold)
-                }
-            },
-            backgroundColor = Color(0xFF1A1A1A),
-            contentColor = Color.White
-        )
+            }
+        }
     }
 }
 
