@@ -462,96 +462,32 @@ private fun AppRoot() {
                     continue
                 }
 
-                // If Accessibility is not enabled, fall back to simulation to keep UI responsive
+                // If Accessibility is not enabled, stop tracking to maintain data integrity
                 val isAccessibilityEnabled = isAccessibilityServiceEnabled()
                 println("DEBUG: *** TRACKING LOOP DEBUG *** isAccessibilityServiceEnabled: $isAccessibilityEnabled")
                 if (!isAccessibilityEnabled) {
-                    println("DEBUG: Using simulation logic - isAccessibilityServiceEnabled: ${isAccessibilityServiceEnabled()}, ENABLE_USAGE_SIMULATION: $ENABLE_USAGE_SIMULATION")
-                    // Get the current foreground app to determine which app should get usage time
-                    val currentForegroundApp = getCurrentForegroundApp()
-                    val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
-                    
-                    // Calculate session duration for debug logging
-                    val currentTime = getCurrentTimeMillis()
-                    val sessionDuration = (currentTime - trackingStartTime) / 1000 // in seconds
-                    
-                    // Only increment usage for the app that is currently in the foreground
-                    trackedApps.forEach { app ->
-                        val currentSessionUsage = updatedSessionUsage[app.name] ?: 0L
-                        
-                        // Check if this app is currently in the foreground
-                        val isAppActive = when {
-                            // If we can detect the foreground app, only increment for that app
-                            currentForegroundApp != null -> {
-                                // Map app name to package name for comparison
-                                val expectedPackage = when (app.name.lowercase()) {
-                                    "instagram" -> "com.instagram.android"
-                                    "tiktok" -> "com.zhiliaoapp.musically"
-                                    "facebook" -> "com.facebook.katana"
-                                    "snapchat" -> "com.snapchat.android"
-                                    "youtube" -> "com.google.android.youtube"
-                                    "twitter" -> "com.twitter.android"
-                                    "chrome" -> "com.android.chrome"
-                                    "messages" -> "com.google.android.apps.messaging"
-                                    "gmail" -> "com.google.android.gm"
-                                    else -> app.name.lowercase().replace(" ", "")
-                                }
-                                currentForegroundApp == expectedPackage
-                            }
-                            // If we can't detect foreground app, fall back to simulation for testing
-                            else -> {
-                                // For testing: Simulate realistic foreground app behavior
-                                // Chrome is "foreground" for 60 seconds, then "background" for 30 seconds, then repeat
-                                // This simulates user actively using Chrome, then switching to other apps
-                                when (app.name.lowercase()) {
-                                    "chrome" -> {
-                                        val cyclePosition = sessionDuration % 90 // 90-second cycle
-                                        cyclePosition < 60 // Chrome is foreground for first 60 seconds of each cycle
-                                    }
-                                    else -> false // Other apps are never foreground in this simulation
-                                }
-                            }
-                        }
-                        
-                        val usageIncrement = if (isAppActive) 1L else 0L
-                        updatedSessionUsage[app.name] = currentSessionUsage + usageIncrement
-                        
-                        if (usageIncrement > 0) {
-                            println("DEBUG: App ${app.name} got usage increment: $usageIncrement, total session: ${currentSessionUsage + usageIncrement}")
-                        }
-                        println("DEBUG: App ${app.name} - isAppActive: $isAppActive, sessionDuration: $sessionDuration, currentSessionUsage: $currentSessionUsage")
-                    }
-                    
-                    sessionAppUsageTimes = updatedSessionUsage
-                    println("DEBUG: Updated sessionAppUsageTimes: $sessionAppUsageTimes")
-                    // Per-minute rollover: credit newly completed minutes to trackedApps
-                    var creditedMap = sessionCreditedMinutes.toMutableMap()
-                    var updatedTrackedApps = trackedApps
-                    for (app in trackedApps) {
-                        val seconds = sessionAppUsageTimes[app.name] ?: 0L
-                        val totalMinutes = (seconds / 60L).toInt()
-                        val creditedSoFar = creditedMap[app.name] ?: 0
-                        val delta = totalMinutes - creditedSoFar
-                        if (delta > 0) {
-                            println("DEBUG: Rollover credit $delta min to ${app.name} (totalMinutes=$totalMinutes, creditedSoFar=$creditedSoFar)")
-                            updatedTrackedApps = updatedTrackedApps.map { a -> if (a.name == app.name) a.copy(minutesUsed = a.minutesUsed + delta) else a }
-                            creditedMap[app.name] = totalMinutes
-                        }
-                    }
-                    if (updatedTrackedApps !== trackedApps) {
-                        trackedApps = updatedTrackedApps
-                    }
-                    sessionCreditedMinutes = creditedMap
-                    
-                    // Persist session data
+                    println("DEBUG: Accessibility disabled - stopping tracking to maintain data integrity")
+                    // Finalize current session usage before stopping
+                    finalizeSessionUsage()
+                    // Stop tracking
+                    isTracking = false
+                    isBlocked = false
+                    // Update accessibility service with unblocked state
+                    updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                    // Save unblocked state to storage
                     coroutineScope.launch {
                         try { 
-                            storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
-                            println("DEBUG: Saved session app usage times to storage")
+                            storage.saveBlockedState(false)
+                            println("DEBUG: Saved unblocked state to storage")
                         } catch (e: Exception) {
-                            println("DEBUG: Error saving session app usage times: ${e.message}")
+                            println("DEBUG: Error saving unblocked state: ${e.message}")
                         }
                     }
+                    // Navigate back to dashboard to show user that tracking has stopped
+                    route = Route.Dashboard
+                    // Show notification to inform user
+                    showAccessibilityDisabledNotification()
+                    return@LaunchedEffect
                 } else {
                     // Real foreground app detection using accessibility service
                     println("DEBUG: Using real foreground app detection")
@@ -2032,6 +1968,7 @@ expect fun openEmailClient(recipient: String)
 expect fun hasCameraPermission(): Boolean
 expect fun requestCameraPermission(): Boolean
 expect fun openAppSettingsForCamera()
+expect fun showAccessibilityDisabledNotification()
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

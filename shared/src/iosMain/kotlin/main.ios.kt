@@ -165,3 +165,9 @@ actual fun QrCodeDisplay(
     // This would be implemented as a Compose component
     // For now, this is a placeholder
 }
+
+actual fun showAccessibilityDisabledNotification() {
+    // On iOS, accessibility is always enabled for our app, so this is a no-op
+    // In a real implementation, you might show a local notification or alert
+    println("DEBUG: showAccessibilityDisabledNotification - iOS (no-op)")
+}

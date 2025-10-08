@@ -550,3 +550,23 @@ private fun getCurrentForegroundAppFallback(activity: Activity): String? {
         null
     }
 }
+
+actual fun showAccessibilityDisabledNotification() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: showAccessibilityDisabledNotification - no activity available")
+        return
+    }
+    
+    try {
+        // Create a simple toast notification to inform the user
+        android.widget.Toast.makeText(
+            activity,
+            "Tracking stopped: Accessibility access was disabled. Please re-enable it in Settings to continue tracking.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        println("DEBUG: showAccessibilityDisabledNotification - notification shown")
+    } catch (e: Exception) {
+        println("DEBUG: showAccessibilityDisabledNotification - error: ${e.message}")
+    }
+}
