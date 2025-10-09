@@ -134,7 +134,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         if (isTrackedApp) {
             // User is trying to use a tracked app while blocked, show overlay immediately
             println("DEBUG: checkAndShowOverlayForApp - showing overlay for blocked tracked app: $packageName")
-            val message = "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
+            val message = "Take a mindful pause - you've reached your time limit of"
             showOverlay(message)
         }
     }

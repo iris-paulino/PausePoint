@@ -3656,7 +3656,7 @@ fun PauseScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        text = "You have used your tracked apps for $durationText",
+                        text = "You have used your tracked apps for",
                         color = Color(0xFFBFC7C2)
                     )
                     Spacer(Modifier.height(8.dp))
