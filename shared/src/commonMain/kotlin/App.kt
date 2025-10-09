@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -182,6 +183,7 @@ private const val ENABLE_USAGE_SIMULATION: Boolean = true
 
 // Platform hook to open Accessibility settings (Android) or no-op elsewhere
 expect fun openAccessibilitySettings()
+expect fun openUsageAccessSettings()
 // Platform check for whether our AccessibilityService is enabled
 expect fun isAccessibilityServiceEnabled(): Boolean
 // Platform function to get the current foreground app package name
@@ -224,6 +226,8 @@ private fun AppRoot() {
     var hasShownUsageAccessPromptThisLaunch by remember { mutableStateOf(false) }
     var hasCheckedPermissionsOnDashboardThisLaunch by remember { mutableStateOf(false) }
     var showAccessibilityConsentDialog by remember { mutableStateOf(false) }
+    var showUsageAccessDisableConfirmationDialog by remember { mutableStateOf(false) }
+    var showAccessibilityDisableConfirmationDialog by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
@@ -527,6 +531,8 @@ private fun AppRoot() {
                     return@LaunchedEffect
                 }
                 
+                // Usage Access optional mode: do not stop tracking on loss
+                
                 // Update usage for currently active app (in case user stayed in same app)
                 updateCurrentAppUsage()
                 
@@ -629,7 +635,63 @@ private fun AppRoot() {
         setOnAppChangeCallback { newPackageName ->
             handleAppChange(newPackageName)
         }
+        
+        // Register callback to handle accessibility status changes
+        setOnAccessibilityStatusChangeCallback { isEnabled ->
+            println("DEBUG: *** ACCESSIBILITY STATUS CHANGED *** isEnabled: $isEnabled")
+            if (!isEnabled && isTracking) {
+                println("DEBUG: Accessibility disabled - stopping tracking immediately")
+                // Finalize current session usage before stopping
+                finalizeSessionUsage()
+                // Stop tracking
+                isTracking = false
+                isBlocked = false
+                // Update accessibility service with unblocked state
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                // Save unblocked state to storage
+                coroutineScope.launch {
+                    try { 
+                        storage.saveBlockedState(false)
+                        storage.saveTrackingState(false)
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving state after accessibility disabled: ${e.message}")
+                    }
+                }
+                // Show notification to user
+                showAccessibilityDisabledNotification()
+            }
+        }
+        
+        // Register callback to handle usage access status changes
+        setOnUsageAccessStatusChangeCallback { isGranted ->
+            println("DEBUG: *** USAGE ACCESS STATUS CHANGED *** isGranted: $isGranted")
+            if (!isGranted && isTracking) {
+                println("DEBUG: Usage access disabled - stopping tracking immediately")
+                // Finalize current session usage before stopping
+                finalizeSessionUsage()
+                // Stop tracking
+                isTracking = false
+                isBlocked = false
+                // Update accessibility service with unblocked state
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                // Save unblocked state to storage
+                coroutineScope.launch {
+                    try { 
+                        storage.saveBlockedState(false)
+                        storage.saveTrackingState(false)
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving state after usage access disabled: ${e.message}")
+                    }
+                }
+                // Show notification to user
+                showUsageAccessDisabledNotification()
+            }
+        }
+        
+        // Start accessibility monitoring
+        startAccessibilityMonitoring()
     }
+
 
     // Function to set up default apps
     suspend fun setupDefaultApps() {
@@ -1031,11 +1093,12 @@ private fun AppRoot() {
     // On first landing on Dashboard per app launch, prompt for disabled permissions
     LaunchedEffect(route) {
         if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
-            val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-            if (!usageAllowed) {
+            val accessibilityAllowed = isAccessibilityServiceEnabled()
+            val usageAllowed = isUsageAccessPermissionGranted()
+            // Only prompt for Usage Access if Accessibility is also off
+            if (!accessibilityAllowed && !usageAllowed) {
                 showUsageAccessDialog = true
             }
-            val accessibilityAllowed = isAccessibilityServiceEnabled()
             if (!accessibilityAllowed) {
                 showAccessibilityConsentDialog = true
             }
@@ -1044,29 +1107,28 @@ private fun AppRoot() {
     }
 
     // Sequentially handle Start Tracking prerequisites
-    LaunchedEffect(pendingStartTracking, showNotificationDialog, showUsageAccessDialog, showNoQrCodeDialog, showNoTrackedAppsDialog, showAccessibilityConsentDialog) {
+    LaunchedEffect(pendingStartTracking, showNotificationDialog, showUsageAccessDialog, showNoQrCodeDialog, showNoTrackedAppsDialog, showAccessibilityConsentDialog, showUsageAccessDisableConfirmationDialog, showAccessibilityDisableConfirmationDialog) {
         if (!pendingStartTracking) return@LaunchedEffect
 
         // If any dialog is currently open, wait until user acts
-        if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog || showAccessibilityConsentDialog) return@LaunchedEffect
+        if (showNotificationDialog || showUsageAccessDialog || showNoQrCodeDialog || showNoTrackedAppsDialog || showAccessibilityConsentDialog || showUsageAccessDisableConfirmationDialog || showAccessibilityDisableConfirmationDialog) return@LaunchedEffect
 
-        // 1) Usage access
-        val usageAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-        println("DEBUG: Checking usage access - allowed: $usageAllowed")
-        if (!usageAllowed) {
-            println("DEBUG: Usage access not allowed, showing dialog")
-            showUsageAccessDialog = true
-            return@LaunchedEffect
-        }
-
-        // 2) Accessibility access
+        // Check both permissions and show relevant dialogs so the user can allow them
         val accessibilityAllowed = isAccessibilityServiceEnabled()
-        println("DEBUG: Checking accessibility - enabled: $accessibilityAllowed")
-        if (!accessibilityAllowed) {
-            println("DEBUG: Accessibility not enabled, showing dialog")
-            showAccessibilityConsentDialog = true
-            return@LaunchedEffect
+        val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+        println("DEBUG: StartTracking checks - accessibility: $accessibilityAllowed, usagePref: $usagePrefAllowed")
+        var showedAnyDialog = false
+        if (!usagePrefAllowed) {
+            println("DEBUG: Usage access preference off, showing dialog")
+            showUsageAccessDialog = true
+            showedAnyDialog = true
         }
+        if (!accessibilityAllowed) {
+            println("DEBUG: Accessibility off, showing dialog")
+            showAccessibilityConsentDialog = true
+            showedAnyDialog = true
+        }
+        if (showedAnyDialog) return@LaunchedEffect
 
         // 3) QR code - allow existing saved codes to satisfy this
         run {
@@ -1375,7 +1437,13 @@ private fun AppRoot() {
             onBack = { route = Route.Settings }
         )
         Route.Permissions -> PermissionsScreen(
-            onBack = { route = Route.Settings }
+            onBack = { route = Route.Settings },
+            isTracking = isTracking,
+            showUsageAccessDisableConfirmationDialog = showUsageAccessDisableConfirmationDialog,
+            showAccessibilityDisableConfirmationDialog = showAccessibilityDisableConfirmationDialog,
+            onShowUsageAccessDisableConfirmationDialog = { showUsageAccessDisableConfirmationDialog = true },
+            onShowAccessibilityDisableConfirmationDialog = { showAccessibilityDisableConfirmationDialog = true },
+            onShowUsageAccessDialog = { showUsageAccessDialog = true }
         )
     }
     
@@ -1494,9 +1562,8 @@ private fun AppRoot() {
                     // Buttons with custom 3dp spacing
                     Button(
                         onClick = {
-                            coroutineScope.launch {
-                                try { storage.saveUsageAccessAllowed(true) } catch (_: Exception) {}
-                            }
+                            // In-app enable: set preference true and close
+                            coroutineScope.launch { try { storage.saveUsageAccessAllowed(true) } catch (_: Exception) {} }
                             showUsageAccessDialog = false
                             if (pendingStartTracking) {
                                 // Continue Start Tracking flow
@@ -1507,7 +1574,7 @@ private fun AppRoot() {
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Allow", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                     
                     Spacer(Modifier.height(3.dp))
@@ -1577,7 +1644,7 @@ private fun AppRoot() {
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) { 
-                        Text("Allow now", color = Color.White, fontWeight = FontWeight.Bold) 
+                        Text("Allow", color = Color.White, fontWeight = FontWeight.Bold)
                     }
                     
                     Spacer(Modifier.height(3.dp))
@@ -1593,6 +1660,129 @@ private fun AppRoot() {
         }
     }
 
+    // Usage Access Disable Confirmation Dialog
+    if (showUsageAccessDisableConfirmationDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showUsageAccessDisableConfirmationDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Text(
+                        "Stop Tracking?",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        "Turning off App Usage Access will stop tracking immediately. You won't be able to monitor your app usage or enforce time limits until you re-enable this permission.",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = {
+                            // Stop tracking and clear state in App scope, stay in-app
+                            try { finalizeSessionUsage() } catch (_: Exception) {}
+                            isTracking = false
+                            isBlocked = false
+                            updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                            coroutineScope.launch {
+                                try {
+                                    storage.saveBlockedState(false)
+                                    storage.saveTrackingState(false)
+                                    storage.saveUsageAccessAllowed(false)
+                                } catch (_: Exception) {}
+                            }
+                            route = Route.Dashboard
+                            showUsageAccessDisableConfirmationDialog = false
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showUsageAccessDisableConfirmationDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { 
+                        Text("Cancel", color = Color.White, textAlign = TextAlign.Center) 
+                    }
+                }
+            }
+        }
+    }
+
+    // Accessibility Disable Confirmation Dialog
+    if (showAccessibilityDisableConfirmationDialog) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { showAccessibilityDisableConfirmationDialog = false }) {
+            Card(
+                backgroundColor = Color(0xFF1A1A1A),
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp)
+                ) {
+                    Text(
+                        "Stop Tracking?",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 24.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    
+                    Text(
+                        "Turning off Accessibility Access will stop tracking immediately. You won't be able to monitor your app usage or enforce time limits until you re-enable this permission.",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Start
+                    )
+                    
+                    Spacer(Modifier.height(24.dp))
+                    
+                    Button(
+                        onClick = {
+                            showAccessibilityDisableConfirmationDialog = false
+                            openAccessibilitySettings()
+                        },
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Continue", color = Color.White, fontWeight = FontWeight.Bold)
+                    }
+                    
+                    Spacer(Modifier.height(3.dp))
+                    
+                    TextButton(
+                        onClick = { showAccessibilityDisableConfirmationDialog = false },
+                        modifier = Modifier.fillMaxWidth()
+                    ) { 
+                        Text("Cancel", color = Color.White, textAlign = TextAlign.Center) 
+                    }
+                }
+            }
+        }
+    }
 
     // No Tracked Apps Dialog
     if (showNoTrackedAppsDialog) {
@@ -2069,7 +2259,12 @@ expect fun hasCameraPermission(): Boolean
 expect fun requestCameraPermission(): Boolean
 expect fun openAppSettingsForCamera()
 expect fun showAccessibilityDisabledNotification()
+expect fun showUsageAccessDisabledNotification()
 expect fun setOnAppChangeCallback(callback: ((String?) -> Unit)?)
+expect fun setOnAccessibilityStatusChangeCallback(callback: ((Boolean) -> Unit)?)
+expect fun startAccessibilityMonitoring()
+expect fun isUsageAccessPermissionGranted(): Boolean
+expect fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?)
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {
@@ -4090,7 +4285,13 @@ private fun DurationSettingScreen(
 
 @Composable
 private fun PermissionsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    isTracking: Boolean,
+    showUsageAccessDisableConfirmationDialog: Boolean,
+    showAccessibilityDisableConfirmationDialog: Boolean,
+    onShowUsageAccessDisableConfirmationDialog: () -> Unit,
+    onShowAccessibilityDisableConfirmationDialog: () -> Unit,
+    onShowUsageAccessDialog: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -4169,103 +4370,29 @@ private fun PermissionsScreen(
         Spacer(Modifier.height(8.dp))
 
         // Allow App Usage Access
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            var usageAccessAllowed by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                try {
-                    usageAccessAllowed = storage.getUsageAccessAllowed()
-                } catch (_: Exception) { usageAccessAllowed = false }
-            }
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Allow App Usage Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Switch(
-                        checked = usageAccessAllowed,
-                        onCheckedChange = { enabled ->
-                            usageAccessAllowed = enabled
-                            // Persist change
-                            coroutineScope.launch {
-                                try { storage.saveUsageAccessAllowed(enabled) } catch (_: Exception) {}
-                            }
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Permit the app to access your app usage to enable tracking.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
+        UsageAccessCard(
+            isTracking = isTracking,
+            showUsageAccessDisableConfirmationDialog = showUsageAccessDisableConfirmationDialog,
+            onShowUsageAccessDisableConfirmationDialog = onShowUsageAccessDisableConfirmationDialog,
+            openUsageAccessSettings = { openUsageAccessSettings() },
+            onRequestEnableInApp = { onShowUsageAccessDialog() },
+            isUsageAccessPermissionGranted = { isUsageAccessPermissionGranted() },
+            storage = storage,
+            coroutineScope = coroutineScope
+        )
 
         Spacer(Modifier.height(8.dp))
 
         // Allow Accessibility Access
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            var accessibilityAccessAllowed by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) {
-                try {
-                    // Check actual system permission status instead of app preference
-                    accessibilityAccessAllowed = isAccessibilityServiceEnabled()
-                } catch (_: Exception) { accessibilityAccessAllowed = false }
-            }
-            
-            // Periodically check system status to catch changes when user returns from settings
-            LaunchedEffect(Unit) {
-                while (true) {
-                    kotlinx.coroutines.delay(2000) // Check every 2 seconds
-                    try {
-                        val actualStatus = isAccessibilityServiceEnabled()
-                        // Always update to match actual system state
-                        accessibilityAccessAllowed = actualStatus
-                        // Update storage to match actual system state
-                        coroutineScope.launch {
-                            try { storage.saveAccessibilityAccessAllowed(actualStatus) } catch (_: Exception) {}
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-            Column(modifier = Modifier.padding(24.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Allow Accessibility Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Switch(
-                        checked = accessibilityAccessAllowed,
-                        onCheckedChange = { enabled ->
-                            // Always open system settings - let user manage the permission there
-                            // The toggle will reflect actual system state when user returns
-                            openAccessibilitySettings()
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = Color(0xFF1A1A1A),
-                            checkedTrackColor = Color(0xFF1E3A5F),
-                            uncheckedThumbColor = Color(0xFF1A1A1A),
-                            uncheckedTrackColor = Color(0xFF4B5563)
-                        )
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
-            }
-        }
+        AccessibilityCard(
+            isTracking = isTracking,
+            showAccessibilityDisableConfirmationDialog = showAccessibilityDisableConfirmationDialog,
+            onShowAccessibilityDisableConfirmationDialog = onShowAccessibilityDisableConfirmationDialog,
+            openAccessibilitySettings = { openAccessibilitySettings() },
+            isAccessibilityServiceEnabled = { isAccessibilityServiceEnabled() },
+            storage = storage,
+            coroutineScope = coroutineScope
+        )
 
         Spacer(Modifier.height(8.dp))
 
@@ -4320,6 +4447,155 @@ private fun PermissionsScreen(
                 Spacer(Modifier.height(8.dp))
                 Text("Required to scan QR codes for pause functionality.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
+        }
+    }
+}
+
+@Composable
+fun UsageAccessCard(
+    isTracking: Boolean,
+    showUsageAccessDisableConfirmationDialog: Boolean,
+    onShowUsageAccessDisableConfirmationDialog: () -> Unit,
+    openUsageAccessSettings: () -> Unit,
+    onRequestEnableInApp: () -> Unit,
+    isUsageAccessPermissionGranted: () -> Boolean,
+    storage: AppStorage,
+    coroutineScope: CoroutineScope
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF2C2C2C),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        var usageAccessAllowed by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            try {
+                // Reflect app preference (in-app, not OS setting)
+                usageAccessAllowed = storage.getUsageAccessAllowed()
+            } catch (_: Exception) { usageAccessAllowed = false }
+        }
+        
+        // Periodically reflect stored preference to keep UI in sync
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(2000) // Check every 2 seconds
+                try {
+                    val pref = storage.getUsageAccessAllowed()
+                    usageAccessAllowed = pref
+                } catch (_: Exception) { /* ignore */ }
+            }
+        }
+        
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Allow App Usage Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Switch(
+                    checked = usageAccessAllowed,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            // Enable path stays in-app: show dialog; CTA will set preference true
+                            onRequestEnableInApp()
+                        } else {
+                            // Disable path: if tracking, confirm; otherwise turn off preference in-app
+                            if (isTracking) {
+                                onShowUsageAccessDisableConfirmationDialog()
+                            } else {
+                                // Not tracking: update preference in-app and reflect UI
+                                coroutineScope.launch { try { storage.saveUsageAccessAllowed(false) } catch (_: Exception) {} }
+                                usageAccessAllowed = false
+                            }
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color(0xFF1A1A1A),
+                        checkedTrackColor = Color(0xFF1E3A5F),
+                        uncheckedThumbColor = Color(0xFF1A1A1A),
+                        uncheckedTrackColor = Color(0xFF4B5563)
+                    )
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Permit the app to access your app usage to enable tracking.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+        }
+    }
+}
+
+@Composable
+fun AccessibilityCard(
+    isTracking: Boolean,
+    showAccessibilityDisableConfirmationDialog: Boolean,
+    onShowAccessibilityDisableConfirmationDialog: () -> Unit,
+    openAccessibilitySettings: () -> Unit,
+    isAccessibilityServiceEnabled: () -> Boolean,
+    storage: AppStorage,
+    coroutineScope: CoroutineScope
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = Color(0xFF2C2C2C),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        var accessibilityAccessAllowed by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            try {
+                // Check actual system permission status instead of app preference
+                accessibilityAccessAllowed = isAccessibilityServiceEnabled()
+            } catch (_: Exception) { accessibilityAccessAllowed = false }
+        }
+        
+        // Periodically check system status to catch changes when user returns from settings
+        LaunchedEffect(Unit) {
+            while (true) {
+                kotlinx.coroutines.delay(2000) // Check every 2 seconds
+                try {
+                    val actualStatus = isAccessibilityServiceEnabled()
+                    // Always update to match actual system state
+                    accessibilityAccessAllowed = actualStatus
+                    // Update storage to match actual system state
+                    coroutineScope.launch {
+                        try { storage.saveAccessibilityAccessAllowed(actualStatus) } catch (_: Exception) {}
+                    }
+                } catch (_: Exception) { /* ignore */ }
+            }
+        }
+        
+        Column(modifier = Modifier.padding(24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Allow Accessibility Access", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Switch(
+                    checked = accessibilityAccessAllowed,
+                    onCheckedChange = { enabled ->
+                        if (enabled) {
+                            // User is trying to enable - just open settings
+                            openAccessibilitySettings()
+                        } else {
+                            // User is trying to disable - check if tracking is active
+                            if (isTracking) {
+                                onShowAccessibilityDisableConfirmationDialog()
+                            } else {
+                                // Not tracking, so safe to open settings
+                                openAccessibilitySettings()
+                            }
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color(0xFF1A1A1A),
+                        checkedTrackColor = Color(0xFF1E3A5F),
+                        uncheckedThumbColor = Color(0xFF1A1A1A),
+                        uncheckedTrackColor = Color(0xFF4B5563)
+                    )
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
         }
     }
 }

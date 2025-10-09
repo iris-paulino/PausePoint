@@ -104,6 +104,10 @@ actual fun openAccessibilitySettings() {
     // No-op on iOS
 }
 
+actual fun openUsageAccessSettings() {
+    // No-op on iOS
+}
+
 actual fun isAccessibilityServiceEnabled(): Boolean {
     return true
 }
@@ -172,8 +176,34 @@ actual fun showAccessibilityDisabledNotification() {
     println("DEBUG: showAccessibilityDisabledNotification - iOS (no-op)")
 }
 
+actual fun showUsageAccessDisabledNotification() {
+    // On iOS, usage access is always available for our app, so this is a no-op
+    // In a real implementation, you might show a local notification or alert
+    println("DEBUG: showUsageAccessDisabledNotification - iOS (no-op)")
+}
+
 actual fun setOnAppChangeCallback(callback: ((String?) -> Unit)?) {
     // On iOS, this would be implemented using app lifecycle notifications
     // For now, this is a no-op
     println("DEBUG: setOnAppChangeCallback - iOS (no-op)")
+}
+
+actual fun setOnAccessibilityStatusChangeCallback(callback: ((Boolean) -> Unit)?) {
+    // No-op on iOS - accessibility is always enabled on iOS
+    println("DEBUG: setOnAccessibilityStatusChangeCallback - iOS (no-op)")
+}
+
+actual fun startAccessibilityMonitoring() {
+    // No-op on iOS - accessibility is always enabled on iOS
+    println("DEBUG: startAccessibilityMonitoring - iOS (no-op)")
+}
+
+actual fun isUsageAccessPermissionGranted(): Boolean {
+    // On iOS, app usage access is always available for our app
+    return true
+}
+
+actual fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?) {
+    // No-op on iOS - usage access is always available on iOS
+    println("DEBUG: setOnUsageAccessStatusChangeCallback - iOS (no-op)")
 }

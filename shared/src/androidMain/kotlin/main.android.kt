@@ -34,6 +34,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import android.net.Uri
+import android.app.AppOpsManager
 
 actual fun getPlatformName(): String = "Android"
 
@@ -501,6 +502,17 @@ actual fun openAccessibilitySettings() {
     }
 }
 
+actual fun openUsageAccessSettings() {
+    val activity = currentActivityRef?.get() ?: return
+    try {
+        val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)
+        activity.startActivity(intent)
+        println("DEBUG: openUsageAccessSettings - opened usage access settings")
+    } catch (e: Exception) {
+        println("DEBUG: openUsageAccessSettings - error: ${e.message}")
+    }
+}
+
 actual fun isAccessibilityServiceEnabled(): Boolean {
     val activity = currentActivityRef?.get()
     println("DEBUG: isAccessibilityServiceEnabled - activity: $activity")
@@ -510,6 +522,8 @@ actual fun isAccessibilityServiceEnabled(): Boolean {
     }
     // cache application context for receiver registration later
     appContextRef = activity.applicationContext
+    // Register accessibility status change receiver
+    ensureAccessibilityReceiverRegistered(activity.applicationContext)
     val pkg = activity.packageName
     
     // Create both possible component name formats that Android might use
@@ -554,7 +568,11 @@ private object ForegroundAppCache {
 }
 
 private var receiverRegistered = false
+private var accessibilityReceiverRegistered = false
+private var usageAccessReceiverRegistered = false
 private var appContextRef: Context? = null
+private var accessibilityStatusCallback: ((Boolean) -> Unit)? = null
+private var usageAccessStatusCallback: ((Boolean) -> Unit)? = null
 
 private fun ensureReceiverRegistered(context: Context) {
     if (receiverRegistered) return
@@ -582,6 +600,70 @@ private fun ensureReceiverRegistered(context: Context) {
         println("DEBUG: ForegroundAppCache - receiver registered with context=$context")
     } catch (e: Exception) {
         println("DEBUG: ForegroundAppCache - register error: ${e.message}")
+    }
+}
+
+private fun ensureAccessibilityReceiverRegistered(context: Context) {
+    if (accessibilityReceiverRegistered) return
+    try {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_MY_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                println("DEBUG: AccessibilityReceiver - received intent: ${intent?.action}")
+                // Check accessibility status when package changes occur
+                val isEnabled = isAccessibilityServiceEnabled()
+                println("DEBUG: AccessibilityReceiver - accessibility status changed to: $isEnabled")
+                accessibilityStatusCallback?.invoke(isEnabled)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(receiver, filter)
+        }
+        accessibilityReceiverRegistered = true
+        println("DEBUG: AccessibilityReceiver - receiver registered with context=$context")
+    } catch (e: Exception) {
+        println("DEBUG: AccessibilityReceiver - register error: ${e.message}")
+    }
+}
+
+private fun ensureUsageAccessReceiverRegistered(context: Context) {
+    if (usageAccessReceiverRegistered) return
+    try {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_MY_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                println("DEBUG: UsageAccessReceiver - received intent: ${intent?.action}")
+                // Check usage access status when package changes occur
+                val isGranted = isUsageAccessPermissionGranted()
+                println("DEBUG: UsageAccessReceiver - usage access status changed to: $isGranted")
+                usageAccessStatusCallback?.invoke(isGranted)
+            }
+        }
+        if (Build.VERSION.SDK_INT >= 33) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            context.registerReceiver(receiver, filter)
+        }
+        usageAccessReceiverRegistered = true
+        println("DEBUG: UsageAccessReceiver - receiver registered with context=$context")
+    } catch (e: Exception) {
+        println("DEBUG: UsageAccessReceiver - register error: ${e.message}")
     }
 }
 
@@ -644,6 +726,26 @@ actual fun showAccessibilityDisabledNotification() {
     }
 }
 
+actual fun showUsageAccessDisabledNotification() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: showUsageAccessDisabledNotification - no activity available")
+        return
+    }
+    
+    try {
+        // Create a simple toast notification to inform the user
+        android.widget.Toast.makeText(
+            activity,
+            "Tracking stopped: App usage access was disabled. Please re-enable it in Settings to continue tracking.",
+            android.widget.Toast.LENGTH_LONG
+        ).show()
+        println("DEBUG: showUsageAccessDisabledNotification - notification shown")
+    } catch (e: Exception) {
+        println("DEBUG: showUsageAccessDisabledNotification - error: ${e.message}")
+    }
+}
+
 private var appChangeCallback: ((String?) -> Unit)? = null
 
 actual fun setOnAppChangeCallback(callback: ((String?) -> Unit)?) {
@@ -658,5 +760,72 @@ actual fun setOnAppChangeCallback(callback: ((String?) -> Unit)?) {
         println("DEBUG: setOnAppChangeCallback - ensured receiver is registered")
     } else {
         println("DEBUG: setOnAppChangeCallback - no context available to register receiver")
+    }
+}
+
+actual fun setOnAccessibilityStatusChangeCallback(callback: ((Boolean) -> Unit)?) {
+    accessibilityStatusCallback = callback
+    println("DEBUG: setOnAccessibilityStatusChangeCallback - callback registered: ${callback != null}")
+    
+    // Also ensure accessibility receiver is registered when callback is set
+    val activity = currentActivityRef?.get()
+    val ctx = activity?.applicationContext ?: appContextRef
+    if (ctx != null) {
+        ensureAccessibilityReceiverRegistered(ctx)
+        println("DEBUG: setOnAccessibilityStatusChangeCallback - ensured accessibility receiver is registered")
+    } else {
+        println("DEBUG: setOnAccessibilityStatusChangeCallback - no context available to register receiver")
+    }
+}
+
+actual fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?) {
+    usageAccessStatusCallback = callback
+    println("DEBUG: setOnUsageAccessStatusChangeCallback - callback registered: ${callback != null}")
+    
+    // Also ensure usage access receiver is registered when callback is set
+    val activity = currentActivityRef?.get()
+    val ctx = activity?.applicationContext ?: appContextRef
+    if (ctx != null) {
+        ensureUsageAccessReceiverRegistered(ctx)
+        println("DEBUG: setOnUsageAccessStatusChangeCallback - ensured usage access receiver is registered")
+    } else {
+        println("DEBUG: setOnUsageAccessStatusChangeCallback - no context available to register receiver")
+    }
+}
+
+// Start periodic accessibility monitoring to catch changes that BroadcastReceiver might miss
+actual fun startAccessibilityMonitoring() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: startAccessibilityMonitoring - no activity available")
+        return
+    }
+    
+    // This will be called from the main app to start monitoring
+    // The actual monitoring is done in the main app's LaunchedEffect
+    println("DEBUG: startAccessibilityMonitoring - monitoring started")
+}
+
+// Check if usage access permission is actually granted by the system
+actual fun isUsageAccessPermissionGranted(): Boolean {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: isUsageAccessPermissionGranted - no activity available")
+        return false
+    }
+    
+    return try {
+        val appOps = activity.getSystemService(android.content.Context.APP_OPS_SERVICE) as AppOpsManager
+        val mode = appOps.checkOpNoThrow(
+            AppOpsManager.OPSTR_GET_USAGE_STATS,
+            android.os.Process.myUid(),
+            activity.packageName
+        )
+        val isGranted = mode == AppOpsManager.MODE_ALLOWED
+        println("DEBUG: isUsageAccessPermissionGranted - mode: $mode, granted: $isGranted")
+        isGranted
+    } catch (e: Exception) {
+        println("DEBUG: isUsageAccessPermissionGranted - error: ${e.message}")
+        false
     }
 }
