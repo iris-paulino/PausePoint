@@ -2845,11 +2845,11 @@ private fun DashboardContent(
                         .clickable { onOpenDurationSetting() }
                         .padding(24.dp)
                 ) {
-                    // Info button in top-right corner
+                    // Info button in top-left corner
                     IconButton(
                         onClick = { onShowTimeRemainingInfo() },
                         modifier = Modifier
-                            .align(Alignment.TopEnd)
+                            .align(Alignment.TopStart)
                             .size(20.dp)
                     ) {
                         Icon(
@@ -2871,19 +2871,24 @@ private fun DashboardContent(
                         val remaining = (timeLimitMinutes - totalTrackedAppUsageMinutes).coerceAtLeast(0)
                         // Debug logging
                         println("DEBUG: Time remaining - totalTrackedAppUsageSeconds: $totalTrackedAppUsageSeconds, totalTrackedAppUsageMinutes: $totalTrackedAppUsageMinutes, remaining: $remaining")
-                        Text("${remaining}m", fontSize = 36.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        val baseFontSize = 36.sp
+                        Text(
+                            text = androidx.compose.ui.text.buildAnnotatedString {
+                                append("${remaining}m ")
+                                pushStyle(androidx.compose.ui.text.SpanStyle(fontSize = baseFontSize * 0.7f))
+                                append("\uD83D\uDD8A\uFE0F")
+                                pop()
+                            },
+                            fontSize = baseFontSize,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                         val minuteLabel = if (remaining == 1) "minute" else "minutes"
                         Text("$minuteLabel remaining until pause time", fontSize = 14.sp, color = Color.White)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             val timeLimitLabel = if (timeLimitMinutes == 1) "minute" else "minutes"
                             Text("Time Limit: ${timeLimitMinutes} $timeLimitLabel", fontSize = 12.sp, color = Color.White)
                             Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = "✏",
-                                fontSize = 12.sp,
-                                color = Color(0xFFD1D5DB),
-                                modifier = Modifier.clickable { onOpenDurationSetting() }
-                            )
                         }
                     }
                 }
