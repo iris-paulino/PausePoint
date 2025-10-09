@@ -1459,7 +1459,16 @@ private fun AppRoot() {
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Text(
-                        "🔔 Enable Notifications?",
+                        "🔔",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Enable Notifications?",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
@@ -1531,7 +1540,16 @@ private fun AppRoot() {
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Text(
-                        "📈 Allow App Usage Access?",
+                        "📈",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Allow App Usage Access?",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
@@ -1602,7 +1620,16 @@ private fun AppRoot() {
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Text(
-                        "🧩 Enable Accessibility?",
+                        "🧩",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Enable Accessibility?",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
@@ -1614,17 +1641,17 @@ private fun AppRoot() {
                     
                     Column {
                         Text(
-                            "We use Accessibility to detect which app is in the foreground for accurate tracking.",
+                            "We use accessibility to detect which app is in the foreground for accurate tracking.",
                             color = Color.White,
                             fontSize = 14.sp,
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Center
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
                             "You can turn this off anytime in Settings.",
                             color = Color(0xFFD1D5DB),
                             fontSize = 12.sp,
-                            textAlign = TextAlign.Start
+                            textAlign = TextAlign.Center
                         )
                     }
                     
