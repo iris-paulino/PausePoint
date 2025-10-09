@@ -3861,7 +3861,7 @@ private fun DurationSettingScreen(
     onCompleteSetup: () -> Unit,
     onBack: () -> Unit
 ) {
-    val quickSelectOptions = listOf(5, 10, 15, 45, 60, 90, 120)
+    val quickSelectOptions = listOf(5, 10, 15, 45, 60, 90)
     
     Column(
         modifier = Modifier
@@ -4066,7 +4066,7 @@ private fun DurationSettingScreen(
             )
         }
         
-        Spacer(Modifier.weight(1f))
+        Spacer(Modifier.height(14.dp))
         
         // Complete Setup button
         Button(
@@ -4083,6 +4083,8 @@ private fun DurationSettingScreen(
                 fontSize = 16.sp
             )
         }
+        
+        Spacer(Modifier.height(24.dp))
     }
 }
 

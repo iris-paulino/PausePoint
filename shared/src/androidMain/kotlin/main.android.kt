@@ -187,12 +187,30 @@ actual fun dismissBlockingOverlay() {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
+            // Set dismissing state in MainActivity to prevent camera permission requests
+            try {
+                val method = activity::class.java.methods.firstOrNull { it.name == "setDismissingState" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Boolean::class.java }
+                if (method != null) {
+                    method.invoke(activity, true)
+                    println("DEBUG: dismissBlockingOverlay - set dismissing state in MainActivity")
+                }
+            } catch (e: Exception) {
+                println("DEBUG: dismissBlockingOverlay - error setting dismissing state: ${e.message}")
+            }
+            
             // Use broadcast receiver to hide the overlay
             val intent = Intent("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(intent)
             println("DEBUG: dismissBlockingOverlay - sent HIDE_BLOCKING_OVERLAY broadcast with package: ${activity.packageName}")
+            
+            // Also send broadcast to finish any running QrScanActivity
+            val qrScanIntent = Intent("com.luminoprisma.scrollpause.FINISH_QR_SCAN_ACTIVITY").apply {
+                setPackage(activity.packageName) // Explicitly set the package
+            }
+            activity.sendBroadcast(qrScanIntent)
+            println("DEBUG: dismissBlockingOverlay - sent FINISH_QR_SCAN_ACTIVITY broadcast with package: ${activity.packageName}")
         } catch (e: Exception) {
             println("DEBUG: dismissBlockingOverlay - error sending broadcast: ${e.message}")
         }
@@ -210,6 +228,17 @@ fun resetTimerAndContinueTracking() {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
+            // Reset dismissing state in MainActivity
+            try {
+                val method = activity::class.java.methods.firstOrNull { it.name == "setDismissingState" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Boolean::class.java }
+                if (method != null) {
+                    method.invoke(activity, false)
+                    println("DEBUG: resetTimerAndContinueTracking - reset dismissing state in MainActivity")
+                }
+            } catch (e: Exception) {
+                println("DEBUG: resetTimerAndContinueTracking - error resetting dismissing state: ${e.message}")
+            }
+            
             // Use broadcast receiver to reset timer and continue tracking
             val intent = Intent("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
@@ -233,6 +262,19 @@ fun dismissAndContinueTracking() {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
+            // Keep dismissing state for a longer period to prevent camera permission requests
+            // from Settings screen polling that happens after dismiss
+            try {
+                val method = activity::class.java.methods.firstOrNull { it.name == "setDismissingState" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Boolean::class.java }
+                if (method != null) {
+                    // Don't reset immediately - let it stay true for a bit longer
+                    // The state will be reset when the user actually interacts with the app
+                    println("DEBUG: dismissAndContinueTracking - keeping dismissing state true to prevent camera permission requests")
+                }
+            } catch (e: Exception) {
+                println("DEBUG: dismissAndContinueTracking - error managing dismissing state: ${e.message}")
+            }
+            
             // Use broadcast receiver to dismiss and continue tracking
             val intent = Intent("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE").apply {
                 setPackage(activity.packageName) // Explicitly set the package
@@ -389,6 +431,32 @@ actual fun hasCameraPermission(): Boolean {
 actual fun requestCameraPermission(): Boolean {
     val activity = currentActivityRef?.get() ?: return false
     return try {
+        // Check dismissing state first before doing anything
+        try {
+            val dismissingField = activity::class.java.declaredFields.firstOrNull { it.name == "isDismissing" }
+            if (dismissingField != null) {
+                dismissingField.isAccessible = true
+                val isDismissing = dismissingField.getBoolean(activity)
+                if (isDismissing) {
+                    println("DEBUG: requestCameraPermission - called but app is dismissing, skipping")
+                    return false
+                }
+            }
+        } catch (e: Exception) {
+            println("DEBUG: requestCameraPermission - error checking dismissing state: ${e.message}")
+        }
+        
+        // Reset dismissing state when user explicitly requests camera permission
+        try {
+            val resetMethod = activity::class.java.methods.firstOrNull { it.name == "resetDismissingStateIfNeeded" && it.parameterTypes.isEmpty() }
+            if (resetMethod != null) {
+                resetMethod.invoke(activity)
+                println("DEBUG: requestCameraPermission - reset dismissing state before requesting permission")
+            }
+        } catch (e: Exception) {
+            println("DEBUG: requestCameraPermission - error resetting dismissing state: ${e.message}")
+        }
+        
         // Delegate to MainActivity helper if available to use ActivityResult API
         val method = activity::class.java.methods.firstOrNull { it.name == "requestCameraPermissionIfNeeded" && it.parameterTypes.isEmpty() }
         if (method != null) {

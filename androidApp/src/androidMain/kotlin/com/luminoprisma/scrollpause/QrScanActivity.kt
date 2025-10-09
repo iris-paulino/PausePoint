@@ -2,8 +2,12 @@ package com.luminoprisma.scrollpause
 
 import android.Manifest
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,6 +23,19 @@ import setQrScanningActive
 
 class QrScanActivity : AppCompatActivity() {
     private var expectedMessage: String? = null // no longer used for validation; any QR counts
+    private var isFinishing = false // Flag to prevent camera permission launcher after finish broadcast
+    private var cameraPermissionLauncherInProgress = false // Flag to track if camera permission launcher is in progress
+
+    private val finishReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            println("DEBUG: QrScanActivity - received FINISH_QR_SCAN_ACTIVITY broadcast")
+            isFinishing = true
+            cameraPermissionLauncherInProgress = false // Cancel any pending camera permission request
+            setQrScanningActive(false)
+            setResult(Activity.RESULT_CANCELED)
+            finish()
+        }
+    }
 
     private val launcher = registerForActivityResult(ScanContract()) { result ->
         val data = Intent()
@@ -69,6 +86,11 @@ class QrScanActivity : AppCompatActivity() {
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        cameraPermissionLauncherInProgress = false // Reset flag when result is received
+        if (isFinishing) {
+            println("DEBUG: QrScanActivity - camera permission result received but activity is finishing, ignoring")
+            return@registerForActivityResult
+        }
         if (isGranted) {
             launchQrScanner()
         } else {
@@ -84,19 +106,46 @@ class QrScanActivity : AppCompatActivity() {
         setQrScanningActive(true)
         expectedMessage = intent?.getStringExtra("expected_message")
         
+        // Register receiver to finish when dismiss is called
+        val filter = IntentFilter("com.luminoprisma.scrollpause.FINISH_QR_SCAN_ACTIVITY")
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(finishReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(finishReceiver, filter)
+            }
+        } catch (_: Exception) { }
+        
         // Check camera permission before launching scanner
+        if (isFinishing) {
+            println("DEBUG: QrScanActivity - onCreate called but activity is finishing, skipping camera permission check")
+            return
+        }
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.CAMERA
             ) == PackageManager.PERMISSION_GRANTED) {
             launchQrScanner()
         } else {
-            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            // Add a small delay to allow finish broadcast to be received if it's coming
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                if (!isFinishing && !cameraPermissionLauncherInProgress) {
+                    cameraPermissionLauncherInProgress = true // Set flag before launching
+                    cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                } else {
+                    println("DEBUG: QrScanActivity - skipping camera permission launcher due to finishing state")
+                }
+            }, 100) // 100ms delay
         }
     }
 
     override fun onResume() {
         super.onResume()
+        if (isFinishing) {
+            println("DEBUG: QrScanActivity - onResume called but activity is finishing, skipping")
+            return
+        }
         // Scanner is visible/interactive
         setQrScanningActive(true)
     }
@@ -110,6 +159,7 @@ class QrScanActivity : AppCompatActivity() {
     override fun onDestroy() {
         // Safety: ensure we clear the flag if the activity is destroyed unexpectedly
         setQrScanningActive(false)
+        try { unregisterReceiver(finishReceiver) } catch (_: Exception) {}
         super.onDestroy()
     }
     

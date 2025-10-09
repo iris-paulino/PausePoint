@@ -13,10 +13,15 @@ import initializeInstalledAppsProvider
 import registerCurrentActivity
 
 class MainActivity : AppCompatActivity() {
+    private var isDismissing = false // Flag to prevent camera permission requests during dismiss
     
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        if (isDismissing) {
+            println("DEBUG: MainActivity - camera permission result received but app is dismissing, ignoring")
+            return@registerForActivityResult
+        }
         // Permission result is handled by the QR scanner itself
         // This launcher is just to ensure we have the permission before scanning
     }
@@ -38,6 +43,10 @@ class MainActivity : AppCompatActivity() {
     }
     
     fun requestCameraPermissionIfNeeded(): Boolean {
+        if (isDismissing) {
+            println("DEBUG: MainActivity - requestCameraPermissionIfNeeded called but app is dismissing, skipping")
+            return false
+        }
         return when {
             ContextCompat.checkSelfPermission(
                 this,
@@ -49,6 +58,18 @@ class MainActivity : AppCompatActivity() {
                 cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
                 false
             }
+        }
+    }
+    
+    fun setDismissingState(dismissing: Boolean) {
+        isDismissing = dismissing
+        println("DEBUG: MainActivity - setDismissingState: $dismissing")
+    }
+    
+    fun resetDismissingStateIfNeeded() {
+        if (isDismissing) {
+            isDismissing = false
+            println("DEBUG: MainActivity - resetDismissingStateIfNeeded: reset dismissing state to false")
         }
     }
 

@@ -24,6 +24,7 @@ import createAppStorage
 import setQrScanningActive
 import resetTimerAndContinueTracking
 import dismissAndContinueTracking
+import com.luminoprisma.scrollpause.QrScanActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
