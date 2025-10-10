@@ -42,12 +42,66 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             println("DEBUG: PendingCommands - setPendingHide()")
         }
         
+        @Volatile private var appContextRef: Context? = null
+
         fun setBlockedState(blocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
             isBlocked = blocked
             trackedAppNames = trackedApps
             timeLimitMinutes = timeLimit
             println("DEBUG: ForegroundAppAccessibilityService - Set blocked state: blocked=$blocked, apps=$trackedApps, limit=$timeLimit")
+
+            // If blocking just turned on while user is already in a tracked app,
+            // immediately launch the Pause screen without waiting for another event
+            if (blocked) {
+                val currentPkg = currentForegroundPackage
+                val isTrackedNow = isPackageTracked(currentPkg, trackedApps)
+                println("DEBUG: setBlockedState - currentPkg=$currentPkg, isTrackedNow=$isTrackedNow")
+                if (isTrackedNow) {
+                    val ctx = appContextRef
+                    if (ctx != null) {
+                        try {
+                            val message = if (timeLimit > 0) {
+                                "Take a mindful pause - you've reached your time limit of ${timeLimit} minutes"
+                            } else {
+                                "Take a mindful pause"
+                            }
+                            val intent = Intent(ctx, PauseOverlayActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                putExtra("message", message)
+                            }
+                            ctx.startActivity(intent)
+                        } catch (e: Exception) {
+                            println("DEBUG: setBlockedState - failed to start activity from companion: ${e.message}")
+                        }
+                    }
+                }
+            }
         }
+
+        private fun isPackageTracked(packageName: String?, trackedApps: List<String>): Boolean {
+            if (packageName.isNullOrBlank()) return false
+            return trackedApps.any { appName ->
+                val normalized = appName.trim()
+                if (normalized.contains('.')) {
+                    packageName == normalized
+                } else {
+                    when (normalized.lowercase()) {
+                        "chrome" -> packageName == "com.android.chrome"
+                        "youtube" -> packageName == "com.google.android.youtube"
+                        "messages" -> packageName == "com.google.android.apps.messaging"
+                        "gmail" -> packageName == "com.google.android.gm"
+                        "whatsapp" -> packageName == "com.whatsapp"
+                        "youtube music" -> packageName == "com.google.android.apps.youtube.music"
+                        else -> packageName.contains(normalized.lowercase())
+                    }
+                }
+            }
+        }
+
+        private const val PREFS_NAME = "scrollpause_prefs"
+        private const val KEY_BLOCKED = "blocked"
+        private const val KEY_TRACKED_APPS = "tracked_apps_csv"
+        private const val KEY_TIME_LIMIT = "time_limit_minutes"
     }
 
     private fun isIgnoredPackage(pkg: String?): Boolean {
@@ -64,7 +118,17 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         println("DEBUG: ForegroundAppAccessibilityService - service connected")
+        // capture app context for companion usage
+        appContextRef = applicationContext
         registerOverlayReceiver()
+        loadStateFromPreferences()
+        try {
+            android.widget.Toast.makeText(
+                this,
+                "ScrollPause connected (blocked=" + isBlocked + ", apps=" + trackedAppNames.size + ")",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        } catch (_: Exception) {}
         // Apply any pending command
         val msg = pendingShowMessage
         if (msg != null) {
@@ -80,6 +144,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     }
     
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        println("DEBUG: onAccessibilityEvent - eventType=" + event?.eventType + ", isBlocked=" + isBlocked + ", trackedApps=" + trackedAppNames)
         var pkg = event?.packageName?.toString()
         if (isIgnoredPackage(pkg)) {
             // Fallback: try active window root
@@ -117,25 +182,52 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         
         // Check if the current foreground app is one of the tracked apps
         val isTrackedApp = trackedAppNames.any { appName ->
-            val expectedPackage = when (appName.lowercase()) {
+            val normalized = appName.trim()
+            // If it looks like a package name (has a dot), compare directly
+            if (normalized.contains('.')) {
+                return@any packageName == normalized
+            }
+            // Map common names to package IDs
+            val expectedPackage = when (normalized.lowercase()) {
                 "chrome" -> "com.android.chrome"
                 "youtube" -> "com.google.android.youtube"
                 "messages" -> "com.google.android.apps.messaging"
                 "gmail" -> "com.google.android.gm"
                 "whatsapp" -> "com.whatsapp"
                 "youtube music" -> "com.google.android.apps.youtube.music"
-                else -> appName.lowercase().replace(" ", "")
+                else -> null
             }
-            packageName == expectedPackage
+            if (expectedPackage != null) {
+                packageName == expectedPackage
+            } else {
+                // Last resort: loose match by substring
+                packageName.contains(normalized.lowercase())
+            }
         }
         
         println("DEBUG: checkAndShowOverlayForApp - isTrackedApp: $isTrackedApp for package: $packageName")
         
         if (isTrackedApp) {
-            // User is trying to use a tracked app while blocked, show overlay immediately
-            println("DEBUG: checkAndShowOverlayForApp - showing overlay for blocked tracked app: $packageName")
-            val message = "Take a mindful pause - you've reached your time limit of"
-            showOverlay(message)
+            // User is trying to use a tracked app while blocked, show PauseOverlayActivity to ensure full screen UI
+            println("DEBUG: checkAndShowOverlayForApp - launching PauseOverlayActivity for blocked tracked app: $packageName")
+            val message = if (timeLimitMinutes > 0) {
+                "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
+            } else {
+                "Take a mindful pause"
+            }
+            try {
+                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    putExtra("message", message)
+                }
+                startActivity(intent)
+                // Also ensure any accessibility overlay is hidden to avoid stacking
+                hideOverlay()
+            } catch (e: Exception) {
+                println("DEBUG: checkAndShowOverlayForApp - error launching PauseOverlayActivity: ${e.message}")
+                // Fallback to accessibility overlay if activity launch fails
+                showOverlay(message)
+            }
         }
     }
 
@@ -150,20 +242,39 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val hideFilter = IntentFilter("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY")
 
             println("DEBUG: registerOverlayReceiver - registering receivers")
-            registerReceiver(object : BroadcastReceiver() {
+            val showReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     println("DEBUG: receiver SHOW_BLOCKING_OVERLAY received - intent=$intent")
                     val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
-                    showOverlay(message)
+                    try {
+                        val activityIntent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            putExtra("message", message)
+                        }
+                        startActivity(activityIntent)
+                        // Ensure any accessibility overlay is hidden so only PauseScreen shows
+                        hideOverlay()
+                    } catch (e: Exception) {
+                        println("DEBUG: SHOW_BLOCKING_OVERLAY - failed to launch activity: ${e.message}, falling back to accessibility overlay")
+                        showOverlay(message)
+                    }
                 }
-            }, showFilter)
-
-            registerReceiver(object : BroadcastReceiver() {
+            }
+            val hideReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     println("DEBUG: receiver HIDE_BLOCKING_OVERLAY received - intent=$intent")
                     hideOverlay()
                 }
-            }, hideFilter)
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(showReceiver, showFilter, Context.RECEIVER_NOT_EXPORTED)
+                registerReceiver(hideReceiver, hideFilter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(showReceiver, showFilter)
+                @Suppress("DEPRECATION")
+                registerReceiver(hideReceiver, hideFilter)
+            }
         } catch (_: Exception) {
         }
     }
@@ -262,6 +373,21 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             overlayView = null
             overlayShown = false
             println("DEBUG: hideOverlay - overlay hidden")
+        }
+    }
+
+    private fun loadStateFromPreferences() {
+        try {
+            val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val blocked = prefs.getBoolean(KEY_BLOCKED, false)
+            val trackedCsv = prefs.getString(KEY_TRACKED_APPS, "") ?: ""
+            val timeLimit = prefs.getInt(KEY_TIME_LIMIT, 0)
+            val apps = if (trackedCsv.isBlank()) emptyList() else trackedCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            isBlocked = blocked
+            trackedAppNames = apps
+            timeLimitMinutes = timeLimit
+            println("DEBUG: loadStateFromPreferences - blocked=$blocked, apps=$apps, limit=$timeLimit")
+        } catch (_: Exception) {
         }
     }
 }

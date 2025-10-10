@@ -3,6 +3,8 @@ package com.luminoprisma.scrollpause
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.ComponentName
+import android.provider.Settings
 
 class OverlayCommandReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
@@ -13,21 +15,20 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                 val message = intent.getStringExtra("message") ?: "Take a mindful pause"
                 println("DEBUG: OverlayCommandReceiver - SHOW received, message='$message'")
                 ForegroundAppAccessibilityService.setPendingShow(message)
-                // Fallback: launch blocking activity to ensure user sees overlay
-                try {
-                    if (context != null) {
-                        println("DEBUG: OverlayCommandReceiver - launching PauseOverlayActivity")
+                // Only if accessibility service is NOT enabled, fall back to activity overlay
+                if (context != null && !isAccessibilityServiceEnabled(context)) {
+                    try {
+                        println("DEBUG: OverlayCommandReceiver - accessibility disabled, launching PauseOverlayActivity fallback")
                         val activityIntent = Intent(context, PauseOverlayActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             putExtra("message", message)
                         }
                         context.startActivity(activityIntent)
-                        println("DEBUG: OverlayCommandReceiver - PauseOverlayActivity launched successfully")
-                    } else {
-                        println("DEBUG: OverlayCommandReceiver - context is null, cannot launch activity")
+                    } catch (e: Exception) {
+                        println("DEBUG: OverlayCommandReceiver - fallback launch error: ${e.message}")
                     }
-                } catch (e: Exception) {
-                    println("DEBUG: OverlayCommandReceiver - error launching activity: ${e.message}")
+                } else {
+                    println("DEBUG: OverlayCommandReceiver - accessibility enabled, relying on TYPE_ACCESSIBILITY_OVERLAY")
                 }
             }
             "com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY" -> {
@@ -42,6 +43,19 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                 // Just hide the overlay for now
                 ForegroundAppAccessibilityService.setPendingHide()
             }
+        }
+    }
+
+    private fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        return try {
+            val expected = ComponentName(context, ForegroundAppAccessibilityService::class.java)
+            val enabled = Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            enabled.split(":").any { it.equals(expected.flattenToString(), ignoreCase = true) }
+        } catch (_: Exception) {
+            false
         }
     }
 }

@@ -2,7 +2,11 @@ package com.luminoprisma.scrollpause
 
 import MainView
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,6 +75,42 @@ class MainActivity : AppCompatActivity() {
             isDismissing = false
             println("DEBUG: MainActivity - resetDismissingStateIfNeeded: reset dismissing state to false")
         }
+    }
+
+    // Accessibility & Overlay helpers
+    fun isAccessibilityServiceEnabled(): Boolean {
+        return try {
+            val expected = ComponentName(this, ForegroundAppAccessibilityService::class.java)
+            val enabledServices = Settings.Secure.getString(
+                contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ) ?: return false
+            enabledServices.split(":").any { it.equals(expected.flattenToString(), ignoreCase = true) }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    fun openAccessibilitySettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: Exception) {
+        }
+    }
+
+    fun showBlockingOverlay(message: String) {
+        val intent = Intent("com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY").apply {
+            setPackage(packageName)
+            putExtra("message", message)
+        }
+        sendBroadcast(intent)
+    }
+
+    fun hideBlockingOverlay() {
+        val intent = Intent("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY").apply {
+            setPackage(packageName)
+        }
+        sendBroadcast(intent)
     }
 
 }

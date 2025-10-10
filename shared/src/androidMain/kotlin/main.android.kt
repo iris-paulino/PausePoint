@@ -150,6 +150,25 @@ actual fun startUsageTracking(
     limitMinutes: Int,
     onLimitReached: () -> Unit
 ) {
+    // Enforce accessibility service requirement before starting tracking
+    val activity = currentActivityRef?.get()
+    val accessibilityEnabled = isAccessibilityServiceEnabled()
+    println("DEBUG: startUsageTracking - accessibilityEnabled=$accessibilityEnabled, packages=$trackedPackages, limit=$limitMinutes")
+    if (!accessibilityEnabled) {
+        // Inform user and route to settings; do not start tracking
+        try {
+            if (activity != null) {
+                android.widget.Toast.makeText(
+                    activity,
+                    "Enable Accessibility for ScrollPause to start tracking.",
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
+        } catch (_: Exception) {}
+        openAccessibilitySettings()
+        return
+    }
+
     // TODO: Implement using UsageStatsManager/AccessibilityService for real app usage tracking.
     // For now, this is a placeholder that would need proper Android permissions and implementation.
     // The actual tracking logic is handled in the common code with session-based timing.
@@ -387,6 +406,25 @@ actual fun setOnDismissCallback(callback: (() -> Unit)?) {
 actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
     println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
     try {
+        // Persist state so the AccessibilityService can restore it after app UI is killed
+        val activity = currentActivityRef?.get()
+        if (activity != null) {
+            try {
+                val prefs = activity.applicationContext.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                val csv = trackedAppNames.joinToString(",")
+                prefs.edit()
+                    .putBoolean("blocked", isBlocked)
+                    .putString("tracked_apps_csv", csv)
+                    .putInt("time_limit_minutes", timeLimitMinutes)
+                    .apply()
+                println("DEBUG: updateAccessibilityServiceBlockedState - persisted to SharedPreferences: blocked=$isBlocked, apps=$csv, limit=$timeLimitMinutes")
+            } catch (e: Exception) {
+                println("DEBUG: updateAccessibilityServiceBlockedState - prefs persist error: ${e.message}")
+            }
+        } else {
+            println("DEBUG: updateAccessibilityServiceBlockedState - no activity to persist prefs")
+        }
+
         // Use reflection to call the accessibility service method safely
         val serviceClass = Class.forName("com.luminoprisma.scrollpause.ForegroundAppAccessibilityService")
         val companionClass = serviceClass.getDeclaredClasses().find { it.simpleName == "Companion" }

@@ -3716,6 +3716,18 @@ private fun AppSelectionScreen(
     onContinue: () -> Unit,
     onBack: () -> Unit
 ) {
+    var searchQuery by remember { mutableStateOf("") }
+    
+    // Filter apps based on search query
+    val filteredApps = if (searchQuery.isBlank()) {
+        availableApps
+    } else {
+        availableApps.filter { app ->
+            app.name.contains(searchQuery, ignoreCase = true) ||
+            app.category.contains(searchQuery, ignoreCase = true)
+        }
+    }
+    
     val selectedCount = availableApps.count { it.isSelected }
     
     // Show loading state if apps are being loaded
@@ -3784,12 +3796,39 @@ private fun AppSelectionScreen(
         
         Spacer(Modifier.height(16.dp))
         
+        // Search field
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            modifier = Modifier.fillMaxWidth(),
+            placeholder = {
+                Text(
+                    "Search apps...",
+                    color = Color(0xFF9CA3AF),
+                    fontSize = 16.sp
+                )
+            },
+            textStyle = androidx.compose.ui.text.TextStyle(
+                color = Color.White,
+                fontSize = 16.sp
+            ),
+            colors = TextFieldDefaults.outlinedTextFieldColors(
+                focusedBorderColor = Color(0xFF1E3A5F),
+                unfocusedBorderColor = Color(0xFF4B5563),
+                cursorColor = Color(0xFF1E3A5F)
+            ),
+            shape = RoundedCornerShape(12.dp),
+            singleLine = true
+        )
+        
+        Spacer(Modifier.height(16.dp))
+        
         // Apps list
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            items(availableApps) { app ->
+            items(filteredApps) { app ->
                 AppSelectionItem(
                     app = app,
                     onToggle = { onAppToggle(app.packageName) }
@@ -3803,7 +3842,7 @@ private fun AppSelectionScreen(
         Button(
             onClick = onContinue,
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF1E3A5F)),
             shape = RoundedCornerShape(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
@@ -3813,6 +3852,9 @@ private fun AppSelectionScreen(
                 fontWeight = FontWeight.Bold
             )
         }
+        
+        // Spacer to prevent blocking by Samsung native buttons
+        Spacer(Modifier.height(LocalConfiguration.current.screenHeightDp.dp / 16))
     }
 }
 
@@ -3863,7 +3905,7 @@ private fun AppSelectionItem(
                 modifier = Modifier
                     .size(48.dp, 28.dp)
                     .background(
-                        color = if (app.isSelected) Color(0xFF4CAF50) else Color(0xFF4B5563),
+                        color = if (app.isSelected) Color(0xFF1E3A5F) else Color(0xFF4B5563),
                         shape = RoundedCornerShape(14.dp)
                     )
                     .clickable { onToggle() },

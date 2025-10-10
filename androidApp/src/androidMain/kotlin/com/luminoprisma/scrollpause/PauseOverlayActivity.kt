@@ -26,6 +26,7 @@ import dismissAndContinueTracking
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import android.view.WindowManager
 
 class PauseOverlayActivity : ComponentActivity() {
     private val hideReceiver = object : BroadcastReceiver() {
@@ -66,6 +67,19 @@ class PauseOverlayActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Ensure this overlay-style activity reliably appears on top
+        try {
+            window.addFlags(
+                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+            )
+            window.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT
+            )
+        } catch (_: Exception) {}
+
         val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
 
         // Register receiver to close when HIDE is sent
@@ -104,6 +118,19 @@ class PauseOverlayActivity : ComponentActivity() {
     override fun onDestroy() {
         try { unregisterReceiver(hideReceiver) } catch (_: Exception) {}
         super.onDestroy()
+    }
+}
+
+// Helper to start this activity robustly from any Context (e.g., service)
+internal fun startPauseOverlayActivity(ctx: Context, message: String?) {
+    try {
+        val i = Intent(ctx, PauseOverlayActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (!message.isNullOrEmpty()) putExtra("message", message)
+        }
+        ctx.startActivity(i)
+    } catch (e: Exception) {
+        println("DEBUG: startPauseOverlayActivity - error: ${e.message}")
     }
 }
 
