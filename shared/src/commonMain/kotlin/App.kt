@@ -2239,7 +2239,7 @@ private fun AppRoot() {
                     
                     // Days without doomscrolling text
                     Text(
-                        "days without doomscrolling",
+                        if (dayStreakCounter == 1) "day without doomscrolling" else "days without doomscrolling",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
@@ -2403,14 +2403,14 @@ private fun QrGeneratorScreen(
     QrGeneratorContent(
         message = message,
         onMessageChange = onMessageChange,
-        onDownloadPdf = { text ->
+        onDownloadPdf = { text, pauseId ->
             // Save a PDF using a platform stub and then continue
             val filePath = saveQrPdf(qrText = text, message = message)
             
             // Save the QR code to storage for later validation
             coroutineScope.launch {
                 val qrCode = SavedQrCode(
-                    id = "pause-${kotlin.random.Random.nextLong()}",
+                    id = pauseId,
                     qrText = text,
                     message = message,
                     createdAt = getCurrentTimeMillis(),
@@ -2742,7 +2742,7 @@ private fun OnboardingPager(
 private fun QrGeneratorContent(
     message: String,
     onMessageChange: (String) -> Unit,
-    onDownloadPdf: (String) -> Unit,
+    onDownloadPdf: (String, String) -> Unit,
     onGenerate: () -> Unit,
     onClose: () -> Unit,
     isSetupMode: Boolean,
@@ -2755,7 +2755,10 @@ private fun QrGeneratorContent(
     var downloadSuccess by remember { mutableStateOf(false) }
     var showAccountabilityDialog by remember { mutableStateOf(false) }
     var isFirstVisit by remember { mutableStateOf(true) }
-    val qrText = remember(message, qrVersion) { "QR:$message:v$qrVersion" }
+    
+    // Generate a unique pause ID for this session
+    var pauseId by remember { mutableStateOf("pause-${kotlin.random.Random.nextLong()}") }
+    val qrText = remember(pauseId, qrVersion) { "QR:$pauseId:v$qrVersion" }
 
     // Check if this is the first visit
     LaunchedEffect(Unit) {
@@ -2843,7 +2846,7 @@ private fun QrGeneratorContent(
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("ID: pause-${kotlin.random.Random.nextLong().toString().takeLast(6)}...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
+                        Text("ID: ${pauseId.takeLast(6)}...", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                         Spacer(Modifier.width(8.dp))
                         Text("⧉", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                     }
@@ -2853,6 +2856,8 @@ private fun QrGeneratorContent(
                     // Generate New QR Code Button inside the card
                     Button(
                         onClick = { 
+                            // Generate a new pause ID for a new QR code
+                            pauseId = "pause-${kotlin.random.Random.nextLong()}"
                             qrVersion++
                             hasGeneratedQr = true
                             downloadSuccess = false
@@ -2911,7 +2916,7 @@ private fun QrGeneratorContent(
                     onClose()
                 } else {
                     // Download PDF first
-                    onDownloadPdf(qrText)
+                    onDownloadPdf(qrText, pauseId)
                     downloadSuccess = true
                 }
             },
@@ -3973,6 +3978,8 @@ fun PauseScreen(
                     Text("Get up and scan your printed QR code", color = Color(0xFFE3F2FD), fontSize = 12.sp)
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
 
             Text(
                 text = "× Dismiss",

@@ -330,6 +330,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     }
                 }
             }
+
+
             val dismissBtn = Button(this).apply {
                 text = "Dismiss"
                 setOnClickListener { 
