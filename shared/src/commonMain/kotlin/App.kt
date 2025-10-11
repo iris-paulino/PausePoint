@@ -1576,6 +1576,7 @@ private fun AppRoot() {
             PauseScreen(
                 durationText = durationText,
                 timeLimitMinutes = timeLimitMinutes,
+                dayStreakCounter = dayStreakCounter,
                 onScanQr = {
                     coroutineScope.launch {
                         val ok = scanQrAndDismiss(qrMessage)
@@ -2928,8 +2929,6 @@ private fun QrGeneratorContent(
             contentPadding = PaddingValues(vertical = 16.dp),
             enabled = hasGeneratedQr
         ) {
-            Text(if (downloadSuccess) "✓" else "↓", color = Color.White)
-            Spacer(Modifier.width(8.dp))
             Text(
                 if (downloadSuccess) {
                     if (isSetupMode) "Continue" else "Go to Dashboard"
@@ -3885,6 +3884,7 @@ private fun SavedQrCodesScreen(
 fun PauseScreen(
     durationText: String,
     timeLimitMinutes: Int,
+    dayStreakCounter: Int,
     onScanQr: () -> Unit,
     onClose: () -> Unit
 ) {
@@ -3981,11 +3981,33 @@ fun PauseScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            Text(
-                text = "× Dismiss",
-                color = Color(0xFF9CA3AF),
-                modifier = Modifier.clickable { onClose() }
-            )
+            Button(
+                onClick = onClose,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF6B7280)),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("× Dismiss", color = Color.White, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
+                    if (dayStreakCounter > 0) {
+                        Text(
+                            "[You will lose your doomscroll-free streak\nand have to watch ads!]",
+                            color = Color(0xFFE5E7EB),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    } else {
+                        Text(
+                            "[You will have to watch ads!]",
+                            color = Color(0xFFE5E7EB),
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -4412,7 +4434,7 @@ private fun DurationSettingScreen(
     onCompleteSetup: () -> Unit,
     onBack: () -> Unit
 ) {
-    val quickSelectOptions = listOf(5, 10, 15, 45, 60, 90)
+    val quickSelectOptions = listOf(5, 10, 15, 45, 60)
     
     Column(
         modifier = Modifier

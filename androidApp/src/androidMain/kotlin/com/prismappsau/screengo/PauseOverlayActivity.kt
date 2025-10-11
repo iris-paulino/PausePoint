@@ -129,12 +129,14 @@ private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLau
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
     var restartTrackingOnUnlock by remember { mutableStateOf(false) }
+    var dayStreakCounter by remember { mutableStateOf(0) }
 
     // Initialize preference from storage so overlay matches main app
     LaunchedEffect(Unit) {
         try {
             val storage = createAppStorage()
             restartTrackingOnUnlock = storage.getAutoRestartOnDismiss()
+            dayStreakCounter = storage.getDayStreakCounter()
         } catch (_: Exception) {}
     }
 
@@ -165,6 +167,7 @@ private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLau
     PauseScreen(
         durationText = durationText,
         timeLimitMinutes = limit,
+        dayStreakCounter = dayStreakCounter,
         onScanQr = {
             setQrScanningActive(true)
             // Persist scanning state for receivers to honor
