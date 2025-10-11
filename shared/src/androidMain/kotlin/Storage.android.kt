@@ -27,6 +27,8 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
     private val DO_NOT_SHOW_CONGRATS_KEY = "do_not_show_congratulation_again"
     private val DO_NOT_SHOW_DISMISS_KEY = "do_not_show_dismiss_again"
     private val AUTO_RESTART_ON_DISMISS_KEY = "auto_restart_on_dismiss"
+    private val DAY_STREAK_COUNTER_KEY = "day_streak_counter"
+    private val LAST_STREAK_UPDATE_DAY_KEY = "last_streak_update_day"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -343,6 +345,38 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
         } catch (_: Exception) {}
     }
 
+    override suspend fun saveDayStreakCounter(count: Int) {
+        try {
+            prefs.edit().putInt(DAY_STREAK_COUNTER_KEY, count).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getDayStreakCounter(): Int {
+        return try {
+            prefs.getInt(DAY_STREAK_COUNTER_KEY, 0)
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveLastStreakUpdateDay(epochDay: Long) {
+        try {
+            prefs.edit().putLong(LAST_STREAK_UPDATE_DAY_KEY, epochDay).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getLastStreakUpdateDay(): Long {
+        return try {
+            prefs.getLong(LAST_STREAK_UPDATE_DAY_KEY, 0L)
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
     override suspend fun saveQrGeneratorVisited(visited: Boolean) {
         try {
             prefs.edit().putBoolean(QR_GENERATOR_VISITED_KEY, visited).apply()
@@ -633,6 +667,22 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getQrGeneratorVisited(): Boolean {
         return false
+    }
+
+    override suspend fun saveDayStreakCounter(count: Int) {
+        // No-op for fallback
+    }
+
+    override suspend fun getDayStreakCounter(): Int {
+        return 0
+    }
+
+    override suspend fun saveLastStreakUpdateDay(epochDay: Long) {
+        // No-op for fallback
+    }
+
+    override suspend fun getLastStreakUpdateDay(): Long {
+        return 0L
     }
 }
 

@@ -25,6 +25,8 @@ class IOSAppStorage : AppStorage {
     private val doNotShowCongratsKey = "do_not_show_congratulation_again"
     private val doNotShowDismissKey = "do_not_show_dismiss_again"
     private val autoRestartOnDismissKey = "auto_restart_on_dismiss"
+    private val dayStreakCounterKey = "day_streak_counter"
+    private val lastStreakUpdateDayKey = "last_streak_update_day"
     // Simple JSON serialization without external dependencies
     
     override suspend fun isOnboardingCompleted(): Boolean {
@@ -466,6 +468,40 @@ class IOSAppStorage : AppStorage {
             userDefaults.boolForKey(qrGeneratorVisitedKey)
         } catch (e: Exception) {
             false
+        }
+    }
+
+    override suspend fun saveDayStreakCounter(count: Int) {
+        try {
+            userDefaults.setInteger(count.toLong(), dayStreakCounterKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getDayStreakCounter(): Int {
+        return try {
+            userDefaults.integerForKey(dayStreakCounterKey).toInt()
+        } catch (e: Exception) {
+            0
+        }
+    }
+
+    override suspend fun saveLastStreakUpdateDay(epochDay: Long) {
+        try {
+            userDefaults.setDouble(epochDay.toDouble(), lastStreakUpdateDayKey)
+            userDefaults.synchronize()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
+    override suspend fun getLastStreakUpdateDay(): Long {
+        return try {
+            userDefaults.doubleForKey(lastStreakUpdateDayKey).toLong()
+        } catch (e: Exception) {
+            0L
         }
     }
 }

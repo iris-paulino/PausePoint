@@ -237,6 +237,26 @@ interface AppStorage {
      * Persist the user's preference for auto-restarting tracking when dismissing.
      */
     suspend fun saveAutoRestartOnDismiss(autoRestart: Boolean)
+
+    /**
+     * Persist the day streak counter (consecutive days without dismissing)
+     */
+    suspend fun saveDayStreakCounter(count: Int)
+
+    /**
+     * Retrieve the day streak counter. Return 0 if unset.
+     */
+    suspend fun getDayStreakCounter(): Int
+
+    /**
+     * Persist the last day when streak was updated (epoch day)
+     */
+    suspend fun saveLastStreakUpdateDay(epochDay: Long)
+
+    /**
+     * Retrieve the last day when streak was updated. Return 0 if unset.
+     */
+    suspend fun getLastStreakUpdateDay(): Long
 }
 
 /**

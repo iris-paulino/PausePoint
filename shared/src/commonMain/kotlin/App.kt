@@ -73,6 +73,18 @@ import androidx.compose.material.SwitchDefaults
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import kotlin.random.Random
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.PI
 
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -89,6 +101,53 @@ fun AppLogo(
             .clip(RoundedCornerShape(16.dp)),
         contentScale = ContentScale.Fit
     )
+}
+
+@OptIn(ExperimentalResourceApi::class)
+@Composable
+fun BadgeIcon(
+    modifier: Modifier = Modifier,
+    size: Dp = 120.dp,
+    number: Int = 2
+) {
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        // Badge transparent image
+        Image(
+            painter = painterResource("images/badge_transparent.png"),
+            contentDescription = "Achievement Badge",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+        )
+        
+        // Number overlay centered on the badge
+        Text(
+            text = number.toString(),
+            color = Color(0xFF004aad), // Dark blue theme color
+            fontSize = (size * 0.4f).value.sp, // Smaller font size to fit nicely on badge
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+fun getRandomCongratulationMessage(): String {
+    val messages = listOf(
+        "Look at you go! Your legs just got a better workout than your thumbs! 🦵",
+        "Walking to your QR code? You're basically a marathon runner now! 🏃",
+        "Your scrolling thumb is probably wondering where you went! 👍",
+        "Someone's been skipping leg day... but NOT today! 💪",
+        "Breaking News: Local human stands up AND walks. Scientists amazed! 📰",
+        "That QR code didn't scan itself! Well done, movement champion! 🎯",
+        "Your couch is proud of you for leaving it! 🛋️",
+        "Achievement Unlocked: Actually Moving Your Body! 🏆",
+        "Who knew standing could feel this good? (Your body did.) 🌟",
+        "You've earned the right to sit back down... but maybe walk around first? 😄"
+    )
+    return messages[Random.nextInt(messages.size)]
 }
 
 @Composable
@@ -233,6 +292,7 @@ private fun AppRoot() {
     var showUsageAccessDisableConfirmationDialog by remember { mutableStateOf(false) }
     var showAccessibilityDisableConfirmationDialog by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
+    var userManuallyStoppedTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
     
     var availableApps by remember { mutableStateOf<List<AvailableApp>>(emptyList()) }
@@ -268,6 +328,8 @@ private fun AppRoot() {
     var timesUnblockedToday by remember { mutableStateOf(0) }
     // Counter for times dismissed today
     var timesDismissedToday by remember { mutableStateOf(0) }
+    // Counter for consecutive days without dismissing
+    var dayStreakCounter by remember { mutableStateOf(0) }
     var isSetupMode by remember { mutableStateOf(false) }
 
     // Load persisted preferences on first composition
@@ -349,13 +411,30 @@ private fun AppRoot() {
         sessionCreditedMinutes = emptyMap()
         sessionElapsedSeconds = 0L
         timesUnblockedToday += 1
-        // Save the incremented times walked counter to storage
+        
+        // Update day streak counter logic
+        val todayEpochDay = currentEpochDayUtc()
+        
+        // Save the incremented times walked counter to storage and update day streak
         coroutineScope.launch {
             try {
+                val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
+                
+                // Only increment day streak if this is the first QR scan of a new day
+                if (lastStreakUpdateDay != todayEpochDay) {
+                    dayStreakCounter += 1
+                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter")
+                } else {
+                    println("DEBUG: handleQrScanSuccess - day streak remains: $dayStreakCounter (same day)")
+                }
+                
                 storage.saveTimesUnblockedToday(timesUnblockedToday)
+                storage.saveDayStreakCounter(dayStreakCounter)
+                storage.saveLastStreakUpdateDay(todayEpochDay)
                 println("DEBUG: handleQrScanSuccess - saved times walked to storage: $timesUnblockedToday")
+                println("DEBUG: handleQrScanSuccess - saved day streak to storage: $dayStreakCounter")
             } catch (e: Exception) {
-                println("DEBUG: handleQrScanSuccess - error saving times walked: ${e.message}")
+                println("DEBUG: handleQrScanSuccess - error saving counters: ${e.message}")
             }
         }
         route = Route.Dashboard
@@ -670,6 +749,25 @@ private fun AppRoot() {
                 }
                 // Show notification to user
                 showAccessibilityDisabledNotification()
+            } else if (isEnabled && !isTracking && !userManuallyStoppedTracking) {
+                // Check if both permissions are now granted and auto-start tracking
+                val usageAccessGranted = isUsageAccessPermissionGranted()
+                coroutineScope.launch {
+                    val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+                    println("DEBUG: Accessibility enabled - checking for auto-start. Usage access granted: $usageAccessGranted, usage pref allowed: $usagePrefAllowed")
+                    
+                    if (usageAccessGranted && usagePrefAllowed && trackedApps.isNotEmpty()) {
+                        // Check if we have QR codes (either current or saved)
+                        val hasAnySavedQr = withTimeoutOrNull(2000) {
+                            storage.getSavedQrCodes().isNotEmpty()
+                        } ?: false
+                        
+                        if (!qrId.isNullOrBlank() || hasAnySavedQr) {
+                            println("DEBUG: Both permissions granted and prerequisites met - auto-starting tracking")
+                            pendingStartTracking = true
+                        }
+                    }
+                }
             }
         }
         
@@ -696,6 +794,24 @@ private fun AppRoot() {
                 }
                 // Show notification to user
                 showUsageAccessDisabledNotification()
+            } else if (isGranted && !isTracking && !userManuallyStoppedTracking) {
+                // Check if both permissions are now granted and auto-start tracking
+                val accessibilityEnabled = isAccessibilityServiceEnabled()
+                println("DEBUG: Usage access granted - checking for auto-start. Accessibility enabled: $accessibilityEnabled")
+                
+                if (accessibilityEnabled && trackedApps.isNotEmpty()) {
+                    coroutineScope.launch {
+                        // Check if we have QR codes (either current or saved)
+                        val hasAnySavedQr = withTimeoutOrNull(2000) {
+                            storage.getSavedQrCodes().isNotEmpty()
+                        } ?: false
+                        
+                        if (!qrId.isNullOrBlank() || hasAnySavedQr) {
+                            println("DEBUG: Both permissions granted and prerequisites met - auto-starting tracking")
+                            pendingStartTracking = true
+                        }
+                    }
+                }
             }
         }
         
@@ -792,9 +908,25 @@ private fun AppRoot() {
 
                     // 2) Increment and persist times walked counter
                     println("DEBUG: QR scan callback - incremented times walked to: $timesUnblockedToday")
+                    
+                    // 2.5) Update day streak counter logic
+                    val todayEpochDay = currentEpochDayUtc()
+                    val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
+                    
+                    // Only increment day streak if this is the first QR scan of a new day
+                    if (lastStreakUpdateDay != todayEpochDay) {
+                        dayStreakCounter += 1
+                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter")
+                    } else {
+                        println("DEBUG: QR scan callback - day streak remains: $dayStreakCounter (same day)")
+                    }
+                    
                     try {
                         storage.saveTimesUnblockedToday(timesUnblockedToday)
+                        storage.saveDayStreakCounter(dayStreakCounter)
+                        storage.saveLastStreakUpdateDay(todayEpochDay)
                         println("DEBUG: QR scan callback - saved times walked to storage")
+                        println("DEBUG: QR scan callback - saved day streak to storage: $dayStreakCounter")
                     } catch (_: Exception) {}
 
                     val doNotShow = try {
@@ -806,12 +938,10 @@ private fun AppRoot() {
                         showCongratulationDialog = true
                         println("DEBUG: QR scan callback - showing congratulations dialog")
                     } else {
-                        println("DEBUG: QR scan callback - preference set to skip dialog; honoring restart preference")
-                        // Honor stored restart preference
-                        val shouldRestart = try { storage.getAutoRestartOnDismiss() } catch (_: Exception) { false }
-                        if (shouldRestart) {
-                            pendingStartTracking = true
-                        }
+                        println("DEBUG: QR scan callback - preference set to skip dialog; auto-restarting tracking")
+                        // Always auto-restart after QR scan
+                        pendingStartTracking = true
+                        userManuallyStoppedTracking = false
                         route = Route.Dashboard
                     }
                 }
@@ -832,13 +962,19 @@ private fun AppRoot() {
                 timesDismissedToday += 1
                 println("DEBUG: Incremented times dismissed counter to: $timesDismissedToday")
                 
-                // Persist the updated counter
+                // 2.5. Reset day streak counter when dismissing
+                dayStreakCounter = 0
+                println("DEBUG: Reset day streak counter to: $dayStreakCounter")
+                
+                // Persist the updated counters
                 coroutineScope.launch {
                     try { 
                         storage.saveTimesDismissedToday(timesDismissedToday)
+                        storage.saveDayStreakCounter(dayStreakCounter)
                         println("DEBUG: Saved times dismissed counter to storage")
+                        println("DEBUG: Saved reset day streak counter to storage")
                     } catch (e: Exception) {
-                        println("DEBUG: Error saving times dismissed counter: ${e.message}")
+                        println("DEBUG: Error saving counters: ${e.message}")
                     }
                 }
                 
@@ -880,6 +1016,11 @@ private fun AppRoot() {
                 dismissBlockingOverlay()
                 println("DEBUG: Dismissed blocking overlays")
                 
+                // 6. Auto-restart tracking after dismiss
+                pendingStartTracking = true
+                userManuallyStoppedTracking = false
+                println("DEBUG: Auto-restarting tracking after dismiss")
+                
                 println("DEBUG: ===== DISMISS CALLBACK COMPLETED =====")
             }
             
@@ -896,6 +1037,8 @@ private fun AppRoot() {
             val savedBlockedState = withTimeoutOrNull(3000) { storage.getBlockedState() } ?: false
             val savedTimesUnblockedToday = withTimeoutOrNull(3000) { storage.getTimesUnblockedToday() } ?: 0
             val savedTimesDismissedToday = withTimeoutOrNull(3000) { storage.getTimesDismissedToday() } ?: 0
+            val savedDayStreakCounter = withTimeoutOrNull(3000) { storage.getDayStreakCounter() } ?: 0
+            val savedLastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
             val savedSessionAppUsageTimes = withTimeoutOrNull(3000) { storage.getSessionAppUsageTimes() } ?: emptyMap()
             val savedSessionStartTime = withTimeoutOrNull(3000) { storage.getSessionStartTime() } ?: 0L
             val todayEpochDay = currentEpochDayUtc()
@@ -910,9 +1053,16 @@ private fun AppRoot() {
             trackingStartTime = savedTrackingStartTime
             isBlocked = savedBlockedState
             
+            // If we're restoring a tracking state, reset the manual stop flag
+            // This allows auto-start when permissions are granted after app restart
+            if (savedTrackingState) {
+                userManuallyStoppedTracking = false
+            }
+            
             // Restore dashboard counters and session data
             timesUnblockedToday = savedTimesUnblockedToday
             timesDismissedToday = savedTimesDismissedToday
+            dayStreakCounter = savedDayStreakCounter
             sessionAppUsageTimes = savedSessionAppUsageTimes
             sessionStartTime = savedSessionStartTime
             
@@ -936,11 +1086,23 @@ private fun AppRoot() {
                 sessionAppUsageTimes = emptyMap()
                 sessionStartTime = 0L
                 sessionCreditedMinutes = emptyMap()
+                
+                // Check if there's a gap in days that should reset the streak
+                val daysDifference = todayEpochDay - savedUsageDay
+                if (daysDifference > 1) {
+                    // More than 1 day gap: reset day streak
+                    dayStreakCounter = 0
+                    println("DEBUG: Daily reset - gap of $daysDifference days, reset day streak to 0")
+                } else {
+                    println("DEBUG: Daily reset - consecutive day, day streak remains: $dayStreakCounter")
+                }
+                
                 withTimeoutOrNull(2000) {
                     storage.saveAppUsageTimes(appUsageTimes)
                     storage.saveUsageDayEpoch(todayEpochDay)
                     storage.saveTimesUnblockedToday(0)
                     storage.saveTimesDismissedToday(0)
+                    storage.saveDayStreakCounter(dayStreakCounter)
                     storage.saveSessionAppUsageTimes(emptyMap())
                     storage.saveSessionStartTime(0L)
                 }
@@ -1109,12 +1271,27 @@ private fun AppRoot() {
         if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
             val accessibilityAllowed = isAccessibilityServiceEnabled()
             val usageAllowed = isUsageAccessPermissionGranted()
-            // Only prompt for Usage Access if Accessibility is also off
-            if (!accessibilityAllowed && !usageAllowed) {
-                showUsageAccessDialog = true
-            }
-            if (!accessibilityAllowed) {
-                showAccessibilityConsentDialog = true
+            
+            // Check if both permissions are already granted and auto-start tracking
+            if (accessibilityAllowed && usageAllowed && !isTracking && !userManuallyStoppedTracking && trackedApps.isNotEmpty()) {
+                coroutineScope.launch {
+                    val hasAnySavedQr = withTimeoutOrNull(2000) {
+                        storage.getSavedQrCodes().isNotEmpty()
+                    } ?: false
+                    
+                    if (!qrId.isNullOrBlank() || hasAnySavedQr) {
+                        println("DEBUG: Both permissions already granted on dashboard - auto-starting tracking")
+                        pendingStartTracking = true
+                    }
+                }
+            } else {
+                // Show permission dialogs if needed
+                if (!usageAllowed) {
+                    showUsageAccessDialog = true
+                }
+                if (!accessibilityAllowed) {
+                    showAccessibilityConsentDialog = true
+                }
             }
             hasCheckedPermissionsOnDashboardThisLaunch = true
         }
@@ -1172,6 +1349,10 @@ private fun AppRoot() {
         }
         isTracking = !isTracking
         pendingStartTracking = false
+        // Reset manual stop flag when tracking is successfully started
+        if (isTracking) {
+            userManuallyStoppedTracking = false
+        }
         println("DEBUG: Tracking state updated to: $isTracking")
     }
 
@@ -1230,6 +1411,7 @@ private fun AppRoot() {
             sessionAppUsageTimes = sessionAppUsageTimes,
             timesUnblockedToday = timesUnblockedToday,
             timesDismissedToday = timesDismissedToday,
+            dayStreakCounter = dayStreakCounter,
             sessionElapsedSeconds = sessionElapsedSeconds,
             onToggleTracking = { 
                 println("DEBUG: onToggleTracking called, current isTracking: $isTracking")
@@ -1239,10 +1421,12 @@ private fun AppRoot() {
                     if (isTracking) { finalizeSessionUsage() }
                     isTracking = false
                     pendingStartTracking = false
+                    userManuallyStoppedTracking = true
                 } else {
                     // Start tracking - check permissions first
                     println("DEBUG: Starting tracking, setting pendingStartTracking = true")
                     pendingStartTracking = true
+                    userManuallyStoppedTracking = false
                 }
             },
             onOpenQrGenerator = { 
@@ -1600,6 +1784,22 @@ private fun AppRoot() {
                             if (pendingStartTracking) {
                                 // Continue Start Tracking flow
                                 pendingStartTracking = true
+                            } else {
+                                // Check if we should auto-start tracking now that both permissions are granted
+                                val accessibilityEnabled = isAccessibilityServiceEnabled()
+                                if (accessibilityEnabled && !isTracking && !userManuallyStoppedTracking && trackedApps.isNotEmpty()) {
+                                    // Check if we have QR codes (either current or saved)
+                                    coroutineScope.launch {
+                                        val hasAnySavedQr = withTimeoutOrNull(2000) {
+                                            storage.getSavedQrCodes().isNotEmpty()
+                                        } ?: false
+                                        
+                                        if (!qrId.isNullOrBlank() || hasAnySavedQr) {
+                                            println("DEBUG: Both permissions granted via dialog - auto-starting tracking")
+                                            pendingStartTracking = true
+                                        }
+                                    }
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
@@ -1988,87 +2188,102 @@ private fun AppRoot() {
     
     // Congratulatory Dialog
     if (showCongratulationDialog) {
-        androidx.compose.ui.window.Dialog(onDismissRequest = { 
-            showCongratulationDialog = false
-            if (doNotShowCongratulationAgain) {
-                coroutineScope.launch {
-                    storage.saveDoNotShowCongratulationAgain(true)
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { 
+                showCongratulationDialog = false
+                handleQrScanSuccess()
+                // Honor Pause Screen setting
+                pendingStartTracking = restartTrackingOnUnlock
+                if (restartTrackingOnUnlock) {
+                    userManuallyStoppedTracking = false
                 }
-            }
-            handleQrScanSuccess()
-            // Honor Pause Screen setting
-            pendingStartTracking = restartTrackingOnUnlock
-            route = Route.Dashboard
-        }) {
-            Card(
-                backgroundColor = Color(0xFF1A1A1A),
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.padding(16.dp)
+                route = Route.Dashboard
+            },
+            properties = androidx.compose.ui.window.DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+                usePlatformDefaultWidth = false
+            )
+        ) {
+            // Full screen dialog with dark blue background only
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF1A1A1A)) // Dark blue background
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp)
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
+                    // Congratulations title
                     Text(
-                        "🎉 Great Job!",
+                        "Congratulations!",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
-                        modifier = Modifier.fillMaxWidth(),
+                        fontSize = 32.sp,
                         textAlign = TextAlign.Center
+                    )
+                    
+                    Spacer(Modifier.height(32.dp))
+                    
+                    // Badge icon
+                    BadgeIcon(
+                        size = 120.dp,
+                        number = dayStreakCounter
                     )
                     
                     Spacer(Modifier.height(16.dp))
                     
-                    Column {
-                        Text(
-                            "Congratulations on taking a mindful pause from doomscrolling! You've successfully completed your break and can now return to your apps.",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Start
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.clickable { 
-                                doNotShowCongratulationAgain = !doNotShowCongratulationAgain 
-                            }
-                        ) {
-                            RadioButton(
-                                selected = doNotShowCongratulationAgain,
-                                onClick = { doNotShowCongratulationAgain = !doNotShowCongratulationAgain },
-                                colors = RadioButtonDefaults.colors(
-                                    selectedColor = Color(0xFF2C4877),
-                                    unselectedColor = Color(0xFF9CA3AF)
-                                )
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                "Do not show again",
-                                color = Color.White,
-                                fontSize = 14.sp
-                            )
-                        }
-                    }
+                    // Days without doomscrolling text
+                    Text(
+                        "days without doomscrolling",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        textAlign = TextAlign.Center
+                    )
                     
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(32.dp))
                     
-                    // Single dismiss action
-                    TextButton(
+                    // Message subheading with random variation
+                    val congratulationMessage = getRandomCongratulationMessage()
+                    Text(
+                        congratulationMessage,
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                    
+                    Spacer(Modifier.height(48.dp))
+                    
+                    // Back to Dashboard button
+                    Button(
                         onClick = { 
                             showCongratulationDialog = false
-                            if (doNotShowCongratulationAgain) {
-                                coroutineScope.launch {
-                                    storage.saveDoNotShowCongratulationAgain(true)
-                                }
-                            }
-                            // Finalize session and honor Pause Screen setting
+                            // Finalize session and auto-restart tracking
                             handleQrScanSuccess()
-                            pendingStartTracking = restartTrackingOnUnlock
+                            pendingStartTracking = true
+                            userManuallyStoppedTracking = false
                             route = Route.Dashboard
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color(0xFF2C4877) // Lighter blue button
+                        ),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("Dismiss", color = Color.White, textAlign = TextAlign.Center)
+                        Text(
+                            "Back to Dashboard",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
                     }
                 }
             }
@@ -2143,8 +2358,9 @@ private fun AppRoot() {
                             coroutineScope.launch {
                                 try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
                             }
-                            // Use the normal Start Tracking pipeline so we only accrue when foregrounded
+                            // Auto-restart tracking after dismiss
                             pendingStartTracking = true
+                            userManuallyStoppedTracking = false
                             route = Route.Dashboard
                         },
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
@@ -2228,6 +2444,7 @@ private fun DashboardScreen(
     sessionAppUsageTimes: Map<String, Long>,
     timesUnblockedToday: Int,
     timesDismissedToday: Int,
+    dayStreakCounter: Int,
     sessionElapsedSeconds: Long,
     onToggleTracking: () -> Unit,
     onOpenQrGenerator: () -> Unit,
