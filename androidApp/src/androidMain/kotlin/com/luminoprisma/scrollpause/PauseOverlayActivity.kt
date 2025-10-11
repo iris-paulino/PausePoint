@@ -139,6 +139,15 @@ private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLau
     val ctx = LocalContext.current
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
+    var restartTrackingOnUnlock by remember { mutableStateOf(false) }
+
+    // Initialize preference from storage so overlay matches main app
+    LaunchedEffect(Unit) {
+        try {
+            val storage = createAppStorage()
+            restartTrackingOnUnlock = storage.getAutoRestartOnDismiss()
+        } catch (_: Exception) {}
+    }
 
     // Extract time limit from message and set up proper display
     LaunchedEffect(message) {

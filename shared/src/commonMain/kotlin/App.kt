@@ -1,3 +1,4 @@
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +12,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.statusBarsPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -37,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -220,6 +223,7 @@ private fun AppRoot() {
     var showCongratulationDialog by remember { mutableStateOf(false) }
     var doNotShowCongratulationAgain by remember { mutableStateOf(false) }
     var showDismissDialog by remember { mutableStateOf(false) }
+    var restartTrackingOnUnlock by remember { mutableStateOf(false) }
     var doNotShowDismissAgain by remember { mutableStateOf(false) }
     var autoRestartOnDismiss by remember { mutableStateOf(false) }
     var hasShownNotificationsPromptThisLaunch by remember { mutableStateOf(false) }
@@ -240,6 +244,13 @@ private fun AppRoot() {
     fun currentEpochDayUtc(): Long = getCurrentTimeMillis() / 86_400_000L
     val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
+
+    // Load persisted preference for restart-on-unlock so PauseScreen and dialog are consistent
+    LaunchedEffect(Unit) {
+        try {
+            restartTrackingOnUnlock = storage.getAutoRestartOnDismiss()
+        } catch (_: Exception) {}
+    }
     
     var isTracking by remember { mutableStateOf(false) }
     var trackingStartTime by remember { mutableStateOf(0L) }
@@ -795,9 +806,12 @@ private fun AppRoot() {
                         showCongratulationDialog = true
                         println("DEBUG: QR scan callback - showing congratulations dialog")
                     } else {
-                        println("DEBUG: QR scan callback - preference set to skip dialog; restarting tracking")
-                        // Restart tracking immediately
-                        isTracking = true
+                        println("DEBUG: QR scan callback - preference set to skip dialog; honoring restart preference")
+                        // Honor stored restart preference
+                        val shouldRestart = try { storage.getAutoRestartOnDismiss() } catch (_: Exception) { false }
+                        if (shouldRestart) {
+                            pendingStartTracking = true
+                        }
                         route = Route.Dashboard
                     }
                 }
@@ -1982,6 +1996,9 @@ private fun AppRoot() {
                 }
             }
             handleQrScanSuccess()
+            // Honor Pause Screen setting
+            pendingStartTracking = restartTrackingOnUnlock
+            route = Route.Dashboard
         }) {
             Card(
                 backgroundColor = Color(0xFF1A1A1A),
@@ -2035,29 +2052,7 @@ private fun AppRoot() {
                     
                     Spacer(Modifier.height(24.dp))
                     
-                    // Buttons with custom 3dp spacing
-                    Button(
-                        onClick = { 
-                            showCongratulationDialog = false
-                            if (doNotShowCongratulationAgain) {
-                                coroutineScope.launch {
-                                    storage.saveDoNotShowCongratulationAgain(true)
-                                }
-                            }
-                            // Finalize session and clear blocked state, then start normal start flow
-                            handleQrScanSuccess()
-                            pendingStartTracking = true
-                            route = Route.Dashboard
-                        },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Restart Tracking", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    
-                    Spacer(Modifier.height(3.dp))
-                    
+                    // Single dismiss action
                     TextButton(
                         onClick = { 
                             showCongratulationDialog = false
@@ -2066,9 +2061,9 @@ private fun AppRoot() {
                                     storage.saveDoNotShowCongratulationAgain(true)
                                 }
                             }
-                            // Finalize session and remain paused
+                            // Finalize session and honor Pause Screen setting
                             handleQrScanSuccess()
-                            isTracking = false
+                            pendingStartTracking = restartTrackingOnUnlock
                             route = Route.Dashboard
                         },
                         modifier = Modifier.fillMaxWidth()
@@ -2824,7 +2819,72 @@ private fun DashboardContent(
             }
         }
         
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
+        
+        // Tracking State Label
+        if (isTracking) {
+            var animationScale by remember { mutableStateOf(1f) }
+            val infiniteTransition = rememberInfiniteTransition(label = "tracking_pulse")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = EaseInOut),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        scaleX = scale
+                        scaleY = scale
+                    },
+                backgroundColor = Color(0xFF385eff),
+                shape = RoundedCornerShape(12.dp),
+                elevation = 8.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Pulsing dot
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color.White, CircleShape)
+                            .graphicsLayer {
+                                alpha = (scale - 1f) * 2f + 0.5f
+                            }
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = "TRACKING YOUR APPS",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        letterSpacing = 1.sp
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    // Pulsing dot
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color.White, CircleShape)
+                            .graphicsLayer {
+                                alpha = (scale - 1f) * 2f + 0.5f
+                            }
+                    )
+                }
+            }
+        }
+        
+        Spacer(Modifier.height(16.dp))
         
         // Current Status Card
         Card(
@@ -3696,8 +3756,6 @@ fun PauseScreen(
                     Text("Get up and scan your printed QR code", color = Color(0xFFE3F2FD), fontSize = 12.sp)
                 }
             }
-
-            Spacer(Modifier.height(12.dp))
 
             Text(
                 text = "× Dismiss",
