@@ -115,21 +115,22 @@ fun BadgeIcon(
         modifier = modifier.size(size),
         contentAlignment = Alignment.Center
     ) {
-        // Badge transparent image
+        // Badge yellow image
         Image(
-            painter = painterResource("images/badge_transparent.png"),
+            painter = painterResource("images/yellowbadge.png"),
             contentDescription = "Achievement Badge",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Fit
         )
         
-        // Number overlay centered on the badge
+        // Number overlay positioned higher on the badge
         Text(
             text = number.toString(),
             color = Color(0xFF004aad), // Dark blue theme color
             fontSize = (size * 0.4f).value.sp, // Smaller font size to fit nicely on badge
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center
+            textAlign = TextAlign.Center,
+            modifier = Modifier.offset(y = (-size * 0.1f)) // Move text up by 10% of badge size
         )
     }
 }
@@ -2331,7 +2332,7 @@ private fun AppRoot() {
                     
                     // Badge icon
                     BadgeIcon(
-                        size = 120.dp,
+                        size = 150.dp,
                         number = dayStreakCounter
                     )
                     
