@@ -233,7 +233,7 @@ private fun QrDetailScreen(
 }
 
 // Simple navigation and app state holder
-private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, QrDetail, PrivacyPolicy, Permissions }
+private enum class Route { Onboarding, QrGenerator, Dashboard, AppSelection, DurationSetting, Pause, Settings, SavedQrCodes, QrDetail, PrivacyPolicy, Permissions, Tutorial }
 
 // Enable simulated app usage increments for testing; rely on platform-specific tracking instead
 private const val ENABLE_USAGE_SIMULATION: Boolean = true
@@ -1530,7 +1530,8 @@ private fun AppRoot() {
             onOpenSavedQrCodes = { route = Route.SavedQrCodes },
             onNotificationsTurnedOff = { },
             onOpenPrivacyPolicy = { route = Route.PrivacyPolicy },
-            onOpenPermissions = { route = Route.Permissions }
+            onOpenPermissions = { route = Route.Permissions },
+            onOpenTutorial = { route = Route.Tutorial }
         )
         Route.SavedQrCodes -> SavedQrCodesScreen(
             onBack = { route = Route.Settings },
@@ -1679,6 +1680,9 @@ private fun AppRoot() {
             onShowAccessibilityDisableConfirmationDialog = { showAccessibilityDisableConfirmationDialog = true },
             onShowUsageAccessDialog = { showUsageAccessDialog = true }
         )
+        Route.Tutorial -> HowToUseScreen(
+            onBack = { route = Route.Settings }
+        )
     }
     
     // Notification Permission Dialog
@@ -1774,7 +1778,7 @@ private fun AppRoot() {
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Text(
-                        "📈",
+                        "\uD83D\uDCC9",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 36.sp,
@@ -1870,7 +1874,7 @@ private fun AppRoot() {
                     modifier = Modifier.padding(24.dp)
                 ) {
                     Text(
-                        "🧩",
+                        "\uD83D\uDC20",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 36.sp,
@@ -3505,7 +3509,8 @@ private fun SettingsScreen(
     onOpenSavedQrCodes: () -> Unit,
     onNotificationsTurnedOff: () -> Unit,
     onOpenPrivacyPolicy: () -> Unit,
-    onOpenPermissions: () -> Unit
+    onOpenPermissions: () -> Unit,
+    onOpenTutorial: () -> Unit
 ) {
     val storage = remember { createAppStorage() }
     val coroutineScope = rememberCoroutineScope()
@@ -3549,6 +3554,23 @@ private fun SettingsScreen(
                 Text("Saved QR Codes", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 Spacer(Modifier.height(8.dp))
                 Text("Manage, share, and protect your QR codes", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // How to use
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenTutorial() },
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("How to use", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Spacer(Modifier.height(8.dp))
+                Text("Learn how to get the most out of ScrollPause", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
         }
 
@@ -5014,5 +5036,397 @@ fun AccessibilityCard(
             Spacer(Modifier.height(8.dp))
             Text("Permit the app to access accessibility services for enhanced tracking features.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
         }
+    }
+}
+
+@Composable
+private fun HowToUseScreen(
+    onBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF1A1A1A))
+            .statusBarsPadding()
+            .padding(24.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("←", fontSize = 24.sp, color = Color.White, modifier = Modifier.clickable { onBack() })
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text("How to Use ScrollPause", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text("Your guide to digital wellness", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+            }
+        }
+        
+        Spacer(Modifier.height(24.dp))
+
+        // Welcome Section
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🏠", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("Welcome to ScrollPause!", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("ScrollPause helps you build healthier digital habits by encouraging physical movement when you've spent too much time on selected apps.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("Instead of just blocking apps, we coach you to make better choices—one mindful pause at a time.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // How It Works Section
+        Text("How It Works", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        
+        Spacer(Modifier.height(16.dp))
+
+        // Step 1: Generate QR Code
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("\uD83C\uDFAC", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("1. Generate Your QR Code", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Create a QR code and place it somewhere that requires movement—across the room, upstairs, or outside.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("The further away, the more effective!", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Step 2: Select Apps
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("📱", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("2. Select Your Apps", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Choose which apps trigger mindful pauses. Set a duration for how long you can use them before a break is needed.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Start with your most addictive apps first.", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Step 3: Pause Activates
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("⏰", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("3. The Pause Activates", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("When your app time is up, ScrollPause pauses your access and encourages you to take a healthy break.", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("This is your moment to choose wellness!", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Step 4: Scan or Choose Activity
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("\uD83C\uDFAB", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("4. Scan QR code", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Walk to your QR code and scan it. Movement over scrolling!", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Each scan builds your streak!", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Step 5: Build Your Streak
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🔥", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("5. Build Your Streak", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Every day you choose movement over dismissing builds your consecutive days streak. Stay consistent!", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Streaks reset if you dismiss instead of moving.", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Step 6: Celebrate Success
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🏆", fontSize = 24.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Text("6. Celebrate Success", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+                Spacer(Modifier.height(12.dp))
+                Text("Get encouraging messages and track your progress. See your QR scans, estimated steps, and consecutive days!", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                Spacer(Modifier.height(8.dp))
+                Card(
+                    backgroundColor = Color(0xFF3C3C3C),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("💡", fontSize = 16.sp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Your future self will thank you!", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Key Features Section
+        Text("Key Features", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        
+        Spacer(Modifier.height(16.dp))
+
+        // Key Features List
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                // QR Code Movement
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("✓", fontSize = 16.sp, color = Color(0xFF1E3A5F), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("QR Code Movement", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Physical activity required to unlock apps", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+
+                
+                // Trusted Contacts
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("✓", fontSize = 16.sp, color = Color(0xFF1E3A5F), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Trusted Contacts", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Accountability partners to help you stay on track", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Dismiss Tracking
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("✓", fontSize = 16.sp, color = Color(0xFF1E3A5F), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Dismiss Tracking", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("See how often you skip your pauses (resets streaks)", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Pro Tips Section
+        Text("Pro Tips", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        
+        Spacer(Modifier.height(16.dp))
+
+        // Pro Tips Cards
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                // Start small
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("🎯", fontSize = 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Start small", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Begin with just 1-2 apps and 15-minute intervals", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // QR placement
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("📍", fontSize = 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("QR placement", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Put codes where you naturally need to go (kitchen, bathroom)", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Protect streaks
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("🌱", fontSize = 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Protect streaks", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Scan daily to maintain your consecutive days streak", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                // Get support
+                Row(verticalAlignment = Alignment.Top) {
+                    Text("👥", fontSize = 20.sp)
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Get support", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Add trusted contacts for accountability when tempted to dismiss", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        // Common Questions Section
+        Text("Common Questions", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        
+        Spacer(Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                // What happens if I dismiss?
+                Column {
+                    Text("What happens if I dismiss?", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Your streaks reset to zero. The goal is to choose movement instead!", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                }
+                
+                Spacer(Modifier.height(16.dp))
+
+
+                // How do I maintain my streak?
+                Column {
+                    Text("How do I maintain my streak?", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Scan your QR code when pauses activate. Avoid dismissing!", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                // Can I use activities instead of QR codes?
+                Column {
+                    Text("I’m outside and don’t have access to my QR code! I don’t want to lose my streak!", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                    Text("You’ll still lose your streak — but hey, you’re outside! You shouldn't be doomscrolling! Enjoy the moment, the sunshine, and the real world around you \uD83C\uDF3F✨", color = Color(0xFFD1D5DB), fontSize = 14.sp)
+                }
+                
+
+
+            }
+        }
+
+        Spacer(Modifier.height(32.dp))
     }
 }
