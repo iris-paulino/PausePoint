@@ -29,6 +29,7 @@ actual class AdManager(private val context: Context) {
     
     actual fun showInterstitialAd(onAdClosed: () -> Unit, onAdFailedToLoad: () -> Unit) {
         println("DEBUG: showInterstitialAd() called - interstitialAd is ${if (interstitialAd != null) "loaded" else "null"}")
+        println("DEBUG: showInterstitialAd() - context: ${context.packageName}, isInitialized: $isInitialized")
         if (interstitialAd != null) {
             println("DEBUG: Showing interstitial ad")
             interstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
@@ -62,15 +63,21 @@ actual class AdManager(private val context: Context) {
     }
     
     actual fun isAdLoaded(): Boolean {
-        return interstitialAd != null
+        val isLoaded = interstitialAd != null
+        println("DEBUG: isAdLoaded() called - returning: $isLoaded")
+        return isLoaded
     }
     
     actual fun loadAd() {
         println("DEBUG: loadAd() called with adUnitId: $adUnitId")
+        println("DEBUG: AdManager initialized: $isInitialized")
+        println("DEBUG: Context: ${context.packageName}")
+        
         val adRequest = AdRequest.Builder()
             .setRequestAgent("ScrollPause-Android")
             .build()
         
+        println("DEBUG: Starting ad load request...")
         InterstitialAd.load(
             context,
             adUnitId,
@@ -82,6 +89,7 @@ actual class AdManager(private val context: Context) {
                     println("DEBUG: Ad error code: ${adError.code}")
                     println("DEBUG: Ad error domain: ${adError.domain}")
                     println("DEBUG: Ad unit ID: $adUnitId")
+                    println("DEBUG: Response info: ${adError.responseInfo}")
                     
                     // Common error codes and their meanings
                     when (adError.code) {
@@ -95,7 +103,8 @@ actual class AdManager(private val context: Context) {
                 
                 override fun onAdLoaded(ad: InterstitialAd) {
                     interstitialAd = ad
-                    println("DEBUG: Ad loaded successfully")
+                    println("DEBUG: Ad loaded successfully!")
+                    println("DEBUG: Ad response info: ${ad.responseInfo}")
                 }
             }
         )
@@ -106,6 +115,7 @@ actual class AdManager(private val context: Context) {
 private var globalAdManager: AdManager? = null
 
 actual fun createAdManager(): AdManager {
+    println("DEBUG: createAdManager() called - globalAdManager is ${if (globalAdManager != null) "available" else "null"}")
     return globalAdManager ?: throw IllegalStateException("AdManager not initialized. Call initializeAdManager() first.")
 }
 
@@ -115,4 +125,5 @@ fun initializeAdManager(context: Context) {
     println("DEBUG: AdManager instance created")
     globalAdManager?.initialize()
     println("DEBUG: AdManager initialization completed")
+    println("DEBUG: globalAdManager is now: ${if (globalAdManager != null) "available" else "null"}")
 }

@@ -26,6 +26,7 @@ import dismissAndContinueTracking
 import createAdManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.view.WindowManager
 
@@ -84,7 +85,7 @@ class PauseOverlayActivity : ComponentActivity() {
         val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
 
         // Register receiver to close when HIDE is sent
-        val filter = IntentFilter("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY")
+        val filter = IntentFilter("com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN")
         try {
             if (Build.VERSION.SDK_INT >= 33) {
                 registerReceiver(hideReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
@@ -99,9 +100,12 @@ class PauseOverlayActivity : ComponentActivity() {
                 message = message, 
                 onFinish = { 
                     // Show ad before dismissing overlay
+                    println("DEBUG: PauseOverlayActivity - onFinish called, attempting to show ad")
                     try {
                         val adManager = createAdManager()
+                        println("DEBUG: PauseOverlayActivity - AdManager created successfully")
                         if (adManager.isAdLoaded()) {
+                            println("DEBUG: Overlay - Ad is loaded, showing interstitial ad")
                             adManager.showInterstitialAd(
                                 onAdClosed = {
                                     println("DEBUG: Overlay ad completed, dismissing overlay")
@@ -115,9 +119,36 @@ class PauseOverlayActivity : ComponentActivity() {
                                 }
                             )
                         } else {
-                            println("DEBUG: No ad loaded for overlay, dismissing anyway")
-                            dismissAndContinueTracking()
-                            finish()
+                            println("DEBUG: Overlay - No ad loaded, attempting to load and show...")
+                            // Try to load an ad first
+                            adManager.loadAd()
+                            
+                            // Wait a moment for the ad to load, then try to show it
+                            CoroutineScope(Dispatchers.Main).launch {
+                                delay(2000) // Wait 2 seconds for ad to load
+                                val isLoadedAfterWait = adManager.isAdLoaded()
+                                println("DEBUG: Overlay - Ad loaded status after wait: $isLoadedAfterWait")
+                                
+                                if (isLoadedAfterWait) {
+                                    println("DEBUG: Overlay - Ad loaded after wait, showing interstitial ad")
+                                    adManager.showInterstitialAd(
+                                        onAdClosed = {
+                                            println("DEBUG: Overlay ad completed after wait, dismissing overlay")
+                                            dismissAndContinueTracking()
+                                            finish()
+                                        },
+                                        onAdFailedToLoad = {
+                                            println("DEBUG: Overlay ad failed after wait, dismissing anyway")
+                                            dismissAndContinueTracking()
+                                            finish()
+                                        }
+                                    )
+                                } else {
+                                    println("DEBUG: Overlay - Ad still not loaded after wait, dismissing without ad")
+                                    dismissAndContinueTracking()
+                                    finish()
+                                }
+                            }
                         }
                     } catch (e: Exception) {
                         println("DEBUG: Error showing overlay ad: ${e.message}, dismissing anyway")

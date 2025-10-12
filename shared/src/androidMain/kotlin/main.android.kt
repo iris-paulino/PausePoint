@@ -187,15 +187,16 @@ actual fun showBlockingOverlay(message: String) {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
-            // Use broadcast receiver to show the overlay
-            val intent = Intent("com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY").apply {
+            // Instead of showing overlay, redirect to our pause screen
+            val intent = Intent().apply {
+                setClassName(activity.packageName, "com.luminoprisma.scrollpause.PauseOverlayActivity")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra("message", message)
-                setPackage(activity.packageName) // Explicitly set the package
             }
-            activity.sendBroadcast(intent)
-            println("DEBUG: showBlockingOverlay - sent SHOW_BLOCKING_OVERLAY broadcast with package: ${activity.packageName}")
+            activity.startActivity(intent)
+            println("DEBUG: showBlockingOverlay - redirected to PauseOverlayActivity with message: $message")
         } catch (e: Exception) {
-            println("DEBUG: showBlockingOverlay - error sending broadcast: ${e.message}")
+            println("DEBUG: showBlockingOverlay - error redirecting to pause screen: ${e.message}")
         }
     } else {
         println("DEBUG: showBlockingOverlay - no activity available")
@@ -218,14 +219,7 @@ actual fun dismissBlockingOverlay() {
                 println("DEBUG: dismissBlockingOverlay - error setting dismissing state: ${e.message}")
             }
             
-            // Use broadcast receiver to hide the overlay
-            val intent = Intent("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY").apply {
-                setPackage(activity.packageName) // Explicitly set the package
-            }
-            activity.sendBroadcast(intent)
-            println("DEBUG: dismissBlockingOverlay - sent HIDE_BLOCKING_OVERLAY broadcast with package: ${activity.packageName}")
-            
-            // Also send broadcast to finish any running QrScanActivity
+            // Send broadcast to finish any running QrScanActivity
             val qrScanIntent = Intent("com.luminoprisma.scrollpause.FINISH_QR_SCAN_ACTIVITY").apply {
                 setPackage(activity.packageName) // Explicitly set the package
             }
@@ -860,7 +854,7 @@ actual fun isUsageAccessPermissionGranted(): Boolean {
             activity.packageName
         )
         val isGranted = mode == AppOpsManager.MODE_ALLOWED
-        println("DEBUG: isUsageAccessPermissionGranted - mode: $mode, granted: $isGranted")
+        println("DEBUG: isUsageAccessPermissionGranted - mode: $mode, granted: $isGranted, packageName: ${activity.packageName}")
         isGranted
     } catch (e: Exception) {
         println("DEBUG: isUsageAccessPermissionGranted - error: ${e.message}")

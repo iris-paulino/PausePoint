@@ -338,6 +338,17 @@ private fun AppRoot() {
         try {
             autoRestartOnDismiss = storage.getAutoRestartOnDismiss()
         } catch (_: Exception) {}
+        
+        // Preload ads when app starts
+        try {
+            val adManager = createAdManager()
+            println("DEBUG: Preloading ads on app start...")
+            adManager.loadAd()
+        } catch (e: Exception) {
+            println("DEBUG: Error preloading ads: ${e.message}")
+        }
+        
+        // No need to sync with system permissions - app works with internal preference only
     }
 
     // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
@@ -394,7 +405,7 @@ private fun AppRoot() {
         timesDismissedToday += 1
         coroutineScope.launch { try { storage.saveTimesDismissedToday(timesDismissedToday) } catch (_: Exception) {} }
 
-        // Auto-restart tracking after dismiss (from dialog preference)
+        // Auto-restart tracking after dismiss (always restart to allow continued monitoring)
         pendingStartTracking = true
         userManuallyStoppedTracking = false
         
@@ -405,6 +416,18 @@ private fun AppRoot() {
         sessionAppUsageTimes = emptyMap()
         sessionStartTime = 0L
         sessionElapsedSeconds = 0L
+        
+        // Persist reset session data to storage to ensure clean restart
+        coroutineScope.launch {
+            try { 
+                storage.saveSessionAppUsageTimes(emptyMap())
+                storage.saveSessionStartTime(0L)
+                println("DEBUG: Saved reset session data to storage after ad completion")
+            } catch (e: Exception) {
+                println("DEBUG: Error saving reset session data: ${e.message}")
+            }
+        }
+        
         dismissBlockingOverlay()
         
         // Navigate to dashboard
@@ -422,16 +445,6 @@ private fun AppRoot() {
             val isLoaded = adManager.isAdLoaded()
             println("DEBUG: Ad loaded status: $isLoaded")
             
-            // If ad is not loaded, try to load it and show a brief loading message
-            if (!isLoaded) {
-                println("DEBUG: Ad not loaded, attempting to load...")
-                adManager.loadAd()
-                // For now, proceed without ad - in a real app you might want to show a loading dialog
-                println("DEBUG: Proceeding without ad since none was loaded")
-                proceedWithDismiss()
-                return
-            }
-            
             if (isLoaded) {
                 println("DEBUG: Ad is loaded, showing interstitial ad")
                 // Show mandatory ad - user must watch it to proceed
@@ -446,8 +459,33 @@ private fun AppRoot() {
                     }
                 )
             } else {
-                println("DEBUG: No ad loaded, proceeding with dismiss")
-                proceedWithDismiss()
+                println("DEBUG: No ad loaded, attempting to load and show...")
+                // Try to load an ad first, then show it
+                adManager.loadAd()
+                
+                // Wait a moment for the ad to load, then try to show it
+                coroutineScope.launch {
+                    delay(2000) // Wait 2 seconds for ad to load
+                    val isLoadedAfterWait = adManager.isAdLoaded()
+                    println("DEBUG: Ad loaded status after wait: $isLoadedAfterWait")
+                    
+                    if (isLoadedAfterWait) {
+                        println("DEBUG: Ad loaded after wait, showing interstitial ad")
+                        adManager.showInterstitialAd(
+                            onAdClosed = {
+                                println("DEBUG: Mandatory ad completed after wait, proceeding with dismiss")
+                                proceedWithDismiss()
+                            },
+                            onAdFailedToLoad = {
+                                println("DEBUG: Ad failed to show after wait, proceeding with dismiss anyway")
+                                proceedWithDismiss()
+                            }
+                        )
+                    } else {
+                        println("DEBUG: Ad still not loaded after wait, proceeding without ad")
+                        proceedWithDismiss()
+                    }
+                }
             }
         } catch (e: Exception) {
             println("DEBUG: Error showing ad: ${e.message}, proceeding with dismiss")
@@ -477,6 +515,17 @@ private fun AppRoot() {
         sessionCreditedMinutes = emptyMap()
         sessionElapsedSeconds = 0L
         timesUnblockedToday += 1
+        
+        // Persist reset session data to storage to ensure clean restart
+        coroutineScope.launch {
+            try { 
+                storage.saveSessionAppUsageTimes(emptyMap())
+                storage.saveSessionStartTime(0L)
+                println("DEBUG: Saved reset session data to storage after QR scan success")
+            } catch (e: Exception) {
+                println("DEBUG: Error saving reset session data after QR scan: ${e.message}")
+            }
+        }
         
         // Update day streak counter logic
         val todayEpochDay = currentEpochDayUtc()
@@ -589,8 +638,14 @@ private fun AppRoot() {
 
     // Function to update usage for currently active app
     fun updateCurrentAppUsage() {
-        if (!isTracking || route == Route.Pause || isBlocked) return
-        if (currentForegroundApp == null || appActiveSince == 0L) return
+        if (!isTracking || route == Route.Pause || isBlocked) {
+            println("DEBUG: updateCurrentAppUsage - not tracking: isTracking=$isTracking, route=$route, isBlocked=$isBlocked")
+            return
+        }
+        if (currentForegroundApp == null || appActiveSince == 0L) {
+            println("DEBUG: updateCurrentAppUsage - no app or time: currentForegroundApp=$currentForegroundApp, appActiveSince=$appActiveSince")
+            return
+        }
         
         val currentTime = getCurrentTimeMillis()
         val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
@@ -695,6 +750,7 @@ private fun AppRoot() {
                 // Check if session usage has reached the limit based on actual accumulated session usage
                 val totalSessionSeconds = sessionAppUsageTimes.values.sum()
                 val usedMinutes = (totalSessionSeconds / 60L).toInt()
+                println("DEBUG: Time limit check - usedMinutes: $usedMinutes, timeLimitMinutes: $timeLimitMinutes, sessionAppUsageTimes: $sessionAppUsageTimes")
                 if (usedMinutes >= timeLimitMinutes) {
                     // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
                     finalizeSessionUsage()
@@ -716,6 +772,7 @@ private fun AppRoot() {
 
     // Function to handle app changes and update usage times
     fun handleAppChange(newPackageName: String?) {
+        println("DEBUG: handleAppChange called - newPackageName: $newPackageName, isTracking: $isTracking, route: $route, isBlocked: $isBlocked")
         if (!isTracking || route == Route.Pause || isBlocked) return
         
         val currentTime = getCurrentTimeMillis()
@@ -771,6 +828,7 @@ private fun AppRoot() {
         // Update current app tracking
         currentForegroundApp = newPackageName
         appActiveSince = currentTime
+        println("DEBUG: handleAppChange - set currentForegroundApp: $newPackageName, appActiveSince: $currentTime")
         
         // If the dashboard app itself is the foreground app, do not accrue usage for any apps
         val isDashboardAppForeground = newPackageName != null && (
@@ -817,12 +875,11 @@ private fun AppRoot() {
                 showAccessibilityDisabledNotification()
             } else if (isEnabled && !isTracking && !userManuallyStoppedTracking) {
                 // Check if both permissions are now granted and auto-start tracking
-                val usageAccessGranted = isUsageAccessPermissionGranted()
                 coroutineScope.launch {
                     val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-                    println("DEBUG: Accessibility enabled - checking for auto-start. Usage access granted: $usageAccessGranted, usage pref allowed: $usagePrefAllowed")
+                    println("DEBUG: Accessibility enabled - checking for auto-start. Usage pref allowed: $usagePrefAllowed")
                     
-                    if (usageAccessGranted && usagePrefAllowed && trackedApps.isNotEmpty()) {
+                    if (usagePrefAllowed && trackedApps.isNotEmpty()) {
                         // Check if we have QR codes (either current or saved)
                         val hasAnySavedQr = withTimeoutOrNull(2000) {
                             storage.getSavedQrCodes().isNotEmpty()
@@ -1375,8 +1432,10 @@ private fun AppRoot() {
         val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
         println("DEBUG: StartTracking checks - accessibility: $accessibilityAllowed, usagePref: $usagePrefAllowed")
         var showedAnyDialog = false
+        
+        // Only check internal preference - don't require system permission
         if (!usagePrefAllowed) {
-            println("DEBUG: Usage access preference off, showing dialog")
+            println("DEBUG: Usage access preference off, showing dialog - usagePrefAllowed: $usagePrefAllowed")
             showUsageAccessDialog = true
             showedAnyDialog = true
         }
@@ -1418,6 +1477,7 @@ private fun AppRoot() {
         // Reset manual stop flag when tracking is successfully started
         if (isTracking) {
             userManuallyStoppedTracking = false
+            println("DEBUG: *** TRACKING RESTARTED *** sessionStartTime: $sessionStartTime, sessionAppUsageTimes: $sessionAppUsageTimes")
         }
         println("DEBUG: Tracking state updated to: $isTracking")
     }
@@ -4324,7 +4384,7 @@ private fun PrivacyPolicyScreen(
                     color = Color.White
                 )
                 Text(
-                    "Last updated: December 2024",
+                    "Last updated: January 2025",
                     fontSize = 14.sp,
                     color = Color(0xFFD1D5DB)
                 )
@@ -4369,7 +4429,8 @@ private fun PrivacyPolicyScreen(
                     "• App Usage Data: We track which apps you use and for how long to help you manage your digital pause\n" +
                     "• Device Information: Basic device information necessary for app functionality\n" +
                     "• QR Code Data: QR codes you generate and scan for pause functionality\n" +
-                    "• Settings Preferences: Your app settings and preferences",
+                    "• Settings Preferences: Your app settings and preferences\n" +
+                    "• Device Identifiers: For advertising purposes through Google AdMob",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -4387,8 +4448,9 @@ private fun PrivacyPolicyScreen(
                 Text(
                     "• Provide apps tracking and pause functionality\n" +
                     "• Generate and manage QR codes for your pause system\n" +
-                    "• Send notifications when time limits are reached\n" +
-                    "• Improve app performance and user experience",
+                    "• Redirect you to our app when time limits are reached\n" +
+                    "• Improve app performance and user experience\n" +
+                    "• Display advertisements through Google AdMob",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp
@@ -4404,8 +4466,8 @@ private fun PrivacyPolicyScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "• All data is stored locally on your device\n" +
-                    "• We do not transmit your personal data to external servers\n" +
+                    "• Most data is stored locally on your device\n" +
+                    "• Device identifiers are shared with Google AdMob for advertising\n" +
                     "• Your app usage data remains private and under your control\n" +
                     "• We implement appropriate security measures to protect your information",
                     color = Color(0xFFD1D5DB),
@@ -4424,9 +4486,30 @@ private fun PrivacyPolicyScreen(
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "• Usage Access: Required to track app usage for wellness features\n" +
-                    "• Accessibility Service: Used to show pause overlays when time limits are reached\n" +
+                    "• Accessibility Service: Used to detect app usage and redirect you to our pause screen when time limits are reached\n" +
                     "• Camera: Used to scan QR codes for pause functionality\n" +
-                    "• Notifications: Used to alert you when time limits are reached",
+                    "• Notifications: Used to alert you when time limits are reached\n" +
+                    "• Internet Access: Used to display advertisements through Google AdMob",
+                    color = Color(0xFFD1D5DB),
+                    fontSize = 14.sp,
+                    lineHeight = 20.sp
+                )
+                
+                Spacer(Modifier.height(24.dp))
+                
+                Text(
+                    "Advertising and Third-Party Services",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "• We use Google AdMob to display advertisements in our app\n" +
+                    "• AdMob may collect device identifiers and usage data for ad targeting\n" +
+                    "• This data is shared with Google and advertising partners\n" +
+                    "• You can opt out of personalized ads in your device settings\n" +
+                    "• AdMob's privacy policy applies to advertising data collection",
                     color = Color(0xFFD1D5DB),
                     fontSize = 14.sp,
                     lineHeight = 20.sp

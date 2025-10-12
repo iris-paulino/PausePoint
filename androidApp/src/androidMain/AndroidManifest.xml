@@ -56,8 +56,8 @@
             android:name=".OverlayCommandReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY" />
-                <action android:name="com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY" />
+                <action android:name="com.luminoprisma.scrollpause.SHOW_PAUSE_SCREEN" />
+                <action android:name="com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN" />
             </intent-filter>
         </receiver>
 

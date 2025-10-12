@@ -2,13 +2,6 @@ package com.luminoprisma.scrollpause
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.View
-import android.view.WindowManager
-import android.widget.Button
-import android.widget.FrameLayout
-import android.widget.TextView
 import android.os.Build
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -120,7 +113,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         println("DEBUG: ForegroundAppAccessibilityService - service connected")
         // capture app context for companion usage
         appContextRef = applicationContext
-        registerOverlayReceiver()
+        registerRedirectReceiver()
         loadStateFromPreferences()
         try {
             android.widget.Toast.makeText(
@@ -133,12 +126,20 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         val msg = pendingShowMessage
         if (msg != null) {
             println("DEBUG: onServiceConnected - applying pending SHOW")
-            showOverlay(msg)
+            try {
+                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("message", msg)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                println("DEBUG: onServiceConnected - error launching PauseOverlayActivity: ${e.message}")
+            }
             pendingShowMessage = null
         }
         if (pendingHide) {
             println("DEBUG: onServiceConnected - applying pending HIDE")
-            hideOverlay()
+            // No action needed - pause screen handles its own dismissal
             pendingHide = false
         }
     }
@@ -167,18 +168,18 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             }
             applicationContext.sendBroadcast(intent)
             
-            // Check if this app should be blocked and show overlay immediately
-            checkAndShowOverlayForApp(pkg)
+            // Check if this app should be blocked and redirect to pause screen
+            checkAndRedirectToPauseApp(pkg)
         }
     }
 
     override fun onInterrupt() {
     }
     
-    private fun checkAndShowOverlayForApp(packageName: String?) {
+    private fun checkAndRedirectToPauseApp(packageName: String?) {
         if (!isBlocked || packageName.isNullOrBlank()) return
         
-        println("DEBUG: checkAndShowOverlayForApp - checking package: $packageName, blocked: $isBlocked")
+        println("DEBUG: checkAndRedirectToPauseApp - checking package: $packageName, blocked: $isBlocked")
         
         // Check if the current foreground app is one of the tracked apps
         val isTrackedApp = trackedAppNames.any { appName ->
@@ -205,65 +206,55 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             }
         }
         
-        println("DEBUG: checkAndShowOverlayForApp - isTrackedApp: $isTrackedApp for package: $packageName")
+        println("DEBUG: checkAndRedirectToPauseApp - isTrackedApp: $isTrackedApp for package: $packageName")
         
         if (isTrackedApp) {
-            // User is trying to use a tracked app while blocked, show PauseOverlayActivity to ensure full screen UI
-            println("DEBUG: checkAndShowOverlayForApp - launching PauseOverlayActivity for blocked tracked app: $packageName")
+            // User is trying to use a tracked app while blocked, redirect them to our Pause screen
+            println("DEBUG: checkAndRedirectToPauseApp - redirecting to PauseOverlayActivity for blocked tracked app: $packageName")
             val message = if (timeLimitMinutes > 0) {
                 "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
             } else {
                 "Take a mindful pause"
             }
             try {
+                // Redirect to our app's Pause screen instead of showing overlay
                 val intent = Intent(this, PauseOverlayActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     putExtra("message", message)
                 }
                 startActivity(intent)
-                // Also ensure any accessibility overlay is hidden to avoid stacking
-                hideOverlay()
             } catch (e: Exception) {
-                println("DEBUG: checkAndShowOverlayForApp - error launching PauseOverlayActivity: ${e.message}")
-                // Fallback to accessibility overlay if activity launch fails
-                showOverlay(message)
+                println("DEBUG: checkAndRedirectToPauseApp - error redirecting to PauseOverlayActivity: ${e.message}")
             }
         }
     }
 
-    // Overlay management
-    private var windowManager: WindowManager? = null
-    private var overlayView: View? = null
-    private var overlayShown: Boolean = false
-
-    private fun registerOverlayReceiver() {
+    // Redirect management - no more overlays, just redirects to our app
+    private fun registerRedirectReceiver() {
         try {
-            val showFilter = IntentFilter("com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY")
-            val hideFilter = IntentFilter("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY")
+            val showFilter = IntentFilter("com.luminoprisma.scrollpause.SHOW_PAUSE_SCREEN")
+            val hideFilter = IntentFilter("com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN")
 
-            println("DEBUG: registerOverlayReceiver - registering receivers")
+            println("DEBUG: registerRedirectReceiver - registering receivers")
             val showReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    println("DEBUG: receiver SHOW_BLOCKING_OVERLAY received - intent=$intent")
+                    println("DEBUG: receiver SHOW_PAUSE_SCREEN received - intent=$intent")
                     val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
                     try {
                         val activityIntent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             putExtra("message", message)
                         }
                         startActivity(activityIntent)
-                        // Ensure any accessibility overlay is hidden so only PauseScreen shows
-                        hideOverlay()
                     } catch (e: Exception) {
-                        println("DEBUG: SHOW_BLOCKING_OVERLAY - failed to launch activity: ${e.message}, falling back to accessibility overlay")
-                        showOverlay(message)
+                        println("DEBUG: SHOW_PAUSE_SCREEN - failed to launch activity: ${e.message}")
                     }
                 }
             }
             val hideReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
-                    println("DEBUG: receiver HIDE_BLOCKING_OVERLAY received - intent=$intent")
-                    hideOverlay()
+                    println("DEBUG: receiver HIDE_PAUSE_SCREEN received - intent=$intent")
+                    // No action needed - the pause screen will handle its own dismissal
                 }
             }
             if (Build.VERSION.SDK_INT >= 33) {
@@ -276,105 +267,6 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 registerReceiver(hideReceiver, hideFilter)
             }
         } catch (_: Exception) {
-        }
-    }
-
-    private fun showOverlay(message: String) {
-        if (overlayShown) { println("DEBUG: showOverlay - already shown"); return }
-        try {
-            val wm = windowManager ?: getSystemService(WINDOW_SERVICE) as WindowManager
-            windowManager = wm
-
-            val overlayType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                overlayType,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                android.graphics.PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-            }
-
-            val container = FrameLayout(this)
-            container.setBackgroundColor(0xCC000000.toInt())
-            val padding = (24 * resources.displayMetrics.density).toInt()
-            container.setPadding(padding, padding * 3, padding, padding)
-            container.isClickable = true
-            container.isFocusable = true
-
-            val title = TextView(this).apply {
-                text = "Pause reached"
-                textSize = 22f
-                setTextColor(android.graphics.Color.WHITE)
-            }
-            val body = TextView(this).apply {
-                text = message
-                textSize = 16f
-                setTextColor(android.graphics.Color.WHITE)
-            }
-            val scanBtn = Button(this).apply {
-                text = "Scan QR to continue"
-                setOnClickListener {
-                    try {
-                        val intent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            putExtra("message", message)
-                        }
-                        startActivity(intent)
-                        // Hide the system overlay since we're showing the activity
-                        hideOverlay()
-                    } catch (e: Exception) {
-                        println("DEBUG: showOverlay - error launching PauseOverlayActivity: ${e.message}")
-                    }
-                }
-            }
-
-
-            val dismissBtn = Button(this).apply {
-                text = "Dismiss"
-                setOnClickListener { 
-                    // Send dismiss broadcast to trigger the dismiss callback
-                    val intent = Intent("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE").apply {
-                        setPackage(applicationContext.packageName)
-                    }
-                    applicationContext.sendBroadcast(intent)
-                    hideOverlay()
-                }
-            }
-
-            val layout = FrameLayout(this).apply {
-                addView(title)
-                addView(body)
-                addView(scanBtn)
-                addView(dismissBtn)
-            }
-            container.addView(layout)
-
-            println("DEBUG: showOverlay - adding view to window manager")
-            wm.addView(container, params)
-            overlayView = container
-            overlayShown = true
-            println("DEBUG: showOverlay - overlay shown")
-        } catch (_: Exception) {
-            println("DEBUG: showOverlay - error showing overlay")
-        }
-    }
-
-    private fun hideOverlay() {
-        try {
-            val wm = windowManager
-            val view = overlayView
-            if (wm != null && view != null) {
-                println("DEBUG: hideOverlay - removing view")
-                wm.removeView(view)
-            }
-        } catch (_: Exception) {
-        } finally {
-            overlayView = null
-            overlayShown = false
-            println("DEBUG: hideOverlay - overlay hidden")
         }
     }
 

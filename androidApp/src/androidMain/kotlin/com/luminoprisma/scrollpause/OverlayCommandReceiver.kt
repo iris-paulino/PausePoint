@@ -11,31 +11,28 @@ class OverlayCommandReceiver : BroadcastReceiver() {
         println("DEBUG: OverlayCommandReceiver.onReceive called - action: ${intent?.action}")
         val action = intent?.action ?: return
         when (action) {
-            "com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY" -> {
+            "com.luminoprisma.scrollpause.SHOW_PAUSE_SCREEN" -> {
                 val message = intent.getStringExtra("message") ?: "Take a mindful pause"
-                println("DEBUG: OverlayCommandReceiver - SHOW received, message='$message'")
+                println("DEBUG: OverlayCommandReceiver - SHOW_PAUSE_SCREEN received, message='$message'")
                 ForegroundAppAccessibilityService.setPendingShow(message)
-                // Only if accessibility service is NOT enabled, fall back to activity overlay
-                if (context != null && !isAccessibilityServiceEnabled(context)) {
+                // Always redirect to our pause screen (no more overlays)
+                if (context != null) {
                     try {
-                        println("DEBUG: OverlayCommandReceiver - accessibility disabled, launching PauseOverlayActivity fallback")
+                        println("DEBUG: OverlayCommandReceiver - redirecting to PauseOverlayActivity")
                         val activityIntent = Intent(context, PauseOverlayActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             putExtra("message", message)
                         }
                         context.startActivity(activityIntent)
                     } catch (e: Exception) {
-                        println("DEBUG: OverlayCommandReceiver - fallback launch error: ${e.message}")
+                        println("DEBUG: OverlayCommandReceiver - redirect error: ${e.message}")
                     }
-                } else {
-                    println("DEBUG: OverlayCommandReceiver - accessibility enabled, relying on TYPE_ACCESSIBILITY_OVERLAY")
                 }
             }
-            "com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY" -> {
-                println("DEBUG: OverlayCommandReceiver - HIDE received")
+            "com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN" -> {
+                println("DEBUG: OverlayCommandReceiver - HIDE_PAUSE_SCREEN received")
                 ForegroundAppAccessibilityService.setPendingHide()
-                // If fallback activity is showing, ensure it closes
-                // Activity registers a receiver to finish on this signal
+                // Pause screen will handle its own dismissal
             }
             "com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE" -> {
                 println("DEBUG: OverlayCommandReceiver - RESET_TIMER_AND_CONTINUE received")
