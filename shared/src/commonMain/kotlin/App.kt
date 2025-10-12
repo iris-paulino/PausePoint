@@ -2587,19 +2587,25 @@ private fun OnboardingFlow(
         pages = listOf(
             OnboardingPage(
                 title = "Welcome to\nScroll Pause",
-                description = "Create boundaries for your app time, and walk or move around when you hit them.",
+                description = "Take control of your screen time.\n" +
+                        "Set limits for your apps and get moving when it's time for a break",
                 showLogo = true
             ),
             OnboardingPage(
                 title = "Walk to Unlock Apps",
-                description = "Print QR codes and place them around your home and office. When time is up, you'll need to physically walk to scan them.",
+                description = "Place QR codes around your space. \nWhen it’s time to pause, walk to scan a QR code and unlock your apps — a quick break, a clearer mind",
                 imagePath = "images/onboarding/walking_onboarding.png"
             ),
             OnboardingPage(
                 title = "Pause Partners",
-                description = "Ask trusted persons to be Scroll Pause partners. They can save the QR codes to help you unlock apps.",
-                primaryCta = "Get Started",
+                description = "Invite trusted friends to hold your QR codes and keep you accountable. They’ll hold your QR codes and help you stay mindful when unlocking apps.",
                 imagePath = "images/onboarding/two_people.png"
+            ),
+            OnboardingPage(
+                title = "Ad Free when you Pause Mindfully",
+                description = "You'll never see ads if you walk to scan your QR code!",
+                primaryCta = "Get Started",
+                imagePath = "images/onboarding/ad free.png"
             )
         ),
         onDone = onGetStarted,
@@ -2832,7 +2838,7 @@ private fun QrGeneratorContent(
             Spacer(Modifier.width(16.dp))
             Column {
                 Text(if (isSetupMode) "Set Up: QR Code Generator" else "QR Code Generator", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text("Create QR codes to place around your home or share with your ScrollPause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+                Text("Create QR codes to place around your home or share with your Scroll Pause partner", fontSize = 14.sp, color = Color(0xFFD1D5DB))
             }
         }
         
@@ -3001,7 +3007,7 @@ private fun QrGeneratorContent(
                 modifier = Modifier.padding(12.dp)
             ) {
                 Text(
-                    "How ScrollPause QR Code Works:",
+                    "How Scroll Pause QR Code Works:",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -3013,7 +3019,7 @@ private fun QrGeneratorContent(
                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
                     "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                     "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                    "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
+                    "4. This makes you step away from your phone for a natural pause, and if scanning from your Scroll Pause partner, adds a little extra social time!",
                     fontSize = 14.sp,
                     color = Color(0xFFD1D5DB),
                     lineHeight = 18.sp
@@ -3704,7 +3710,7 @@ private fun SavedQrCodesScreen(
                             "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
                             "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                             "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                            "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
+                            "4. This makes you step away from your phone for a natural pause, and if scanning from your Scroll Pause partner, adds a little extra social time!",
                             fontSize = 14.sp,
                             color = Color(0xFFD1D5DB),
                             lineHeight = 20.sp
@@ -3905,7 +3911,7 @@ private fun SavedQrCodesScreen(
                                     "1. Print your QR code and place it somewhere you have to walk to (kitchen, bedroom, upstairs, etc.).\n\n" +
                                     "2. No printer? Share a screenshot of your QR code with a family member, friend, or housemate—your ScrollPause accountability partner—and ask them to keep it on their phone.\n\n" +
                                     "3. When your time limit ends, you'll need to scan the QR code—either where you placed it or from your partner—to unlock your apps.\n\n" +
-                                    "4. This makes you step away from your phone for a natural pause, and if scanning from your ScrollPause partner, adds a little extra social time!",
+                                    "4. This makes you step away from your phone for a natural pause, and if scanning from your Scroll Pause partner, adds a little extra social time!",
                                     fontSize = 14.sp,
                                     color = Color(0xFFD1D5DB),
                                     lineHeight = 20.sp

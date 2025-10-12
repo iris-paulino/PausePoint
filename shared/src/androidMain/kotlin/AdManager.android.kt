@@ -67,7 +67,9 @@ actual class AdManager(private val context: Context) {
     
     actual fun loadAd() {
         println("DEBUG: loadAd() called with adUnitId: $adUnitId")
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder()
+            .setRequestAgent("ScrollPause-Android")
+            .build()
         
         InterstitialAd.load(
             context,
