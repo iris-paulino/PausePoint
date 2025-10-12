@@ -85,6 +85,7 @@ import kotlin.random.Random
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.PI
+import createAdManager
 
 @OptIn(ExperimentalResourceApi::class)
 @Composable
@@ -388,6 +389,77 @@ private fun AppRoot() {
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
+    }
+
+    // Helper function to proceed with dismiss logic after ad
+    fun proceedWithDismiss() {
+        println("DEBUG: proceedWithDismiss called - ad completed, now clearing blocked state")
+        // Always finalize
+        finalizeSessionUsage()
+        // Count dismiss
+        timesDismissedToday += 1
+        coroutineScope.launch { try { storage.saveTimesDismissedToday(timesDismissedToday) } catch (_: Exception) {} }
+
+        // Auto-restart tracking after dismiss (from dialog preference)
+        pendingStartTracking = true
+        userManuallyStoppedTracking = false
+        
+        // Clear blocked state and overlays ONLY after ad is completed
+        isBlocked = false
+        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+        coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
+        sessionAppUsageTimes = emptyMap()
+        sessionStartTime = 0L
+        sessionElapsedSeconds = 0L
+        dismissBlockingOverlay()
+        
+        // Navigate to dashboard
+        route = Route.Dashboard
+    }
+
+    // Helper function to handle dismiss with mandatory ads
+    fun handleDismissWithAd() {
+        println("DEBUG: handleDismissWithAd called - showing mandatory ad")
+        try {
+            println("DEBUG: Creating AdManager...")
+            val adManager = createAdManager()
+            println("DEBUG: AdManager created successfully")
+            
+            val isLoaded = adManager.isAdLoaded()
+            println("DEBUG: Ad loaded status: $isLoaded")
+            
+            // If ad is not loaded, try to load it and show a brief loading message
+            if (!isLoaded) {
+                println("DEBUG: Ad not loaded, attempting to load...")
+                adManager.loadAd()
+                // For now, proceed without ad - in a real app you might want to show a loading dialog
+                println("DEBUG: Proceeding without ad since none was loaded")
+                proceedWithDismiss()
+                return
+            }
+            
+            if (isLoaded) {
+                println("DEBUG: Ad is loaded, showing interstitial ad")
+                // Show mandatory ad - user must watch it to proceed
+                adManager.showInterstitialAd(
+                    onAdClosed = {
+                        println("DEBUG: Mandatory ad completed, proceeding with dismiss")
+                        proceedWithDismiss()
+                    },
+                    onAdFailedToLoad = {
+                        println("DEBUG: Ad failed to show, proceeding with dismiss anyway")
+                        proceedWithDismiss()
+                    }
+                )
+            } else {
+                println("DEBUG: No ad loaded, proceeding with dismiss")
+                proceedWithDismiss()
+            }
+        } catch (e: Exception) {
+            println("DEBUG: Error showing ad: ${e.message}, proceeding with dismiss")
+            println("DEBUG: Exception details: ${e.stackTraceToString()}")
+            proceedWithDismiss()
+        }
     }
 
     // Helper function to handle QR scan success
@@ -1596,39 +1668,8 @@ private fun AppRoot() {
                     }
                 },
                 onClose = { 
-                    println("DEBUG: PauseScreen onClose called")
-                    // Always finalize
-                    finalizeSessionUsage()
-                    // Count dismiss
-                    timesDismissedToday += 1
-                    coroutineScope.launch { try { storage.saveTimesDismissedToday(timesDismissedToday) } catch (_: Exception) {} }
-
-                    // If user opted to suppress dialog, follow preference; else show dialog
-                    coroutineScope.launch {
-                        val skipDialog = try { storage.getDoNotShowDismissAgain() } catch (_: Exception) { false }
-                        val autoRestartPref = try { storage.getAutoRestartOnDismiss() } catch (_: Exception) { false }
-                        if (skipDialog) {
-                            if (autoRestartPref) {
-                                // Restart tracking immediately and return to last route (dashboard shows tracked apps)
-                                isTracking = true
-                                route = Route.Dashboard
-                            } else {
-                                // Do not auto-start; go back to Pause screen parent (Dashboard)
-                                isTracking = false
-                                route = Route.Dashboard
-                            }
-                        } else {
-                            showDismissDialog = true
-                        }
-                        // Clear blocked state and overlays in either case
-                        isBlocked = false
-                        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
-                        storage.saveBlockedState(false)
-                        sessionAppUsageTimes = emptyMap()
-                        sessionStartTime = 0L
-                        sessionElapsedSeconds = 0L
-                        dismissBlockingOverlay()
-                    }
+                    println("DEBUG: PauseScreen onClose called - showing ad before dismiss")
+                    handleDismissWithAd()
                 }
             )
         }
@@ -2359,10 +2400,8 @@ private fun AppRoot() {
                             coroutineScope.launch {
                                 try { storage.saveDoNotShowDismissAgain(doNotShowDismissAgain) } catch (_: Exception) {}
                             }
-                            // Auto-restart tracking after dismiss
-                            pendingStartTracking = true
-                            userManuallyStoppedTracking = false
-                            route = Route.Dashboard
+                            // Show mandatory ad - user remains blocked until ad completes
+                            handleDismissWithAd()
                         },
                         colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
                         shape = RoundedCornerShape(24.dp),

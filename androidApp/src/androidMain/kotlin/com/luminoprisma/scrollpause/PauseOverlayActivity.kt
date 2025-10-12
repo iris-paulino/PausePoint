@@ -23,6 +23,7 @@ import createAppStorage
 import setQrScanningActive
 import resetTimerAndContinueTracking
 import dismissAndContinueTracking
+import createAdManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -97,9 +98,32 @@ class PauseOverlayActivity : ComponentActivity() {
             PauseOverlayContent(
                 message = message, 
                 onFinish = { 
-                    // Dismiss and continue tracking when user dismisses
-                    dismissAndContinueTracking()
-                    finish() 
+                    // Show ad before dismissing overlay
+                    try {
+                        val adManager = createAdManager()
+                        if (adManager.isAdLoaded()) {
+                            adManager.showInterstitialAd(
+                                onAdClosed = {
+                                    println("DEBUG: Overlay ad completed, dismissing overlay")
+                                    dismissAndContinueTracking()
+                                    finish()
+                                },
+                                onAdFailedToLoad = {
+                                    println("DEBUG: Overlay ad failed, dismissing anyway")
+                                    dismissAndContinueTracking()
+                                    finish()
+                                }
+                            )
+                        } else {
+                            println("DEBUG: No ad loaded for overlay, dismissing anyway")
+                            dismissAndContinueTracking()
+                            finish()
+                        }
+                    } catch (e: Exception) {
+                        println("DEBUG: Error showing overlay ad: ${e.message}, dismissing anyway")
+                        dismissAndContinueTracking()
+                        finish()
+                    }
                 },
                 qrScanLauncher = qrScanLauncher
             )

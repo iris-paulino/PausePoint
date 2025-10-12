@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import initializeAppStorage
 import initializeInstalledAppsProvider
 import registerCurrentActivity
+import initializeAdManager
 
 class MainActivity : AppCompatActivity() {
     private var isDismissing = false // Flag to prevent camera permission requests during dismiss
@@ -38,6 +39,9 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize the installed apps provider with the activity context
         initializeInstalledAppsProvider(this)
+        
+        // Initialize the ad manager with the activity context
+        initializeAdManager(this)
 
         registerCurrentActivity(this)
 

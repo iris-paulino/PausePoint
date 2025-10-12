@@ -37,6 +37,7 @@ kotlin {
                 api("androidx.appcompat:appcompat:1.6.1")
                 api("androidx.core:core-ktx:1.10.1")
                 implementation("com.google.zxing:core:3.5.2")
+                implementation("com.google.android.gms:play-services-ads:22.6.0")
                 // 'javase' artifact is desktop-only; not needed for Android
             }
         }
