@@ -229,12 +229,6 @@ private fun QrDetailScreen(
         }
 
         Spacer(Modifier.height(16.dp))
-
-        Text(
-            text = message,
-            color = Color.White,
-            fontSize = 16.sp
-        )
     }
 }
 
@@ -3313,7 +3307,7 @@ private fun DashboardContent(
                     Spacer(Modifier.height(12.dp))
                     
                     Text(
-                        "Print your personal QR codes and place them around your home. When your time limit is reached, you'll need to walk to scan one - encouraging healthy movement breaks!",
+                        "Print your personal QR codes and place them around your home. \nNo printer? Take a screenshot and share it with a trusted friend. \nWhen your time limit ends, walk to scan a code and take a healthy movement break.",
                         fontSize = 14.sp,
                         color = Color(0xFFD1D5DB),
                         lineHeight = 20.sp
