@@ -176,12 +176,12 @@ fun getRandomPauseMessage(): String {
         "Your time matters more than endless feeds.",
         "One pause at a time — your mind will thank you.",
         "You've broken the scroll once before — you can do it again.",
-        "Go enjoy something screen-free — your brain will love it."
+        "Go enjoy something screen-free — your brain will love it.",
         "Look up, move, and take in the world around you.",
         "Refocus your energy on something that fills you up.",
         "A few minutes away can lift your mood instantly.",
         "Reconnect with what makes you feel alive.",
-        "Take control back — your attention is powerful."
+        "Take control back — your attention is powerful.",
         "Log off for a bit and see how much clearer you feel.",
         "You’ve got this — put the phone down and breathe.",
         "Do something real — even one small action counts.",
@@ -303,6 +303,496 @@ private data class AvailableApp(
     val packageName: String,
     val isSelected: Boolean = false
 )
+
+// Comprehensive app information with multiple identifiers for robust tracking
+private data class AppInfo(
+    val displayName: String,
+    val primaryPackageName: String,
+    val alternativePackageNames: List<String> = emptyList(),
+    val alternativeDisplayNames: List<String> = emptyList(),
+    val category: String,
+    val icon: String
+)
+
+// Comprehensive database of popular apps with all possible identifiers
+private val COMPREHENSIVE_APP_DATABASE = mapOf(
+    // Social Media Apps
+    "instagram" to AppInfo(
+        displayName = "Instagram",
+        primaryPackageName = "com.instagram.android",
+        alternativePackageNames = listOf("com.instagram.lite"),
+        alternativeDisplayNames = listOf("IG", "Insta"),
+        category = "Social Media",
+        icon = "📷"
+    ),
+    "tiktok" to AppInfo(
+        displayName = "TikTok",
+        primaryPackageName = "com.zhiliaoapp.musically",
+        alternativePackageNames = listOf("com.ss.android.ugc.trill", "com.zhiliaoapp.musically.lite"),
+        alternativeDisplayNames = listOf("Tik Tok", "Musically"),
+        category = "Social Media",
+        icon = "🎵"
+    ),
+    "facebook" to AppInfo(
+        displayName = "Facebook",
+        primaryPackageName = "com.facebook.katana",
+        alternativePackageNames = listOf("com.facebook.lite", "com.facebook.orca"),
+        alternativeDisplayNames = listOf("FB", "Meta"),
+        category = "Social Media",
+        icon = "📘"
+    ),
+    "twitter" to AppInfo(
+        displayName = "Twitter",
+        primaryPackageName = "com.twitter.android",
+        alternativePackageNames = listOf("com.twitter.android.lite"),
+        alternativeDisplayNames = listOf("X", "Tweet"),
+        category = "Social Media",
+        icon = "🐦"
+    ),
+    "snapchat" to AppInfo(
+        displayName = "Snapchat",
+        primaryPackageName = "com.snapchat.android",
+        alternativePackageNames = listOf("com.snapchat.android.lite"),
+        alternativeDisplayNames = listOf("Snap"),
+        category = "Social Media",
+        icon = "👻"
+    ),
+    "reddit" to AppInfo(
+        displayName = "Reddit",
+        primaryPackageName = "com.reddit.frontpage",
+        alternativePackageNames = listOf("com.reddit.frontpage.lite"),
+        alternativeDisplayNames = listOf("Reddit"),
+        category = "Social Media",
+        icon = "🤖"
+    ),
+    "pinterest" to AppInfo(
+        displayName = "Pinterest",
+        primaryPackageName = "com.pinterest",
+        alternativePackageNames = listOf("com.pinterest.lite"),
+        alternativeDisplayNames = listOf("Pin"),
+        category = "Social Media",
+        icon = "📌"
+    ),
+    "linkedin" to AppInfo(
+        displayName = "LinkedIn",
+        primaryPackageName = "com.linkedin.android",
+        alternativePackageNames = listOf("com.linkedin.android.lite"),
+        alternativeDisplayNames = listOf("Linked In"),
+        category = "Professional",
+        icon = "💼"
+    ),
+    "discord" to AppInfo(
+        displayName = "Discord",
+        primaryPackageName = "com.discord",
+        alternativePackageNames = listOf("com.discord.lite"),
+        alternativeDisplayNames = listOf("Discord Chat"),
+        category = "Social Media",
+        icon = "💬"
+    ),
+    "telegram" to AppInfo(
+        displayName = "Telegram",
+        primaryPackageName = "org.telegram.messenger",
+        alternativePackageNames = listOf("org.telegram.plus"),
+        alternativeDisplayNames = listOf("Telegram Messenger"),
+        category = "Messaging",
+        icon = "✈️"
+    ),
+    "whatsapp" to AppInfo(
+        displayName = "WhatsApp",
+        primaryPackageName = "com.whatsapp",
+        alternativePackageNames = listOf("com.whatsapp.w4b", "com.whatsapp.business"),
+        alternativeDisplayNames = listOf("Whats App", "WA"),
+        category = "Messaging",
+        icon = "💚"
+    ),
+    "messenger" to AppInfo(
+        displayName = "Messenger",
+        primaryPackageName = "com.facebook.orca",
+        alternativePackageNames = listOf("com.facebook.mlite"),
+        alternativeDisplayNames = listOf("Facebook Messenger", "FB Messenger"),
+        category = "Messaging",
+        icon = "💙"
+    ),
+    "signal" to AppInfo(
+        displayName = "Signal",
+        primaryPackageName = "org.thoughtcrime.securesms",
+        alternativePackageNames = listOf("org.thoughtcrime.securesms.lite"),
+        alternativeDisplayNames = listOf("Signal Messenger"),
+        category = "Messaging",
+        icon = "🔒"
+    ),
+    "viber" to AppInfo(
+        displayName = "Viber",
+        primaryPackageName = "com.viber.voip",
+        alternativePackageNames = listOf("com.viber.voip.lite"),
+        alternativeDisplayNames = listOf("Viber Messenger"),
+        category = "Messaging",
+        icon = "💜"
+    ),
+    "wechat" to AppInfo(
+        displayName = "WeChat",
+        primaryPackageName = "com.tencent.mm",
+        alternativePackageNames = listOf("com.tencent.mm.lite"),
+        alternativeDisplayNames = listOf("We Chat", "微信"),
+        category = "Messaging",
+        icon = "💚"
+    ),
+    "line" to AppInfo(
+        displayName = "LINE",
+        primaryPackageName = "jp.naver.line.android",
+        alternativePackageNames = listOf("jp.naver.line.android.lite"),
+        alternativeDisplayNames = listOf("Line Messenger"),
+        category = "Messaging",
+        icon = "💚"
+    ),
+    
+    // Entertainment Apps
+    "youtube" to AppInfo(
+        displayName = "YouTube",
+        primaryPackageName = "com.google.android.youtube",
+        alternativePackageNames = listOf("com.google.android.apps.youtube.kids", "com.google.android.youtube.tv"),
+        alternativeDisplayNames = listOf("YT", "You Tube"),
+        category = "Entertainment",
+        icon = "📺"
+    ),
+    "youtube music" to AppInfo(
+        displayName = "YouTube Music",
+        primaryPackageName = "com.google.android.apps.youtube.music",
+        alternativePackageNames = listOf("com.google.android.apps.youtube.music.lite"),
+        alternativeDisplayNames = listOf("YT Music", "YouTube Music"),
+        category = "Music",
+        icon = "🎵"
+    ),
+    "spotify" to AppInfo(
+        displayName = "Spotify",
+        primaryPackageName = "com.spotify.music",
+        alternativePackageNames = listOf("com.spotify.music.lite"),
+        alternativeDisplayNames = listOf("Spotify Music"),
+        category = "Music",
+        icon = "🎵"
+    ),
+    "netflix" to AppInfo(
+        displayName = "Netflix",
+        primaryPackageName = "com.netflix.mediaclient",
+        alternativePackageNames = listOf("com.netflix.mediaclient.lite"),
+        alternativeDisplayNames = listOf("Net Flix"),
+        category = "Entertainment",
+        icon = "🎬"
+    ),
+    "twitch" to AppInfo(
+        displayName = "Twitch",
+        primaryPackageName = "tv.twitch.android.app",
+        alternativePackageNames = listOf("tv.twitch.android.app.lite"),
+        alternativeDisplayNames = listOf("Twitch TV"),
+        category = "Entertainment",
+        icon = "🎮"
+    ),
+    "amazon prime" to AppInfo(
+        displayName = "Amazon Prime Video",
+        primaryPackageName = "com.amazon.avod.thirdpartyclient",
+        alternativePackageNames = listOf("com.amazon.avod.thirdpartyclient.lite"),
+        alternativeDisplayNames = listOf("Prime Video", "Amazon Prime"),
+        category = "Entertainment",
+        icon = "📺"
+    ),
+    "disney plus" to AppInfo(
+        displayName = "Disney+",
+        primaryPackageName = "com.disney.disneyplus",
+        alternativePackageNames = listOf("com.disney.disneyplus.lite"),
+        alternativeDisplayNames = listOf("Disney Plus", "Disney+"),
+        category = "Entertainment",
+        icon = "🏰"
+    ),
+    "hulu" to AppInfo(
+        displayName = "Hulu",
+        primaryPackageName = "com.hulu.plus",
+        alternativePackageNames = listOf("com.hulu.plus.lite"),
+        alternativeDisplayNames = listOf("Hulu Plus"),
+        category = "Entertainment",
+        icon = "📺"
+    ),
+    
+    // Productivity Apps
+    "chrome" to AppInfo(
+        displayName = "Chrome",
+        primaryPackageName = "com.android.chrome",
+        alternativePackageNames = listOf("com.chrome.beta", "com.chrome.dev", "com.chrome.canary"),
+        alternativeDisplayNames = listOf("Google Chrome", "Chrome Browser"),
+        category = "Browser",
+        icon = "🌐"
+    ),
+    "firefox" to AppInfo(
+        displayName = "Firefox",
+        primaryPackageName = "org.mozilla.firefox",
+        alternativePackageNames = listOf("org.mozilla.firefox_beta", "org.mozilla.fenix"),
+        alternativeDisplayNames = listOf("Mozilla Firefox", "Firefox Browser"),
+        category = "Browser",
+        icon = "🦊"
+    ),
+    "safari" to AppInfo(
+        displayName = "Safari",
+        primaryPackageName = "com.apple.safari",
+        alternativePackageNames = listOf("com.apple.safari.lite"),
+        alternativeDisplayNames = listOf("Safari Browser"),
+        category = "Browser",
+        icon = "🧭"
+    ),
+    "edge" to AppInfo(
+        displayName = "Microsoft Edge",
+        primaryPackageName = "com.microsoft.emmx",
+        alternativePackageNames = listOf("com.microsoft.emmx.beta"),
+        alternativeDisplayNames = listOf("Edge", "Microsoft Edge Browser"),
+        category = "Browser",
+        icon = "🌐"
+    ),
+    "gmail" to AppInfo(
+        displayName = "Gmail",
+        primaryPackageName = "com.google.android.gm",
+        alternativePackageNames = listOf("com.google.android.gm.lite"),
+        alternativeDisplayNames = listOf("Google Mail", "GMail"),
+        category = "Productivity",
+        icon = "📧"
+    ),
+    "outlook" to AppInfo(
+        displayName = "Outlook",
+        primaryPackageName = "com.microsoft.office.outlook",
+        alternativePackageNames = listOf("com.microsoft.office.outlook.lite"),
+        alternativeDisplayNames = listOf("Microsoft Outlook", "Outlook Mail"),
+        category = "Productivity",
+        icon = "📧"
+    ),
+    "maps" to AppInfo(
+        displayName = "Google Maps",
+        primaryPackageName = "com.google.android.apps.maps",
+        alternativePackageNames = listOf("com.google.android.apps.maps.lite"),
+        alternativeDisplayNames = listOf("Maps", "Google Maps"),
+        category = "Navigation",
+        icon = "🗺️"
+    ),
+    "waze" to AppInfo(
+        displayName = "Waze",
+        primaryPackageName = "com.waze",
+        alternativePackageNames = listOf("com.waze.lite"),
+        alternativeDisplayNames = listOf("Waze Navigation"),
+        category = "Navigation",
+        icon = "🗺️"
+    ),
+    "uber" to AppInfo(
+        displayName = "Uber",
+        primaryPackageName = "com.ubercab",
+        alternativePackageNames = listOf("com.ubercab.lite"),
+        alternativeDisplayNames = listOf("Uber Driver", "Uber Eats"),
+        category = "Transportation",
+        icon = "🚗"
+    ),
+    "lyft" to AppInfo(
+        displayName = "Lyft",
+        primaryPackageName = "me.lyft.android",
+        alternativePackageNames = listOf("me.lyft.android.lite"),
+        alternativeDisplayNames = listOf("Lyft Driver"),
+        category = "Transportation",
+        icon = "🚗"
+    ),
+    
+    // Gaming Apps
+    "minecraft" to AppInfo(
+        displayName = "Minecraft",
+        primaryPackageName = "com.mojang.minecraftpe",
+        alternativePackageNames = listOf("com.mojang.minecraftpe.lite"),
+        alternativeDisplayNames = listOf("Minecraft PE", "Minecraft Pocket Edition"),
+        category = "Gaming",
+        icon = "🧱"
+    ),
+    "pubg" to AppInfo(
+        displayName = "PUBG Mobile",
+        primaryPackageName = "com.tencent.ig",
+        alternativePackageNames = listOf("com.pubg.krmobile", "com.pubg.newstate"),
+        alternativeDisplayNames = listOf("PUBG", "PlayerUnknown's Battlegrounds"),
+        category = "Gaming",
+        icon = "🎮"
+    ),
+    "fortnite" to AppInfo(
+        displayName = "Fortnite",
+        primaryPackageName = "com.epicgames.fortnite",
+        alternativePackageNames = listOf("com.epicgames.fortnite.lite"),
+        alternativeDisplayNames = listOf("Fortnite Mobile"),
+        category = "Gaming",
+        icon = "🎮"
+    ),
+    "clash of clans" to AppInfo(
+        displayName = "Clash of Clans",
+        primaryPackageName = "com.supercell.clashofclans",
+        alternativePackageNames = listOf("com.supercell.clashofclans.lite"),
+        alternativeDisplayNames = listOf("COC", "Clash of Clans"),
+        category = "Gaming",
+        icon = "⚔️"
+    ),
+    "clash royale" to AppInfo(
+        displayName = "Clash Royale",
+        primaryPackageName = "com.supercell.clashroyale",
+        alternativePackageNames = listOf("com.supercell.clashroyale.lite"),
+        alternativeDisplayNames = listOf("CR", "Clash Royale"),
+        category = "Gaming",
+        icon = "👑"
+    ),
+    
+    // Shopping Apps
+    "amazon" to AppInfo(
+        displayName = "Amazon",
+        primaryPackageName = "com.amazon.mShop.android.shopping",
+        alternativePackageNames = listOf("com.amazon.mShop.android.shopping.lite"),
+        alternativeDisplayNames = listOf("Amazon Shopping", "Amazon App"),
+        category = "Shopping",
+        icon = "🛒"
+    ),
+    "ebay" to AppInfo(
+        displayName = "eBay",
+        primaryPackageName = "com.ebay.mobile",
+        alternativePackageNames = listOf("com.ebay.mobile.lite"),
+        alternativeDisplayNames = listOf("eBay Mobile", "eBay App"),
+        category = "Shopping",
+        icon = "🛒"
+    ),
+    "shopify" to AppInfo(
+        displayName = "Shopify",
+        primaryPackageName = "com.shopify.mobile",
+        alternativePackageNames = listOf("com.shopify.mobile.lite"),
+        alternativeDisplayNames = listOf("Shopify Mobile"),
+        category = "Shopping",
+        icon = "🛒"
+    ),
+    
+    // Food & Delivery Apps
+    "doordash" to AppInfo(
+        displayName = "DoorDash",
+        primaryPackageName = "com.dd.doordash",
+        alternativePackageNames = listOf("com.dd.doordash.lite"),
+        alternativeDisplayNames = listOf("Door Dash"),
+        category = "Food & Delivery",
+        icon = "🍔"
+    ),
+    "ubereats" to AppInfo(
+        displayName = "Uber Eats",
+        primaryPackageName = "com.ubercab.eats",
+        alternativePackageNames = listOf("com.ubercab.eats.lite"),
+        alternativeDisplayNames = listOf("Uber Eats", "UberEats"),
+        category = "Food & Delivery",
+        icon = "🍔"
+    ),
+    "grubhub" to AppInfo(
+        displayName = "Grubhub",
+        primaryPackageName = "com.grubhub.android",
+        alternativePackageNames = listOf("com.grubhub.android.lite"),
+        alternativeDisplayNames = listOf("Grub Hub", "Grubhub"),
+        category = "Food & Delivery",
+        icon = "🍔"
+    ),
+    "postmates" to AppInfo(
+        displayName = "Postmates",
+        primaryPackageName = "com.postmates.android",
+        alternativePackageNames = listOf("com.postmates.android.lite"),
+        alternativeDisplayNames = listOf("Post Mates"),
+        category = "Food & Delivery",
+        icon = "🍔"
+    )
+)
+
+// Robust app matching functions
+private fun findAppByPackageName(packageName: String): AppInfo? {
+    return COMPREHENSIVE_APP_DATABASE.values.find { appInfo ->
+        appInfo.primaryPackageName == packageName || 
+        appInfo.alternativePackageNames.contains(packageName)
+    }
+}
+
+private fun findAppByDisplayName(displayName: String): AppInfo? {
+    val normalizedName = displayName.lowercase().trim()
+    return COMPREHENSIVE_APP_DATABASE.values.find { appInfo ->
+        appInfo.displayName.lowercase() == normalizedName ||
+        appInfo.alternativeDisplayNames.any { it.lowercase() == normalizedName }
+    }
+}
+
+private fun findAppByAnyIdentifier(identifier: String): AppInfo? {
+    val normalizedId = identifier.lowercase().trim()
+    
+    // First try exact package name match
+    findAppByPackageName(identifier)?.let { return it }
+    
+    // Then try display name match
+    findAppByDisplayName(identifier)?.let { return it }
+    
+    // Then try partial matches in package names
+    COMPREHENSIVE_APP_DATABASE.values.find { appInfo ->
+        appInfo.primaryPackageName.lowercase().contains(normalizedId) ||
+        appInfo.alternativePackageNames.any { it.lowercase().contains(normalizedId) }
+    }?.let { return it }
+    
+    // Finally try partial matches in display names
+    COMPREHENSIVE_APP_DATABASE.values.find { appInfo ->
+        appInfo.displayName.lowercase().contains(normalizedId) ||
+        appInfo.alternativeDisplayNames.any { it.lowercase().contains(normalizedId) }
+    }?.let { return it }
+    
+    return null
+}
+
+private fun getAllPossibleIdentifiersForApp(appInfo: AppInfo): List<String> {
+    return listOf(appInfo.displayName) + 
+           appInfo.alternativeDisplayNames + 
+           listOf(appInfo.primaryPackageName) + 
+           appInfo.alternativePackageNames
+}
+
+private fun getAllTrackedAppIdentifiers(trackedApps: List<TrackedApp>): List<String> {
+    return trackedApps.flatMap { trackedApp ->
+        val appInfo = findAppByDisplayName(trackedApp.name)
+        if (appInfo != null) {
+            getAllPossibleIdentifiersForApp(appInfo)
+        } else {
+            // Fallback for unknown apps - use the name as-is and try to create a package name
+            listOf(trackedApp.name, trackedApp.name.lowercase().replace(" ", ""))
+        }
+    }
+}
+
+private fun getPackageNameForTrackedApp(trackedApp: TrackedApp): String {
+    val appInfo = findAppByDisplayName(trackedApp.name)
+    return appInfo?.primaryPackageName ?: trackedApp.name.lowercase().replace(" ", "")
+}
+
+private fun getDefaultTrackedAppsFromDatabase(): List<TrackedApp> {
+    val defaultAppKeys = listOf(
+        "instagram", "tiktok", "snapchat", "facebook", "twitter", "reddit", 
+        "pinterest", "linkedin", "discord", "telegram", "whatsapp",
+        "youtube", "chrome"
+    )
+    
+    return defaultAppKeys.mapNotNull { key ->
+        COMPREHENSIVE_APP_DATABASE[key]?.let { appInfo ->
+            TrackedApp(appInfo.displayName, 0, 15)
+        }
+    }
+}
+
+private fun getDefaultAvailableAppsFromDatabase(): List<AvailableApp> {
+    val defaultAppKeys = listOf(
+        "instagram", "tiktok", "snapchat", "facebook", "twitter", "reddit", 
+        "pinterest", "linkedin", "discord", "telegram", "whatsapp",
+        "youtube", "chrome"
+    )
+    
+    return defaultAppKeys.mapNotNull { key ->
+        COMPREHENSIVE_APP_DATABASE[key]?.let { appInfo ->
+            AvailableApp(
+                name = appInfo.displayName,
+                category = appInfo.category,
+                icon = appInfo.icon,
+                packageName = appInfo.primaryPackageName
+            )
+        }
+    }
+}
 
 @Composable
 private fun AppRoot() {
@@ -622,27 +1112,9 @@ private fun AppRoot() {
             }
             println("DEBUG: Updated tracked apps with current time limit: $timeLimitMinutes minutes")
             
-            // Start platform-specific usage tracking
+            // Start platform-specific usage tracking with robust app identification
             val trackedPackages = trackedApps.map { app ->
-                // Map app names to package names - this is a simplified mapping
-                // In a real implementation, you'd have proper package name mapping
-                when (app.name.lowercase()) {
-                    "instagram" -> "com.instagram.android"
-                    "tiktok" -> "com.zhiliaoapp.musically"
-                    "facebook" -> "com.facebook.katana"
-                    "snapchat" -> "com.snapchat.android"
-                    "youtube" -> "com.google.android.youtube"
-                    "twitter" -> "com.twitter.android"
-                    "reddit" -> "com.reddit.frontpage"
-                    "linkedin" -> "com.linkedin.android"
-                    "whatsapp" -> "com.whatsapp"
-                    "spotify" -> "com.spotify.music"
-                    "netflix" -> "com.netflix.mediaclient"
-                    "discord" -> "com.discord"
-                    "telegram" -> "org.telegram.messenger"
-                    "chrome" -> "com.android.chrome"
-                    else -> app.name.lowercase().replace(" ", "")
-                }
+                getPackageNameForTrackedApp(app)
             }
             
             startUsageTracking(
@@ -671,7 +1143,7 @@ private fun AppRoot() {
             // Check periodically if user is trying to use a tracked app while blocked
             while (isBlocked) {
                 delay(5000) // Check every 5 seconds for better battery life
-                checkAndShowOverlayIfBlocked(trackedApps.map { it.name }, isBlocked, timeLimitMinutes)
+                checkAndShowOverlayIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isBlocked, timeLimitMinutes)
             }
         }
     }
@@ -699,23 +1171,7 @@ private fun AppRoot() {
             
             // Find which tracked app is currently active and add the time
             for (app in trackedApps) {
-                val expectedPackage = when (app.name.lowercase()) {
-                    "chrome" -> "com.android.chrome"
-                    "youtube" -> "com.google.android.youtube"
-                    "youtube music" -> "com.google.android.apps.youtube.music"
-                    "messages" -> "com.google.android.apps.messaging"
-                    "gmail" -> "com.google.android.gm"
-                    "maps" -> "com.google.android.apps.maps"
-                    "whatsapp" -> "com.whatsapp"
-                    "jira" -> "com.atlassian.android.jira.core"
-                    "kttipay" -> "com.kttipay"
-                    else -> {
-                        val matchingApp = availableApps.find { availableApp ->
-                            availableApp.name.equals(app.name, ignoreCase = true)
-                        }
-                        matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
-                    }
-                }
+                val expectedPackage = getPackageNameForTrackedApp(app)
                 
                 if (currentForegroundApp == expectedPackage) {
                     val currentUsage = updatedSessionUsage[app.name] ?: 0L
@@ -801,7 +1257,7 @@ private fun AppRoot() {
                     isTracking = false
                     isBlocked = true
                     // Update accessibility service with blocked state
-                    updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                    updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     // Save blocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(true)
@@ -829,23 +1285,7 @@ private fun AppRoot() {
                 
                 // Find which tracked app was active and add the time
                 for (app in trackedApps) {
-                    val expectedPackage = when (app.name.lowercase()) {
-                        "chrome" -> "com.android.chrome"
-                        "youtube" -> "com.google.android.youtube"
-                        "youtube music" -> "com.google.android.apps.youtube.music"
-                        "messages" -> "com.google.android.apps.messaging"
-                        "gmail" -> "com.google.android.gm"
-                        "maps" -> "com.google.android.apps.maps"
-                        "whatsapp" -> "com.whatsapp"
-                        "jira" -> "com.atlassian.android.jira.core"
-                        "kttipay" -> "com.kttipay"
-                        else -> {
-                            val matchingApp = availableApps.find { availableApp ->
-                                availableApp.name.equals(app.name, ignoreCase = true)
-                            }
-                            matchingApp?.packageName ?: app.name.lowercase().replace(" ", "")
-                        }
-                    }
+                    val expectedPackage = getPackageNameForTrackedApp(app)
                     
                     if (currentForegroundApp == expectedPackage) {
                         val currentUsage = updatedSessionUsage[app.name] ?: 0L
@@ -1029,28 +1469,10 @@ private fun AppRoot() {
         } catch (e: Exception) {
             println("DEBUG: Exception occurred while loading apps: ${e.message}")
             e.printStackTrace()
-            // Fallback to some default apps even if detection fails
-            trackedApps = listOf(
-                TrackedApp("Instagram", 0, 15),
-                TrackedApp("TikTok", 0, 15),
-                TrackedApp("Snapchat", 0, 15),
-                TrackedApp("Facebook", 0, 15),
-                TrackedApp("Twitter", 0, 15),
-                TrackedApp("Reddit", 0, 15),
-                TrackedApp("YouTube", 0, 15),
-                TrackedApp("Chrome", 0, 15)
-            )
+            // Fallback to default apps from comprehensive database
+            trackedApps = getDefaultTrackedAppsFromDatabase()
             // Persist fallback package identifiers so the choice survives restarts
-            val fallbackPackages = listOf(
-                "com.instagram.android",
-                "com.zhiliaoapp.musically",
-                "com.snapchat.android",
-                "com.facebook.katana",
-                "com.twitter.android",
-                "com.reddit.frontpage",
-                "com.google.android.youtube",
-                "com.android.chrome"
-            )
+            val fallbackPackages = trackedApps.map { getPackageNameForTrackedApp(it) }
             try { storage.saveSelectedAppPackages(fallbackPackages) } catch (_: Exception) {}
         } finally {
             isLoadingApps = false
@@ -1235,7 +1657,7 @@ private fun AppRoot() {
             
             // Update accessibility service with restored blocked state
             if (isBlocked) {
-                updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
             } else {
                 updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
             }
@@ -1383,18 +1805,9 @@ private fun AppRoot() {
                         }
                         println("DEBUG: Loaded ${availableApps.size} apps for selection")
                     } else {
-                        // If no apps are detected, provide some common fallback apps
-                        println("DEBUG: No apps detected, using fallback apps")
-                        val fallback = listOf(
-                            AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
-                            AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
-                            AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
-                            AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                            AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
-                            AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
-                            AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
-                            AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
-                        )
+                        // If no apps are detected, provide fallback apps from comprehensive database
+                        println("DEBUG: No apps detected, using fallback apps from database")
+                        val fallback = getDefaultAvailableAppsFromDatabase()
                         availableApps = fallback.map { app ->
                             val isTracked = trackedApps.any { tracked ->
                                 tracked.name.equals(app.name, ignoreCase = true) ||
@@ -1405,19 +1818,10 @@ private fun AppRoot() {
                         }
                     }
                 } catch (e: Exception) {
-                    // If loading fails, provide fallback apps
+                    // If loading fails, provide fallback apps from comprehensive database
                     println("DEBUG: Exception occurred while loading apps: ${e.message}")
                     e.printStackTrace()
-                    val fallback = listOf(
-                        AvailableApp("Instagram", "Social Media", "📷", "com.instagram.android"),
-                        AvailableApp("TikTok", "Social Media", "🎵", "com.zhiliaoapp.musically"),
-                        AvailableApp("Facebook", "Social Media", "📘", "com.facebook.katana"),
-                        AvailableApp("Twitter", "Social Media", "🐦", "com.twitter.android"),
-                        AvailableApp("YouTube", "Entertainment", "📺", "com.google.android.youtube"),
-                        AvailableApp("Snapchat", "Social Media", "👻", "com.snapchat.android"),
-                        AvailableApp("Reddit", "Social Media", "🤖", "com.reddit.frontpage"),
-                        AvailableApp("LinkedIn", "Professional", "💼", "com.linkedin.android")
-                    )
+                    val fallback = getDefaultAvailableAppsFromDatabase()
                     availableApps = fallback.map { app ->
                         val isTracked = trackedApps.any { tracked ->
                             tracked.name.equals(app.name, ignoreCase = true) ||
@@ -3288,6 +3692,15 @@ private fun DashboardContent(
                         )
                     }
                     
+                    // Pencil emoji in top-right corner
+                    Text(
+                        "✎",
+                        fontSize = 20.sp,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer(scaleX = -1f)
+                    )
+                    
                     // Main content centered
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -3304,7 +3717,6 @@ private fun DashboardContent(
                             text = androidx.compose.ui.text.buildAnnotatedString {
                                 append("${remaining}m ")
                                 pushStyle(androidx.compose.ui.text.SpanStyle(fontSize = baseFontSize * 0.7f))
-                                append("\uD83D\uDD8A\uFE0F")
                                 pop()
                             },
                             fontSize = baseFontSize,
