@@ -852,6 +852,10 @@ private fun AppRoot() {
     var sessionElapsedSeconds by remember { mutableStateOf(0L) }
     // Tracks how many whole minutes have already been credited to each app during the current session
     var sessionCreditedMinutes by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    // Foreground tracking markers and session-start guard
+    var currentForegroundApp by remember { mutableStateOf<String?>(null) }
+    var appActiveSince by remember { mutableStateOf(0L) }
+    var sessionJustStarted by remember { mutableStateOf(false) }
     
     // Counter for times unblocked today
     var timesUnblockedToday by remember { mutableStateOf(0) }
@@ -948,8 +952,13 @@ private fun AppRoot() {
         updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
         sessionAppUsageTimes = emptyMap()
+        sessionCreditedMinutes = emptyMap()
         sessionStartTime = 0L
         sessionElapsedSeconds = 0L
+        // Ensure next session begins clean
+        currentForegroundApp = null
+        appActiveSince = 0L
+        sessionJustStarted = true
         
         // Persist reset session data to storage to ensure clean restart
         coroutineScope.launch {
@@ -1048,6 +1057,10 @@ private fun AppRoot() {
         sessionStartTime = 0L
         sessionCreditedMinutes = emptyMap()
         sessionElapsedSeconds = 0L
+        // Ensure next session begins clean
+        currentForegroundApp = null
+        appActiveSince = 0L
+        sessionJustStarted = true
         timesUnblockedToday += 1
         
         // Persist reset session data to storage to ensure clean restart
@@ -1092,11 +1105,31 @@ private fun AppRoot() {
         dismissBlockingOverlay()
     }
 
+    
+
     // Track individual app usage when tracking is active
     LaunchedEffect(isTracking) {
         println("DEBUG: *** FIRST LaunchedEffect triggered *** isTracking: $isTracking")
         println("DEBUG: *** FIRST LaunchedEffect - current thread: ${Thread.currentThread().name}")
         if (isTracking) {
+            // Start a brand-new session: zero any prior session data and persist the reset
+            sessionAppUsageTimes = emptyMap()
+            sessionCreditedMinutes = emptyMap()
+            sessionElapsedSeconds = 0L
+            // Also clear any pre-session foreground tracking markers to avoid pre-counting
+            currentForegroundApp = null
+            appActiveSince = 0L
+            sessionJustStarted = true
+            println("DEBUG: Session start reset - cleared currentForegroundApp/appActiveSince")
+            coroutineScope.launch {
+                try {
+                    storage.saveSessionAppUsageTimes(emptyMap())
+                    storage.saveSessionStartTime(0L)
+                    println("DEBUG: Starting new session - cleared prior session usage in storage")
+                } catch (e: Exception) {
+                    println("DEBUG: Error clearing prior session usage at start: ${e.message}")
+                }
+            }
             trackingStartTime = getCurrentTimeMillis()
             sessionStartTime = getCurrentTimeMillis() // Start new session
             println("DEBUG: *** TRACKING STARTED *** trackingStartTime set to: $trackingStartTime")
@@ -1151,9 +1184,9 @@ private fun AppRoot() {
         }
     }
 
-    // Track the current foreground app and when it became active
-    var currentForegroundApp by remember { mutableStateOf<String?>(null) }
-    var appActiveSince by remember { mutableStateOf(0L) }
+    
+
+    
 
     // Function to update usage for currently active app
     fun updateCurrentAppUsage() {
@@ -1256,7 +1289,15 @@ private fun AppRoot() {
                 updateCurrentAppUsage()
                 
                 // Check if session usage has reached the limit based on actual accumulated session usage
-                val totalSessionSeconds = sessionAppUsageTimes.values.sum()
+                var totalSessionSeconds = sessionAppUsageTimes.values.sum()
+                // Defensive cap: total session seconds should never exceed real elapsed time since session start
+                if (sessionStartTime > 0L) {
+                    val elapsedSinceStart = ((getCurrentTimeMillis() - sessionStartTime) / 1000L).coerceAtLeast(0L)
+                    if (totalSessionSeconds > elapsedSinceStart) {
+                        println("DEBUG: Capping totalSessionSeconds from $totalSessionSeconds to elapsed $elapsedSinceStart to prevent carryover")
+                        totalSessionSeconds = elapsedSinceStart
+                    }
+                }
                 val usedMinutes = (totalSessionSeconds / 60L).toInt()
                 println("DEBUG: Time limit check - usedMinutes: $usedMinutes, timeLimitMinutes: $timeLimitMinutes, sessionAppUsageTimes: $sessionAppUsageTimes")
                 if (usedMinutes >= timeLimitMinutes) {
@@ -1280,6 +1321,15 @@ private fun AppRoot() {
 
     // Function to handle app changes and update usage times
     fun handleAppChange(newPackageName: String?) {
+        // On the first app seen right after session start, do not attribute any past time
+        if (sessionJustStarted) {
+            val now = getCurrentTimeMillis()
+            currentForegroundApp = newPackageName
+            appActiveSince = if (newPackageName != null) now else 0L
+            sessionJustStarted = false
+            println("DEBUG: handleAppChange - sessionJustStarted: initialized foreground tracking for $newPackageName at $now without attributing past time")
+            return
+        }
         println("DEBUG: handleAppChange called - newPackageName: $newPackageName, isTracking: $isTracking, route: $route, isBlocked: $isBlocked")
         if (!isTracking || route == Route.Pause || isBlocked) return
         
@@ -1694,12 +1744,22 @@ private fun AppRoot() {
                 userManuallyStoppedTracking = false
             }
             
-            // Restore dashboard counters and session data
+            // Restore dashboard counters
             timesUnblockedToday = savedTimesUnblockedToday
             timesDismissedToday = savedTimesDismissedToday
             dayStreakCounter = savedDayStreakCounter
-            sessionAppUsageTimes = savedSessionAppUsageTimes
-            sessionStartTime = savedSessionStartTime
+
+            // IMPORTANT: Never reuse prior session usage when app restarts.
+            // Always start with a clean session and persist that choice to avoid race conditions
+            // where state-loading could reintroduce stale session usage after we clear at start.
+            sessionAppUsageTimes = emptyMap()
+            sessionStartTime = 0L
+            withTimeoutOrNull(2000) {
+                try {
+                    storage.saveSessionAppUsageTimes(emptyMap())
+                    storage.saveSessionStartTime(0L)
+                } catch (_: Exception) {}
+            }
             
             // Update accessibility service with restored blocked state
             if (isBlocked) {
