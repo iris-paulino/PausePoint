@@ -1094,6 +1094,8 @@ private fun AppRoot() {
 
     // Track individual app usage when tracking is active
     LaunchedEffect(isTracking) {
+        println("DEBUG: *** FIRST LaunchedEffect triggered *** isTracking: $isTracking")
+        println("DEBUG: *** FIRST LaunchedEffect - current thread: ${Thread.currentThread().name}")
         if (isTracking) {
             trackingStartTime = getCurrentTimeMillis()
             sessionStartTime = getCurrentTimeMillis() // Start new session
@@ -1127,6 +1129,7 @@ private fun AppRoot() {
             )
         } else {
             // Stop tracking and save final state
+            println("DEBUG: *** TRACKING STOPPED *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
             if (trackingStartTime > 0) {
                 // Save updated usage times and tracking state to storage
                 coroutineScope.launch {
@@ -1200,10 +1203,15 @@ private fun AppRoot() {
 
     // Event-driven tracking: Handle app changes via accessibility service events
     LaunchedEffect(isTracking, trackingStartTime) {
-        println("DEBUG: *** LaunchedEffect triggered *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
+        println("DEBUG: *** SECOND LaunchedEffect triggered *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
+        println("DEBUG: *** SECOND LaunchedEffect - current thread: ${Thread.currentThread().name}")
         if (isTracking && trackingStartTime > 0) {
             println("DEBUG: Starting event-driven tracking")
-            
+        } else {
+            println("DEBUG: LaunchedEffect condition failed - isTracking: $isTracking, trackingStartTime: $trackingStartTime")
+        }
+        
+        if (isTracking && trackingStartTime > 0) {
             // Minimal polling only for time limit checks and accessibility monitoring
             while (isTracking) {
                 delay(30000) // Check every 30 seconds for time limits and accessibility status
@@ -1278,8 +1286,10 @@ private fun AppRoot() {
         val currentTime = getCurrentTimeMillis()
         
         // If we were tracking a previous app, add the time spent to its usage
+        println("DEBUG: handleAppChange - checking time tracking: currentForegroundApp=$currentForegroundApp, appActiveSince=$appActiveSince, newPackageName=$newPackageName")
         if (currentForegroundApp != null && appActiveSince > 0) {
             val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
+            println("DEBUG: handleAppChange - timeSpent=$timeSpent seconds")
             if (timeSpent > 0) {
                 val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
                 
@@ -1291,6 +1301,42 @@ private fun AppRoot() {
                         val currentUsage = updatedSessionUsage[app.name] ?: 0L
                         updatedSessionUsage[app.name] = currentUsage + timeSpent
                         println("DEBUG: Added $timeSpent seconds to ${app.name} (total: ${currentUsage + timeSpent})")
+                        break
+                    }
+                }
+                
+                sessionAppUsageTimes = updatedSessionUsage
+                
+                // Persist session data
+                coroutineScope.launch {
+                    try { 
+                        storage.saveSessionAppUsageTimes(sessionAppUsageTimes)
+                        println("DEBUG: Saved session app usage times to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving session app usage times: ${e.message}")
+                    }
+                }
+            }
+        }
+        
+        // Also track time if we're staying in the same tracked app (for apps like Instagram that generate frequent events)
+        if (currentForegroundApp == newPackageName && newPackageName != null && appActiveSince > 0) {
+            val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
+            // For apps like Instagram that generate very frequent events, track even small time increments
+            if (timeSpent >= 0) { // Changed from > 0 to >= 0 to handle 0-second increments
+                println("DEBUG: handleAppChange - same app time tracking: timeSpent=$timeSpent seconds for $newPackageName")
+                val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
+                
+                // Find which tracked app is currently active and add the time
+                for (app in trackedApps) {
+                    val expectedPackage = getPackageNameForTrackedApp(app)
+                    
+                    if (newPackageName == expectedPackage) {
+                        val currentUsage = updatedSessionUsage[app.name] ?: 0L
+                        // For very frequent events, add a small increment (e.g., 0.1 seconds) to accumulate over time
+                        val incrementToAdd = if (timeSpent == 0L) 1L else timeSpent // Add 1 second for 0-time events
+                        updatedSessionUsage[app.name] = currentUsage + incrementToAdd
+                        println("DEBUG: Added $incrementToAdd seconds to ${app.name} (same app, total: ${currentUsage + incrementToAdd})")
                         break
                     }
                 }
