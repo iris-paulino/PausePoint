@@ -1082,8 +1082,12 @@ private fun AppRoot() {
             try {
                 val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
                 
-                // Only increment day streak if this is the first QR scan of a new day
-                if (lastStreakUpdateDay != todayEpochDay) {
+                // If the streak is currently 0, set it to 1 on successful scan.
+                // Otherwise, only increment if this is the first QR scan of a new day.
+                if (dayStreakCounter == 0) {
+                    dayStreakCounter = 1
+                    println("DEBUG: handleQrScanSuccess - set day streak to: $dayStreakCounter (was 0)")
+                } else if (lastStreakUpdateDay != todayEpochDay) {
                     dayStreakCounter += 1
                     println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter")
                 } else {
@@ -1598,8 +1602,12 @@ private fun AppRoot() {
                     val todayEpochDay = currentEpochDayUtc()
                     val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
                     
-                    // Only increment day streak if this is the first QR scan of a new day
-                    if (lastStreakUpdateDay != todayEpochDay) {
+                    // If the streak is currently 0, set it to 1 on successful scan.
+                    // Otherwise, only increment if this is the first QR scan of a new day.
+                    if (dayStreakCounter == 0) {
+                        dayStreakCounter = 1
+                        println("DEBUG: QR scan callback - set day streak to: $dayStreakCounter (was 0)")
+                    } else if (lastStreakUpdateDay != todayEpochDay) {
                         dayStreakCounter += 1
                         println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter")
                     } else {
