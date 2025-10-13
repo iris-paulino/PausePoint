@@ -153,6 +153,49 @@ fun getRandomCongratulationMessage(): String {
 }
 
 @Composable
+fun getRandomPauseMessage(): String {
+    val messages = listOf(
+        "Did you know that doomscrolling is linked to higher levels of anxiety and stress? Step away and let yourself recharge.",
+        "Pause for a moment — your mind will thank you.",
+        "Did you know? Studies show that spending too long scrolling can disrupt your sleep and mood. Stretch your body and give your mind a break.",
+        "Too much scrolling floods your brain with stress hormones — take a breather!",
+        "Research shows that cutting down screen time can boost happiness and focus.",
+        "Even a 5-minute pause can reset your mood and reduce tension.",
+        "Your brain needs breaks, too — give it some quiet time to recharge.",
+        "You deserve calm, not chaos. Take a short pause.",
+        "A quick scroll break can help you feel more grounded and present.",
+        "Stepping away now means you'll feel better later.",
+        "Less scrolling, more serenity — you've got this.",
+        "Research links doomscrolling to higher cortisol (the stress hormone). A pause helps lower it.",
+        "People who limit social media use report better focus and less loneliness. Go enjoy something screen-free — your brain will love it.",
+        "Scrolling too long keeps your brain in alert mode — breaks help you relax.",
+        "Pausing from screens helps your brain process emotions more clearly.",
+        "Reducing doomscrolling can improve your sleep quality within days.",
+        "Take a breath. Step away. You're choosing peace over panic.",
+        "You're in control — not the algorithm.",
+        "Your time matters more than endless feeds.",
+        "One pause at a time — your mind will thank you.",
+        "You've broken the scroll once before — you can do it again.",
+        "Go enjoy something screen-free — your brain will love it."
+        "Look up, move, and take in the world around you.",
+        "Refocus your energy on something that fills you up.",
+        "A few minutes away can lift your mood instantly.",
+        "Reconnect with what makes you feel alive.",
+        "Take control back — your attention is powerful."
+        "Log off for a bit and see how much clearer you feel.",
+        "You’ve got this — put the phone down and breathe.",
+        "Do something real — even one small action counts.",
+        "Turn off the feed, turn on your focus.",
+        "Try a short break — your mind will thank you.",
+        "Take a moment offline and feel the difference.",
+        "Give yourself five minutes of peace right now.",
+        "Pause and reconnect with yourself — you deserve it.",
+        "Step away for a bit — your focus will follow."
+    )
+    return messages[Random.nextInt(messages.size)]
+}
+
+@Composable
 fun App() {
     MaterialTheme(
         colors = androidx.compose.material.MaterialTheme.colors.copy(
@@ -4066,7 +4109,7 @@ fun PauseScreen(
                     Spacer(Modifier.height(16.dp))
                     Text(
                         text = "You have used your tracked apps for",
-                        color = Color(0xFFBFC7C2)
+                        color = Color.White
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -4077,9 +4120,10 @@ fun PauseScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        text = "Walk to your QR code to unlock your apps",
-                        color = Color(0xFFBFC7C2),
-                        fontSize = 14.sp
+                        text = getRandomPauseMessage(),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -4097,7 +4141,7 @@ fun PauseScreen(
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.Start) {
                     Text("Scan My QR Code", color = Color.White, fontWeight = FontWeight.Bold)
-                    Text("Get up and scan your printed QR code", color = Color(0xFFE3F2FD), fontSize = 12.sp)
+                    Text("Walk to your QR code to unlock your apps", color = Color.White, fontSize = 12.sp)
                 }
             }
 
@@ -4116,14 +4160,14 @@ fun PauseScreen(
                     if (dayStreakCounter > 0) {
                         Text(
                             "[You will lose your doomscroll-free streak\nand have to watch ads!]",
-                            color = Color(0xFFE5E7EB),
+                            color = Color.White,
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
                         )
                     } else {
                         Text(
                             "[You will have to watch ads!]",
-                            color = Color(0xFFE5E7EB),
+                            color = Color.White,
                             fontSize = 12.sp,
                             textAlign = TextAlign.Center
                         )
