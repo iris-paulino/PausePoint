@@ -1375,22 +1375,21 @@ private fun AppRoot() {
         
         // Also track time if we're staying in the same tracked app (for apps like Instagram that generate frequent events)
         if (currentForegroundApp == newPackageName && newPackageName != null && appActiveSince > 0) {
-            val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
-            // For apps like Instagram that generate very frequent events, track even small time increments
-            if (timeSpent >= 0) { // Changed from > 0 to >= 0 to handle 0-second increments
-                println("DEBUG: handleAppChange - same app time tracking: timeSpent=$timeSpent seconds for $newPackageName")
+            val elapsedSeconds = (currentTime - appActiveSince) / 1000L // Convert to seconds
+            if (elapsedSeconds >= 1L) {
+                println("DEBUG: handleAppChange - same app time tracking: timeSpent=$elapsedSeconds seconds for $newPackageName")
                 val updatedSessionUsage = sessionAppUsageTimes.toMutableMap()
                 
-                // Find which tracked app is currently active and add the time
+                // Find which tracked app is currently active and add the deduplicated time
                 for (app in trackedApps) {
                     val expectedPackage = getPackageNameForTrackedApp(app)
                     
                     if (newPackageName == expectedPackage) {
                         val currentUsage = updatedSessionUsage[app.name] ?: 0L
-                        // For very frequent events, add a small increment (e.g., 0.1 seconds) to accumulate over time
-                        val incrementToAdd = if (timeSpent == 0L) 1L else timeSpent // Add 1 second for 0-time events
-                        updatedSessionUsage[app.name] = currentUsage + incrementToAdd
-                        println("DEBUG: Added $incrementToAdd seconds to ${app.name} (same app, total: ${currentUsage + incrementToAdd})")
+                         // Only add 1 second per call to prevent massive jumps
+                         val secondsToAdd = 1L
+                         updatedSessionUsage[app.name] = currentUsage + secondsToAdd
+                         println("DEBUG: Added $secondsToAdd seconds to ${app.name} (same app, total: ${currentUsage + secondsToAdd})")
                         break
                     }
                 }
@@ -1406,13 +1405,20 @@ private fun AppRoot() {
                         println("DEBUG: Error saving session app usage times: ${e.message}")
                     }
                 }
+                
+                // Move the active-since marker forward only after accruing real elapsed seconds
+                appActiveSince = currentTime
+            } else {
+                // Duplicate/sub-second event; do not reset appActiveSince to preserve elapsed calculation
             }
         }
         
-        // Update current app tracking
-        currentForegroundApp = newPackageName
-        appActiveSince = currentTime
-        println("DEBUG: handleAppChange - set currentForegroundApp: $newPackageName, appActiveSince: $currentTime")
+        // Update current app tracking only when the app actually changes
+        if (currentForegroundApp != newPackageName) {
+            currentForegroundApp = newPackageName
+            appActiveSince = currentTime
+            println("DEBUG: handleAppChange - set currentForegroundApp: $newPackageName, appActiveSince: $currentTime")
+        }
         
         // If the dashboard app itself is the foreground app, do not accrue usage for any apps
         val isDashboardAppForeground = newPackageName != null && (
