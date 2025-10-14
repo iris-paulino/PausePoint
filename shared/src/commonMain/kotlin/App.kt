@@ -4962,7 +4962,7 @@ private fun AppSelectionItem(
                 modifier = Modifier
                     .size(48.dp, 28.dp)
                     .background(
-                        color = if (app.isSelected) Color(0xFF1E3A5F) else Color(0xFF4B5563),
+                        color = if (app.isSelected) Color(0xFF4A90E2) else Color(0xFF4B5563),
                         shape = RoundedCornerShape(14.dp)
                     )
                     .clickable { onToggle() },
