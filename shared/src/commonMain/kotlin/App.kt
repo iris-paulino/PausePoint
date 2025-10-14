@@ -833,6 +833,9 @@ private fun AppRoot() {
     fun currentEpochDayUtc(): Long = getCurrentTimeMillis() / 86_400_000L
     val installedAppsProvider = remember { createInstalledAppsProvider() }
     val coroutineScope = rememberCoroutineScope()
+    
+    // Track the last known day for midnight reset detection
+    var lastKnownDay by remember { mutableStateOf(currentEpochDayUtc()) }
 
     // Load persisted preference for restart-on-unlock so PauseScreen and dialog are consistent
     LaunchedEffect(Unit) {
@@ -864,6 +867,52 @@ private fun AppRoot() {
     // Counter for consecutive days without dismissing
     var dayStreakCounter by remember { mutableStateOf(0) }
     var isSetupMode by remember { mutableStateOf(false) }
+    
+    // Function to reset all daily statistics
+    fun resetDailyStatistics() {
+        println("DEBUG: Resetting daily statistics at midnight")
+        
+        // Reset all daily counters
+        timesUnblockedToday = 0
+        timesDismissedToday = 0
+        appUsageTimes = emptyMap()
+        sessionAppUsageTimes = emptyMap()
+        sessionStartTime = 0L
+        sessionCreditedMinutes = emptyMap()
+        
+        // Reset tracked apps usage
+        trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
+        
+        // Update the last known day
+        lastKnownDay = currentEpochDayUtc()
+        
+        // Persist the reset data
+        coroutineScope.launch {
+            try {
+                storage.saveAppUsageTimes(emptyMap())
+                storage.saveTimesUnblockedToday(0)
+                storage.saveTimesDismissedToday(0)
+                storage.saveSessionAppUsageTimes(emptyMap())
+                storage.saveSessionStartTime(0L)
+                storage.saveUsageDayEpoch(lastKnownDay)
+                println("DEBUG: Successfully saved reset daily statistics to storage")
+            } catch (e: Exception) {
+                println("DEBUG: Error saving reset daily statistics: ${e.message}")
+            }
+        }
+    }
+    
+    // Background timer to check for midnight reset every minute
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000) // Check every minute
+            val currentDay = currentEpochDayUtc()
+            if (currentDay != lastKnownDay) {
+                println("DEBUG: Day change detected - from $lastKnownDay to $currentDay")
+                resetDailyStatistics()
+            }
+        }
+    }
 
     // Load persisted preferences on first composition
     LaunchedEffect(Unit) {
@@ -1782,12 +1831,14 @@ private fun AppRoot() {
                 updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
             }
 
-            // Daily reset if needed
+            // Daily reset if needed (on app startup)
             if (savedUsageDay == 0L) {
                 // First run: set today as the usage day
+                lastKnownDay = todayEpochDay
                 withTimeoutOrNull(2000) { storage.saveUsageDayEpoch(todayEpochDay) }
             } else if (savedUsageDay != todayEpochDay) {
-                // New day: reset today's counters
+                // New day detected on app startup: reset today's counters
+                println("DEBUG: App startup - new day detected, resetting daily statistics")
                 trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
                 appUsageTimes = emptyMap()
                 timesUnblockedToday = 0
@@ -1795,6 +1846,7 @@ private fun AppRoot() {
                 sessionAppUsageTimes = emptyMap()
                 sessionStartTime = 0L
                 sessionCreditedMinutes = emptyMap()
+                lastKnownDay = todayEpochDay
                 
                 // Check if there's a gap in days that should reset the streak
                 val daysDifference = todayEpochDay - savedUsageDay
@@ -1815,6 +1867,9 @@ private fun AppRoot() {
                     storage.saveSessionAppUsageTimes(emptyMap())
                     storage.saveSessionStartTime(0L)
                 }
+            } else {
+                // Same day: update lastKnownDay to current day
+                lastKnownDay = todayEpochDay
             }
             
             // Do not add background elapsed time to usage; only count active foreground session increments
@@ -1961,10 +2016,10 @@ private fun AppRoot() {
     LaunchedEffect(route) {
         if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
             val accessibilityAllowed = isAccessibilityServiceEnabled()
-            val usageAllowed = isUsageAccessPermissionGranted()
+            val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
             
             // Check if both permissions are already granted and auto-start tracking
-            if (accessibilityAllowed && usageAllowed && !isTracking && !userManuallyStoppedTracking && trackedApps.isNotEmpty()) {
+            if (accessibilityAllowed && usagePrefAllowed && !isTracking && !userManuallyStoppedTracking && trackedApps.isNotEmpty()) {
                 coroutineScope.launch {
                     val hasAnySavedQr = withTimeoutOrNull(2000) {
                         storage.getSavedQrCodes().isNotEmpty()
@@ -1977,7 +2032,7 @@ private fun AppRoot() {
                 }
             } else {
                 // Show permission dialogs if needed
-                if (!usageAllowed) {
+                if (!usagePrefAllowed) {
                     showUsageAccessDialog = true
                 }
                 if (!accessibilityAllowed) {
