@@ -4726,7 +4726,7 @@ fun PauseScreen(
             ) {
                 Text("▣", color = Color.White)
                 Spacer(Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.Start) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Scan My QR Code", color = Color.White, fontWeight = FontWeight.Bold)
                     Text("Walk to your QR code to unlock your apps", color = Color.White, fontSize = 12.sp)
                 }

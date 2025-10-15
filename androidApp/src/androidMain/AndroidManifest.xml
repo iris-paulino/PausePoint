@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions for querying installed applications -->
     <uses-permission android:name="android.permission.GET_TASKS" />
@@ -72,6 +73,16 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/foreground_accessibility_service_config" />
         </service>
+
+        <!-- Override CaptureActivity from zxing-android-embedded library to remove orientation restriction -->
+        <activity
+            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+            android:exported="false"
+            android:theme="@style/zxing_CaptureTheme"
+            android:stateNotNeeded="true"
+            android:windowSoftInputMode="stateAlwaysHidden"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
     </application>
 
 </manifest>
