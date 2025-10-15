@@ -31,7 +31,7 @@ android {
         applicationId = "com.luminoprisma.scrollpause"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 8
+        versionCode = 9
         versionName = "1.3"
     }
     
