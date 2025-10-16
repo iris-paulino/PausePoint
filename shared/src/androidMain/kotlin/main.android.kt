@@ -419,16 +419,22 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
             println("DEBUG: updateAccessibilityServiceBlockedState - no activity to persist prefs")
         }
 
-        // Use reflection to call the accessibility service method safely
-        val serviceClass = Class.forName("com.luminoprisma.scrollpause.ForegroundAppAccessibilityService")
-        val companionClass = serviceClass.getDeclaredClasses().find { it.simpleName == "Companion" }
-        if (companionClass != null) {
-            val companionInstance = companionClass.getDeclaredField("INSTANCE").get(null)
-            val setBlockedStateMethod = companionClass.getDeclaredMethod("setBlockedState", Boolean::class.java, List::class.java, Int::class.java)
-            setBlockedStateMethod.invoke(companionInstance, isBlocked, trackedAppNames, timeLimitMinutes)
-            println("DEBUG: updateAccessibilityServiceBlockedState - successfully updated accessibility service")
+        // Send broadcast to notify accessibility service of state change
+        if (activity != null) {
+            try {
+                val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
+                    setPackage(activity.packageName)
+                    putExtra("isBlocked", isBlocked)
+                    putExtra("trackedApps", trackedAppNames.joinToString(","))
+                    putExtra("timeLimit", timeLimitMinutes)
+                }
+                activity.sendBroadcast(intent)
+                println("DEBUG: updateAccessibilityServiceBlockedState - sent STATE_CHANGED broadcast")
+            } catch (e: Exception) {
+                println("DEBUG: updateAccessibilityServiceBlockedState - error sending broadcast: ${e.message}")
+            }
         } else {
-            println("DEBUG: updateAccessibilityServiceBlockedState - could not find Companion class")
+            println("DEBUG: updateAccessibilityServiceBlockedState - no activity to send broadcast")
         }
     } catch (e: Exception) {
         println("DEBUG: updateAccessibilityServiceBlockedState - error updating accessibility service: ${e.message}")
@@ -746,15 +752,26 @@ actual fun showAccessibilityDisabledNotification() {
     }
     
     try {
-        // Create a simple toast notification to inform the user
-        android.widget.Toast.makeText(
-            activity,
-            "Tracking stopped: Accessibility access was disabled. Please re-enable it in Settings to continue tracking.",
-            android.widget.Toast.LENGTH_LONG
-        ).show()
+        // Use the new notification manager for better user experience
+        val notificationManager = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+            .getDeclaredConstructor(Context::class.java)
+            .newInstance(activity) as Any
+        
+        val showMethod = notificationManager::class.java.getDeclaredMethod("showAccessibilityDisabledNotification")
+        showMethod.invoke(notificationManager)
+        
         println("DEBUG: showAccessibilityDisabledNotification - notification shown")
     } catch (e: Exception) {
-        println("DEBUG: showAccessibilityDisabledNotification - error: ${e.message}")
+        // Fallback to toast if notification manager fails
+        try {
+            android.widget.Toast.makeText(
+                activity,
+                "Tracking stopped: Accessibility access was disabled. Please re-enable it in Settings to continue tracking.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        } catch (toastException: Exception) {
+            println("DEBUG: showAccessibilityDisabledNotification - error: ${e.message}")
+        }
     }
 }
 
@@ -766,15 +783,26 @@ actual fun showUsageAccessDisabledNotification() {
     }
     
     try {
-        // Create a simple toast notification to inform the user
-        android.widget.Toast.makeText(
-            activity,
-            "Tracking stopped: App usage access was disabled. Please re-enable it in Settings to continue tracking.",
-            android.widget.Toast.LENGTH_LONG
-        ).show()
+        // Use the new notification manager for better user experience
+        val notificationManager = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+            .getDeclaredConstructor(Context::class.java)
+            .newInstance(activity) as Any
+        
+        val showMethod = notificationManager::class.java.getDeclaredMethod("showUsageAccessDisabledNotification")
+        showMethod.invoke(notificationManager)
+        
         println("DEBUG: showUsageAccessDisabledNotification - notification shown")
     } catch (e: Exception) {
-        println("DEBUG: showUsageAccessDisabledNotification - error: ${e.message}")
+        // Fallback to toast if notification manager fails
+        try {
+            android.widget.Toast.makeText(
+                activity,
+                "Tracking stopped: App usage access was disabled. Please re-enable it in Settings to continue tracking.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
+        } catch (toastException: Exception) {
+            println("DEBUG: showUsageAccessDisabledNotification - error: ${e.message}")
+        }
     }
 }
 
@@ -861,3 +889,158 @@ actual fun isUsageAccessPermissionGranted(): Boolean {
         false
     }
 }
+
+// Platform-specific implementations for service management
+actual fun startAppMonitoringForegroundService() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: startAppMonitoringForegroundService - no activity available")
+        return
+    }
+    
+    try {
+        // Use reflection to call the service start method
+        val serviceClass = Class.forName("com.luminoprisma.scrollpause.AppMonitoringForegroundService")
+        val startMethod = serviceClass.getDeclaredMethod("startService", Context::class.java)
+        startMethod.invoke(null, activity)
+        println("DEBUG: startAppMonitoringForegroundService - service started")
+    } catch (e: Exception) {
+        println("DEBUG: startAppMonitoringForegroundService - error: ${e.message}")
+    }
+}
+
+actual fun stopAppMonitoringForegroundService() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: stopAppMonitoringForegroundService - no activity available")
+        return
+    }
+    
+    try {
+        // Use reflection to call the service stop method
+        val serviceClass = Class.forName("com.luminoprisma.scrollpause.AppMonitoringForegroundService")
+        val stopMethod = serviceClass.getDeclaredMethod("stopService", Context::class.java)
+        stopMethod.invoke(null, activity)
+        println("DEBUG: stopAppMonitoringForegroundService - service stopped")
+    } catch (e: Exception) {
+        println("DEBUG: stopAppMonitoringForegroundService - error: ${e.message}")
+    }
+}
+
+actual fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: saveTrackingStateForRestart - no activity available")
+        return
+    }
+    
+    try {
+        // Use reflection to call the restart detector save method
+        val detectorClass = Class.forName("com.luminoprisma.scrollpause.AppRestartDetector")
+        val constructor = detectorClass.getDeclaredConstructor(Context::class.java)
+        val detector = constructor.newInstance(activity)
+        val saveMethod = detectorClass.getDeclaredMethod("saveTrackingState", Boolean::class.java, Boolean::class.java, List::class.java, Int::class.java)
+        saveMethod.invoke(detector, isTracking, isBlocked, trackedApps, timeLimit)
+        println("DEBUG: saveTrackingStateForRestart - state saved")
+    } catch (e: Exception) {
+        println("DEBUG: saveTrackingStateForRestart - error: ${e.message}")
+    }
+}
+
+actual fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int) {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: showPersistentBlockingNotification - no activity available")
+        return
+    }
+    
+    try {
+        // Use reflection to call the notification manager
+        val managerClass = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val constructor = managerClass.getDeclaredConstructor(Context::class.java)
+        val manager = constructor.newInstance(activity)
+        val showMethod = managerClass.getDeclaredMethod("showPersistentBlockingNotification", List::class.java, Int::class.java)
+        showMethod.invoke(manager, trackedApps, timeLimit)
+        println("DEBUG: showPersistentBlockingNotification - showed notification for ${trackedApps.size} apps")
+    } catch (e: Exception) {
+        println("DEBUG: showPersistentBlockingNotification - error: ${e.message}")
+    }
+}
+
+actual fun clearPersistentBlockingNotification() {
+    val activity = currentActivityRef?.get()
+    if (activity == null) {
+        println("DEBUG: clearPersistentBlockingNotification - no activity available")
+        return
+    }
+    
+    try {
+        // Use reflection to call the notification manager
+        val managerClass = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val constructor = managerClass.getDeclaredConstructor(Context::class.java)
+        val manager = constructor.newInstance(activity)
+        val clearMethod = managerClass.getDeclaredMethod("clearPersistentBlockingNotification")
+        clearMethod.invoke(manager)
+        println("DEBUG: clearPersistentBlockingNotification - cleared notification")
+    } catch (e: Exception) {
+        println("DEBUG: clearPersistentBlockingNotification - error: ${e.message}")
+    }
+}
+
+actual fun startCompliantAppBlocking(trackedApps: List<String>, timeLimit: Int) {
+    try {
+        val activity = currentActivityRef?.get()
+        if (activity != null) {
+            // Use reflection to call the compliant app blocking service
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
+            val blockingService = getInstanceMethod.invoke(null, activity)
+            val startBlockingMethod = serviceClass.getDeclaredMethod("startBlocking", List::class.java, Int::class.java)
+            startBlockingMethod.invoke(blockingService, trackedApps, timeLimit)
+            println("DEBUG: startCompliantAppBlocking - started blocking ${trackedApps.size} apps")
+        } else {
+            println("DEBUG: startCompliantAppBlocking - no activity available")
+        }
+    } catch (e: Exception) {
+        println("DEBUG: startCompliantAppBlocking - error: ${e.message}")
+    }
+}
+
+actual fun stopCompliantAppBlocking() {
+    try {
+        val activity = currentActivityRef?.get()
+        if (activity != null) {
+            // Use reflection to call the compliant app blocking service
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
+            val blockingService = getInstanceMethod.invoke(null, activity)
+            val stopBlockingMethod = serviceClass.getDeclaredMethod("stopBlocking")
+            stopBlockingMethod.invoke(blockingService)
+            println("DEBUG: stopCompliantAppBlocking - stopped blocking")
+        } else {
+            println("DEBUG: stopCompliantAppBlocking - no activity available")
+        }
+    } catch (e: Exception) {
+        println("DEBUG: stopCompliantAppBlocking - error: ${e.message}")
+    }
+}
+
+actual fun isCompliantAppBlockingEnabled(): Boolean {
+    return try {
+        val activity = currentActivityRef?.get()
+        if (activity != null) {
+            // Use reflection to call the compliant app blocking service
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
+            val blockingService = getInstanceMethod.invoke(null, activity)
+            val isBlockingMethod = serviceClass.getDeclaredMethod("isBlocking")
+            isBlockingMethod.invoke(blockingService) as Boolean
+        } else {
+            false
+        }
+    } catch (e: Exception) {
+        println("DEBUG: isCompliantAppBlockingEnabled - error: ${e.message}")
+        false
+    }
+}
+

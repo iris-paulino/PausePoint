@@ -490,6 +490,22 @@ class AndroidAppStorage(private val context: Context) : AppStorage {
         
         return usageTimes
     }
+    
+    override suspend fun savePersistentTrackingConsent(consent: Boolean) {
+        try {
+            prefs.edit().putBoolean("persistent_tracking_consent", consent).apply()
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+    
+    override suspend fun getPersistentTrackingConsent(): Boolean {
+        return try {
+            prefs.getBoolean("persistent_tracking_consent", false)
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
 
 // Global storage instance - will be initialized in MainActivity
@@ -683,6 +699,14 @@ class FallbackAppStorage : AppStorage {
 
     override suspend fun getLastStreakUpdateDay(): Long {
         return 0L
+    }
+    
+    override suspend fun savePersistentTrackingConsent(consent: Boolean) {
+        // No-op for fallback
+    }
+    
+    override suspend fun getPersistentTrackingConsent(): Boolean {
+        return false
     }
 }
 

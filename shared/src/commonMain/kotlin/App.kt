@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -820,6 +821,8 @@ private fun AppRoot() {
     var showAccessibilityConsentDialog by remember { mutableStateOf(false) }
     var showUsageAccessDisableConfirmationDialog by remember { mutableStateOf(false) }
     var showAccessibilityDisableConfirmationDialog by remember { mutableStateOf(false) }
+    var showPersistentTrackingConsentDialog by remember { mutableStateOf(false) }
+    var persistentTrackingConsent by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var userManuallyStoppedTracking by remember { mutableStateOf(false) }
     var trackedApps by remember { mutableStateOf<List<TrackedApp>>(emptyList()) }
@@ -841,6 +844,7 @@ private fun AppRoot() {
     LaunchedEffect(Unit) {
         try {
             restartTrackingOnUnlock = storage.getAutoRestartOnDismiss()
+            persistentTrackingConsent = storage.getPersistentTrackingConsent()
         } catch (_: Exception) {}
     }
     
@@ -999,6 +1003,8 @@ private fun AppRoot() {
         // Clear blocked state and overlays ONLY after ad is completed
         isBlocked = false
         updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+        stopCompliantAppBlocking()
+        clearPersistentBlockingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
         sessionAppUsageTimes = emptyMap()
         sessionCreditedMinutes = emptyMap()
@@ -1098,6 +1104,10 @@ private fun AppRoot() {
         isBlocked = false
         // Update accessibility service with unblocked state
         updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+        // Stop system-level app blocking
+        stopCompliantAppBlocking()
+        // Clear persistent blocking notification
+        clearPersistentBlockingNotification()
         // Save unblocked state to storage
         coroutineScope.launch {
             storage.saveBlockedState(false)
@@ -1213,6 +1223,18 @@ private fun AppRoot() {
                     route = Route.Pause
                 }
             )
+            
+        // Start enhanced services only if user has given consent
+            if (persistentTrackingConsent) {
+                // Start foreground service for persistent monitoring
+                startAppMonitoringForegroundService()
+                
+                // Save tracking state for restart detection
+                saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+            } else {
+                // Show consent dialog for enhanced tracking
+                showPersistentTrackingConsentDialog = true
+            }
         } else {
             // Stop tracking and save final state
             println("DEBUG: *** TRACKING STOPPED *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
@@ -1223,6 +1245,9 @@ private fun AppRoot() {
                     storage.saveTrackingState(false)
                 }
             }
+            
+            // Stop foreground service
+            stopAppMonitoringForegroundService()
         }
     }
 
@@ -1360,10 +1385,14 @@ private fun AppRoot() {
                     isBlocked = true
                     // Update accessibility service with blocked state
                     updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                    // Start compliant app blocking using notifications
+                    startCompliantAppBlocking(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     // Save blocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(true)
                     }
+                    // Show persistent blocking notification
+                    showPersistentBlockingNotification(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     route = Route.Pause
                     // Show the blocking overlay to prevent further app usage
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
@@ -1642,10 +1671,12 @@ private fun AppRoot() {
                 println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
                 // Ensure overlays are dismissed and user is not considered blocked anymore
                 isBlocked = false
+                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
                 dismissBlockingOverlay()
                 println("DEBUG: QR scan callback - cleared blocked state and dismissed overlay")
 
-                coroutineScope.launch {
+                // Use a different approach since coroutineScope might not be available in this context
+                try {
                     // 1) Finalize current session usage to credit minutes, then clear session
                     println("DEBUG: QR scan callback - finalizing session usage before dialog")
                     finalizeSessionUsage()
@@ -1655,7 +1686,9 @@ private fun AppRoot() {
                     
                     // 2.5) Update day streak counter logic
                     val todayEpochDay = currentEpochDayUtc()
-                    val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
+                    val lastStreakUpdateDay = try {
+                        runBlocking { withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } } ?: 0L
+                    } catch (_: Exception) { 0L }
                     
                     // If the streak is currently 0, set it to 1 on successful scan.
                     // Otherwise, only increment if this is the first QR scan of a new day.
@@ -1670,15 +1703,18 @@ private fun AppRoot() {
                     }
                     
                     try {
-                        storage.saveTimesUnblockedToday(timesUnblockedToday)
-                        storage.saveDayStreakCounter(dayStreakCounter)
-                        storage.saveLastStreakUpdateDay(todayEpochDay)
+                        runBlocking {
+                            storage.saveTimesUnblockedToday(timesUnblockedToday)
+                            storage.saveDayStreakCounter(dayStreakCounter)
+                            storage.saveLastStreakUpdateDay(todayEpochDay)
+                        }
                         println("DEBUG: QR scan callback - saved times walked to storage")
                         println("DEBUG: QR scan callback - saved day streak to storage: $dayStreakCounter")
                     } catch (_: Exception) {}
 
                     val doNotShow = try {
-                        storage.getDoNotShowCongratulationAgain()
+                        // Use runBlocking to call suspend function in non-coroutine context
+                        runBlocking { storage.getDoNotShowCongratulationAgain() }
                     } catch (_: Exception) { false }
                     println("DEBUG: QR scan callback - doNotShowCongratulationAgain=$doNotShow")
 
@@ -1692,6 +1728,8 @@ private fun AppRoot() {
                         userManuallyStoppedTracking = false
                         route = Route.Dashboard
                     }
+                } catch (e: Exception) {
+                    println("DEBUG: QR scan callback - error in callback: ${e.message}")
                 }
             }
             
@@ -1795,11 +1833,30 @@ private fun AppRoot() {
             println("DEBUG: App startup - savedAppUsageTimes: $savedAppUsageTimes")
             println("DEBUG: App startup - savedUsageDay: $savedUsageDay, todayEpochDay: $todayEpochDay")
             
-            // Restore tracking state
-            isTracking = savedTrackingState
+            // Restore tracking state with validation
+            // If we're blocked but not tracking, this is an inconsistent state
+            // that can happen when the app is killed while in Pause screen
+            if (savedBlockedState && !savedTrackingState) {
+                println("DEBUG: App startup - Inconsistent state detected: isBlocked=true but isTracking=false")
+                println("DEBUG: App startup - This typically happens when app was killed while in Pause screen")
+                println("DEBUG: App startup - Clearing blocked state and resetting to dashboard")
+                // Clear the inconsistent blocked state
+                isBlocked = false
+                isTracking = false
+                // Save the corrected state
+                withTimeoutOrNull(2000) {
+                    try {
+                        storage.saveBlockedState(false)
+                        storage.saveTrackingState(false)
+                    } catch (_: Exception) {}
+                }
+            } else {
+                isTracking = savedTrackingState
+                isBlocked = savedBlockedState
+            }
+            
             appUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
-            isBlocked = savedBlockedState
             
             // If we're restoring a tracking state, reset the manual stop flag
             // This allows auto-start when permissions are granted after app restart
@@ -1826,7 +1883,22 @@ private fun AppRoot() {
             
             // Update accessibility service with restored blocked state
             if (isBlocked) {
-                updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                // If we're blocked but have no tracked apps, this is an inconsistent state
+                // This can happen when the app was killed while in Pause route
+                if (trackedApps.isEmpty()) {
+                    println("DEBUG: App startup - Inconsistent state detected: isBlocked=true but trackedApps=empty")
+                    println("DEBUG: App startup - Clearing blocked state to prevent stuck state")
+                    isBlocked = false
+                    // Save the corrected state
+                    withTimeoutOrNull(2000) {
+                        try {
+                            storage.saveBlockedState(false)
+                        } catch (_: Exception) {}
+                    }
+                    updateAccessibilityServiceBlockedState(false, emptyList(), 0)
+                } else {
+                    updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                }
             } else {
                 updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
             }
@@ -2101,6 +2173,18 @@ private fun AppRoot() {
         if (isTracking) {
             userManuallyStoppedTracking = false
             println("DEBUG: *** TRACKING RESTARTED *** sessionStartTime: $sessionStartTime, sessionAppUsageTimes: $sessionAppUsageTimes")
+            
+            // Start enhanced services only if user has given consent
+            if (persistentTrackingConsent) {
+                // Start foreground service for persistent monitoring
+                startAppMonitoringForegroundService()
+                
+                // Save tracking state for restart detection
+                saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                
+                // Update accessibility service with current tracking state
+                updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+            }
         }
         println("DEBUG: Tracking state updated to: $isTracking")
     }
@@ -2368,7 +2452,7 @@ private fun AppRoot() {
         )
     }
     
-    // Notification Permission Dialog
+    // Notification Dialog (existing)
     if (showNotificationDialog) {
         androidx.compose.ui.window.Dialog(onDismissRequest = { showNotificationDialog = false; pendingStartTracking = false }) {
             Card(
@@ -2623,6 +2707,39 @@ private fun AppRoot() {
             }
         }
     }
+
+    // Persistent Tracking Consent Dialog
+    PersistentTrackingConsentDialog(
+        isVisible = showPersistentTrackingConsentDialog,
+        onAllow = {
+            persistentTrackingConsent = true
+            showPersistentTrackingConsentDialog = false
+            coroutineScope.launch {
+                try {
+                    storage.savePersistentTrackingConsent(true)
+                    // Now start the enhanced services
+                    startAppMonitoringForegroundService()
+                    saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                } catch (e: Exception) {
+                    println("DEBUG: Error saving persistent tracking consent: ${e.message}")
+                }
+            }
+        },
+        onDeny = {
+            persistentTrackingConsent = false
+            showPersistentTrackingConsentDialog = false
+            coroutineScope.launch {
+                try {
+                    storage.savePersistentTrackingConsent(false)
+                } catch (e: Exception) {
+                    println("DEBUG: Error saving persistent tracking consent: ${e.message}")
+                }
+            }
+        },
+        onDismiss = {
+            showPersistentTrackingConsentDialog = false
+        }
+    )
 
     // Usage Access Disable Confirmation Dialog
     if (showUsageAccessDisableConfirmationDialog) {
@@ -3225,6 +3342,14 @@ expect fun setOnAccessibilityStatusChangeCallback(callback: ((Boolean) -> Unit)?
 expect fun startAccessibilityMonitoring()
 expect fun isUsageAccessPermissionGranted(): Boolean
 expect fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?)
+expect fun startAppMonitoringForegroundService()
+expect fun stopAppMonitoringForegroundService()
+expect fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int)
+expect fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int)
+expect fun clearPersistentBlockingNotification()
+expect fun startCompliantAppBlocking(trackedApps: List<String>, timeLimit: Int)
+expect fun stopCompliantAppBlocking()
+expect fun isCompliantAppBlockingEnabled(): Boolean
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

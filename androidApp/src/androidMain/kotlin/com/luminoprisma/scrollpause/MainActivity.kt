@@ -19,6 +19,8 @@ import initializeAdManager
 
 class MainActivity : AppCompatActivity() {
     private var isDismissing = false // Flag to prevent camera permission requests during dismiss
+    private lateinit var appRestartDetector: AppRestartDetector
+    private lateinit var notificationManager: BlockingNotificationManager
     
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -42,6 +44,13 @@ class MainActivity : AppCompatActivity() {
         
         // Initialize the ad manager with the activity context
         initializeAdManager(this)
+
+        // Initialize new monitoring components
+        appRestartDetector = AppRestartDetector(this)
+        notificationManager = BlockingNotificationManager(this)
+        
+        // Detect app restart and auto-resume if needed
+        appRestartDetector.onAppStart()
 
         registerCurrentActivity(this)
 
@@ -115,6 +124,11 @@ class MainActivity : AppCompatActivity() {
             setPackage(packageName)
         }
         sendBroadcast(intent)
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        appRestartDetector.cleanup()
     }
 
 }

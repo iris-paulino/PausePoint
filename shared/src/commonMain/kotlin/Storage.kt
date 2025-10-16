@@ -257,6 +257,16 @@ interface AppStorage {
      * Retrieve the last day when streak was updated. Return 0 if unset.
      */
     suspend fun getLastStreakUpdateDay(): Long
+    
+    /**
+     * Save persistent tracking consent preference
+     */
+    suspend fun savePersistentTrackingConsent(consent: Boolean)
+    
+    /**
+     * Get persistent tracking consent preference
+     */
+    suspend fun getPersistentTrackingConsent(): Boolean
 }
 
 /**

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
+import android.content.SharedPreferences
 
 class ForegroundAppAccessibilityService : AccessibilityService() {
     companion object {
@@ -24,6 +25,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             currentForegroundPackage = packageName
             println("DEBUG: ForegroundAppAccessibilityService - Set foreground app: $packageName")
         }
+        
+        fun isBlocked(): Boolean = isBlocked
 
         fun setPendingShow(message: String) {
             pendingShowMessage = message
@@ -42,6 +45,23 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             trackedAppNames = trackedApps
             timeLimitMinutes = timeLimit
             println("DEBUG: ForegroundAppAccessibilityService - Set blocked state: blocked=$blocked, apps=$trackedApps, limit=$timeLimit")
+
+            // Persist the blocking state so it survives app kills
+            appContextRef?.let { context ->
+                try {
+                    val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().apply {
+                        putBoolean(KEY_BLOCKED, blocked)
+                        putString(KEY_TRACKED_APPS, trackedApps.joinToString(","))
+                        putInt(KEY_TIME_LIMIT, timeLimit)
+                        putLong("blocking_start_time", System.currentTimeMillis())
+                        apply()
+                    }
+                    println("DEBUG: ForegroundAppAccessibilityService - Persisted blocking state: blocked=$blocked")
+                } catch (e: Exception) {
+                    println("DEBUG: ForegroundAppAccessibilityService - Error persisting state: ${e.message}")
+                }
+            }
 
             // If blocking just turned on while user is already in a tracked app,
             // immediately launch the Pause screen without waiting for another event
@@ -115,6 +135,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         appContextRef = applicationContext
         registerRedirectReceiver()
         loadStateFromPreferences()
+        
+        // Additional debugging for persistent blocking
+        println("DEBUG: ForegroundAppAccessibilityService - Service connected, checking if we should restore blocking")
+        println("DEBUG: ForegroundAppAccessibilityService - Current state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes")
         try {
             android.widget.Toast.makeText(
                 this,
@@ -122,6 +146,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 android.widget.Toast.LENGTH_SHORT
             ).show()
         } catch (_: Exception) {}
+        
+        // Start periodic connection monitoring to ensure service stays connected
+        startConnectionMonitoring()
+        
         // Apply any pending command
         val msg = pendingShowMessage
         if (msg != null) {
@@ -174,6 +202,35 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+    }
+    
+    private fun startConnectionMonitoring() {
+        // Check connection every 5 seconds
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val runnable = object : Runnable {
+            override fun run() {
+                try {
+                    // Check if we have a valid connection by trying to access service info
+                    val serviceInfo = serviceInfo
+                    if (serviceInfo == null) {
+                        println("DEBUG: startConnectionMonitoring - Service connection lost, attempting to restore")
+                        // Try to restore connection by calling onServiceConnected again
+                        onServiceConnected()
+                    } else {
+                        // Connection is good, check if we need to restore state
+                        if (!isBlocked && trackedAppNames.isEmpty()) {
+                            println("DEBUG: startConnectionMonitoring - Service connected but no blocking state, checking SharedPreferences")
+                            loadStateFromPreferences()
+                        }
+                    }
+                } catch (e: Exception) {
+                    println("DEBUG: startConnectionMonitoring - Error checking connection: ${e.message}")
+                }
+                // Schedule next check in 5 seconds
+                handler.postDelayed(this, 5000)
+            }
+        }
+        handler.postDelayed(runnable, 5000)
     }
     
     private fun checkAndRedirectToPauseApp(packageName: String?) {
@@ -234,6 +291,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         try {
             val showFilter = IntentFilter("com.luminoprisma.scrollpause.SHOW_PAUSE_SCREEN")
             val hideFilter = IntentFilter("com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN")
+            val stateFilter = IntentFilter("com.luminoprisma.scrollpause.STATE_CHANGED")
 
             println("DEBUG: registerRedirectReceiver - registering receivers")
             val showReceiver = object : BroadcastReceiver() {
@@ -257,14 +315,24 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     // No action needed - the pause screen will handle its own dismissal
                 }
             }
+            val stateReceiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    println("DEBUG: receiver STATE_CHANGED received - intent=$intent")
+                    // Reload state from SharedPreferences when state changes
+                    loadStateFromPreferences()
+                }
+            }
             if (Build.VERSION.SDK_INT >= 33) {
                 registerReceiver(showReceiver, showFilter, Context.RECEIVER_NOT_EXPORTED)
                 registerReceiver(hideReceiver, hideFilter, Context.RECEIVER_NOT_EXPORTED)
+                registerReceiver(stateReceiver, stateFilter, Context.RECEIVER_NOT_EXPORTED)
             } else {
                 @Suppress("DEPRECATION")
                 registerReceiver(showReceiver, showFilter)
                 @Suppress("DEPRECATION")
                 registerReceiver(hideReceiver, hideFilter)
+                @Suppress("DEPRECATION")
+                registerReceiver(stateReceiver, stateFilter)
             }
         } catch (_: Exception) {
         }
@@ -277,11 +345,57 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val trackedCsv = prefs.getString(KEY_TRACKED_APPS, "") ?: ""
             val timeLimit = prefs.getInt(KEY_TIME_LIMIT, 0)
             val apps = if (trackedCsv.isBlank()) emptyList() else trackedCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            
+            println("DEBUG: loadStateFromPreferences - Loading state from SharedPreferences")
+            println("DEBUG: loadStateFromPreferences - Raw data: blocked=$blocked, csv='$trackedCsv', limit=$timeLimit")
+            println("DEBUG: loadStateFromPreferences - Parsed apps: $apps")
+            println("DEBUG: loadStateFromPreferences - All preferences: ${prefs.all}")
+            
+            // Always update the state, even if it's the same
             isBlocked = blocked
             trackedAppNames = apps
             timeLimitMinutes = timeLimit
-            println("DEBUG: loadStateFromPreferences - blocked=$blocked, apps=$apps, limit=$timeLimit")
-        } catch (_: Exception) {
+            
+            println("DEBUG: loadStateFromPreferences - Updated state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes")
+            
+            // If we're restoring a blocked state, check if user is currently in a tracked app
+            if (blocked && apps.isNotEmpty()) {
+                println("DEBUG: loadStateFromPreferences - Restoring blocked state, checking current app")
+                
+                // Wait a moment for the service to be fully initialized
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                    val currentPkg = currentForegroundPackage
+                    println("DEBUG: loadStateFromPreferences - Current foreground package: $currentPkg")
+                    
+                    if (isPackageTracked(currentPkg, apps)) {
+                        println("DEBUG: loadStateFromPreferences - User in tracked app, showing Pause screen immediately")
+                        val message = if (timeLimit > 0) {
+                            "Take a mindful pause - you've reached your time limit of ${timeLimit} minutes"
+                        } else {
+                            "Take a mindful pause"
+                        }
+                        
+                        try {
+                            val intent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                putExtra("message", message)
+                            }
+                            startActivity(intent)
+                            println("DEBUG: loadStateFromPreferences - Successfully launched Pause screen")
+                        } catch (e: Exception) {
+                            println("DEBUG: loadStateFromPreferences - Error launching Pause screen: ${e.message}")
+                        }
+                    } else {
+                        println("DEBUG: loadStateFromPreferences - User not in tracked app, blocking will activate when they switch to one")
+                    }
+                }, 1000) // Wait 1 second for service initialization
+            } else if (!blocked) {
+                println("DEBUG: loadStateFromPreferences - No blocking state to restore")
+            } else {
+                println("DEBUG: loadStateFromPreferences - Blocked state but no tracked apps")
+            }
+        } catch (e: Exception) {
+            println("DEBUG: loadStateFromPreferences - Error: ${e.message}")
         }
     }
 }
