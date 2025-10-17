@@ -1675,7 +1675,8 @@ private fun AppRoot() {
                 println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
                 // Ensure overlays are dismissed and user is not considered blocked anymore
                 isBlocked = false
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                // Clear blocked state but preserve tracked apps and time limit for continued tracking
+                updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                 dismissBlockingOverlay()
                 println("DEBUG: QR scan callback - cleared blocked state and dismissed overlay")
 
@@ -1722,16 +1723,26 @@ private fun AppRoot() {
                     } catch (_: Exception) { false }
                     println("DEBUG: QR scan callback - doNotShowCongratulationAgain=$doNotShow")
 
+                    // Clear session usage and restart tracking after QR scan
+                    sessionAppUsageTimes = emptyMap()
+                    sessionStartTime = 0L
+                    sessionElapsedSeconds = 0L
+                    currentForegroundApp = null
+                    appActiveSince = 0L
+                    println("DEBUG: QR scan callback - cleared session data for fresh start")
+                    
+                    // Always auto-restart tracking after QR scan
+                    pendingStartTracking = true
+                    userManuallyStoppedTracking = false
+                    route = Route.Dashboard
+                    println("DEBUG: QR scan callback - set pendingStartTracking=true for auto-restart")
+
                     if (!doNotShow) {
                         // Launch platform overlay immediately so it's visible even outside the app
                         println("DEBUG: QR scan callback - launching Congratulations overlay")
                         showCongratulationsOverlay()
                     } else {
                         println("DEBUG: QR scan callback - preference set to skip dialog; auto-restarting tracking")
-                        // Always auto-restart after QR scan
-                        pendingStartTracking = true
-                        userManuallyStoppedTracking = false
-                        route = Route.Dashboard
                     }
                 } catch (e: Exception) {
                     println("DEBUG: QR scan callback - error in callback: ${e.message}")
