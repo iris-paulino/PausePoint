@@ -1687,6 +1687,7 @@ private fun AppRoot() {
                     finalizeSessionUsage()
 
                     // 2) Increment and persist times walked counter
+                    timesUnblockedToday += 1
                     println("DEBUG: QR scan callback - incremented times walked to: $timesUnblockedToday")
                     
                     // 2.5) Update day streak counter logic
