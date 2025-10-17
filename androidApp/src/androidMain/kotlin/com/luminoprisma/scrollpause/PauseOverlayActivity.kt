@@ -109,12 +109,12 @@ class PauseOverlayActivity : ComponentActivity() {
                             adManager.showInterstitialAd(
                                 onAdClosed = {
                                     println("DEBUG: Overlay ad completed, dismissing overlay")
-                                    dismissAndContinueTracking()
+                                    performSelfContainedDismiss()
                                     finish()
                                 },
                                 onAdFailedToLoad = {
                                     println("DEBUG: Overlay ad failed, dismissing anyway")
-                                    dismissAndContinueTracking()
+                                    performSelfContainedDismiss()
                                     finish()
                                 }
                             )
@@ -134,25 +134,25 @@ class PauseOverlayActivity : ComponentActivity() {
                                     adManager.showInterstitialAd(
                                         onAdClosed = {
                                             println("DEBUG: Overlay ad completed after wait, dismissing overlay")
-                                            dismissAndContinueTracking()
+                                            performSelfContainedDismiss()
                                             finish()
                                         },
                                         onAdFailedToLoad = {
                                             println("DEBUG: Overlay ad failed after wait, dismissing anyway")
-                                            dismissAndContinueTracking()
+                                            performSelfContainedDismiss()
                                             finish()
                                         }
                                     )
                                 } else {
                                     println("DEBUG: Overlay - Ad still not loaded after wait, dismissing without ad")
-                                    dismissAndContinueTracking()
+                                    performSelfContainedDismiss()
                                     finish()
                                 }
                             }
                         }
                     } catch (e: Exception) {
                         println("DEBUG: Error showing overlay ad: ${e.message}, dismissing anyway")
-                        dismissAndContinueTracking()
+                        performSelfContainedDismiss()
                         finish()
                     }
                 },
@@ -161,14 +161,55 @@ class PauseOverlayActivity : ComponentActivity() {
         }
     }
 
+    private fun performSelfContainedDismiss() {
+        println("DEBUG: PauseOverlayActivity - performSelfContainedDismiss called")
+        // 1) Increment and persist times dismissed
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                val storage = createAppStorage()
+                val current = try { storage.getTimesDismissedToday() } catch (_: Exception) { 0 }
+                val updated = current + 1
+                try { storage.saveTimesDismissedToday(updated) } catch (_: Exception) {}
+                println("DEBUG: OverlayDismiss - incremented timesDismissedToday to: $updated")
+            } catch (e: Exception) {
+                println("DEBUG: OverlayDismiss - error updating timesDismissedToday: ${e.message}")
+            }
+        }
+
+        // 2) Persist blocked=false, clear usage for tracked apps, broadcast STATE_CHANGED
+        try {
+            val prefs = applicationContext.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+            val csv = prefs.getString("tracked_apps_csv", "") ?: ""
+            val limit = prefs.getInt("time_limit_minutes", 0)
+            prefs.edit().apply {
+                putBoolean("blocked", false)
+                if (csv.isNotBlank()) {
+                    csv.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
+                        val usageKey = "usage_" + name.replace(" ", "_")
+                        remove(usageKey)
+                    }
+                }
+                apply()
+            }
+            println("DEBUG: OverlayDismiss - cleared usage for tracked apps")
+
+            val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
+                setPackage(packageName)
+                putExtra("isBlocked", false)
+                putExtra("trackedApps", csv)
+                putExtra("timeLimit", limit)
+            }
+            applicationContext.sendBroadcast(intent)
+            println("DEBUG: OverlayDismiss - sent STATE_CHANGED (blocked=false, limit=$limit)")
+        } catch (e: Exception) {
+            println("DEBUG: OverlayDismiss - error during unblock broadcast: ${e.message}")
+        }
+    }
+
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
         println("DEBUG: PauseOverlayActivity - onNewIntent called")
-        // Bring the activity to the foreground when user switches to another tracked app
-        // The activity is already running, so we just need to make sure it's visible
-        // The existing content will remain the same
     }
-
 
     override fun onDestroy() {
         try { unregisterReceiver(hideReceiver) } catch (_: Exception) {}

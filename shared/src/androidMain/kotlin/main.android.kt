@@ -395,49 +395,106 @@ actual fun setOnTimerResetCallback(callback: (() -> Unit)?) {
 
 actual fun setOnDismissCallback(callback: (() -> Unit)?) {
     onDismissCallback = callback
+    
+    // Also set the callback in MainActivity so the broadcast receiver can call it
+    val activity = currentActivityRef?.get()
+    if (activity != null) {
+        try {
+            val method = activity::class.java.methods.firstOrNull { it.name == "setDismissCallback" && it.parameterTypes.size == 1 }
+            if (method != null) {
+                method.invoke(activity, callback)
+                println("DEBUG: setOnDismissCallback - set callback in MainActivity")
+            }
+        } catch (e: Exception) {
+            println("DEBUG: setOnDismissCallback - error setting callback in MainActivity: ${e.message}")
+        }
+    }
 }
 
 actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
     println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
     try {
-        // Persist state so the AccessibilityService can restore it after app UI is killed
+        // Choose a safe context (application if activity missing)
         val activity = currentActivityRef?.get()
-        if (activity != null) {
+        val ctx: Context? = activity?.applicationContext ?: appContextRef
+
+        // Persist state so the AccessibilityService can restore it after app UI is killed
+        if (ctx != null) {
             try {
-                val prefs = activity.applicationContext.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                val prefs = ctx.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
                 val csv = trackedAppNames.joinToString(",")
                 prefs.edit()
                     .putBoolean("blocked", isBlocked)
                     .putString("tracked_apps_csv", csv)
                     .putInt("time_limit_minutes", timeLimitMinutes)
                     .apply()
-                println("DEBUG: updateAccessibilityServiceBlockedState - persisted to SharedPreferences: blocked=$isBlocked, apps=$csv, limit=$timeLimitMinutes")
+                println("DEBUG: updateAccessibilityServiceBlockedState - persisted to SharedPreferences (app ctx): blocked=$isBlocked, apps=$csv, limit=$timeLimitMinutes")
             } catch (e: Exception) {
                 println("DEBUG: updateAccessibilityServiceBlockedState - prefs persist error: ${e.message}")
             }
         } else {
-            println("DEBUG: updateAccessibilityServiceBlockedState - no activity to persist prefs")
+            println("DEBUG: updateAccessibilityServiceBlockedState - no context to persist prefs")
         }
 
         // Send broadcast to notify accessibility service of state change
-        if (activity != null) {
+        if (ctx != null) {
             try {
                 val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
-                    setPackage(activity.packageName)
+                    setPackage(ctx.packageName)
                     putExtra("isBlocked", isBlocked)
                     putExtra("trackedApps", trackedAppNames.joinToString(","))
                     putExtra("timeLimit", timeLimitMinutes)
                 }
-                activity.sendBroadcast(intent)
-                println("DEBUG: updateAccessibilityServiceBlockedState - sent STATE_CHANGED broadcast")
+                ctx.sendBroadcast(intent)
+                println("DEBUG: updateAccessibilityServiceBlockedState - sent STATE_CHANGED broadcast (app ctx)")
             } catch (e: Exception) {
                 println("DEBUG: updateAccessibilityServiceBlockedState - error sending broadcast: ${e.message}")
             }
         } else {
-            println("DEBUG: updateAccessibilityServiceBlockedState - no activity to send broadcast")
+            println("DEBUG: updateAccessibilityServiceBlockedState - no context to send broadcast")
         }
     } catch (e: Exception) {
         println("DEBUG: updateAccessibilityServiceBlockedState - error updating accessibility service: ${e.message}")
+    }
+}
+
+@Suppress("unused")
+actual fun openLastTrackedApp(trackedAppIdentifiers: List<String>) {
+    try {
+        val activity = currentActivityRef?.get() ?: return
+        // Try to launch the most recent tracked app seen by the Accessibility Service
+        val pkg = ForegroundAppCache.getLastTrackedForegroundPackage(trackedAppIdentifiers)
+        if (pkg != null) {
+            val intent = activity.packageManager.getLaunchIntentForPackage(pkg)
+            if (intent != null) {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                activity.startActivity(intent)
+                println("DEBUG: openLastTrackedApp - launched $pkg")
+                return
+            }
+        }
+        println("DEBUG: openLastTrackedApp - no tracked package to launch")
+    } catch (e: Exception) {
+        println("DEBUG: openLastTrackedApp - error: ${e.message}")
+    }
+}
+
+@Suppress("unused")
+fun showCongratulationsOverlay() {
+    try {
+        val activity = currentActivityRef?.get()
+        val ctx = activity?.applicationContext ?: appContextRef
+        val intent = android.content.Intent().apply {
+            setClassName(
+                ctx?.packageName ?: "com.luminoprisma.scrollpause",
+                "com.luminoprisma.scrollpause.CongratulationsOverlayActivity"
+            )
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        ctx?.startActivity(intent)
+        println("DEBUG: showCongratulationsOverlay - launched overlay activity")
+    } catch (e: Exception) {
+        println("DEBUG: showCongratulationsOverlay - error: ${e.message}")
     }
 }
 
@@ -603,6 +660,16 @@ actual fun isAccessibilityServiceEnabled(): Boolean {
 private object ForegroundAppCache {
     @Volatile
     var currentPackage: String? = null
+
+    fun getLastTrackedForegroundPackage(identifiers: List<String>): String? {
+        val pkg = currentPackage ?: return null
+        // identifiers may include names and package ids; match by package id subset
+        val isMatch = identifiers.any { id ->
+            val normalized = id.trim()
+            normalized.isNotEmpty() && (normalized == pkg || (normalized.contains('.') && pkg == normalized))
+        }
+        return if (isMatch) pkg else null
+    }
 }
 
 private var receiverRegistered = false

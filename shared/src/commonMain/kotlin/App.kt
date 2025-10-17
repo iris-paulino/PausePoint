@@ -1210,6 +1210,10 @@ private fun AppRoot() {
             }
             println("DEBUG: Updated tracked apps with current time limit: $timeLimitMinutes minutes")
             
+            // Update accessibility service with tracked apps so it can track time and trigger blocking
+            updateAccessibilityServiceBlockedState(false, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+            println("DEBUG: Updated accessibility service with tracked apps for time tracking")
+            
             // Start platform-specific usage tracking with robust app identification
             val trackedPackages = trackedApps.map { app ->
                 getPackageNameForTrackedApp(app)
@@ -1764,11 +1768,14 @@ private fun AppRoot() {
                     }
                 }
                 
-                // 3. Reset session tracking state when dismissing (same as QR scan)
-                isTracking = false
+                // 3. Reset session state but keep tracking ON and keep tracked apps/time limit
                 isBlocked = false
-                // Update accessibility service with unblocked state
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                // Notify accessibility service to continue timing for current tracked apps
+                updateAccessibilityServiceBlockedState(
+                    false,
+                    getAllTrackedAppIdentifiers(trackedApps),
+                    timeLimitMinutes
+                )
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -1794,18 +1801,17 @@ private fun AppRoot() {
                     }
                 }
                 
-                // 4. Navigate back to dashboard (same as QR scan)
-                route = Route.Dashboard
-                println("DEBUG: Set route to Dashboard")
+                // 4. Stay in the user's app; do not navigate to dashboard
+                println("DEBUG: Staying in tracked app after dismiss; no dashboard navigation")
                 
                 // 5. Dismiss any blocking overlays (same as QR scan)
                 dismissBlockingOverlay()
                 println("DEBUG: Dismissed blocking overlays")
                 
-                // 6. Auto-restart tracking after dismiss
-                pendingStartTracking = true
+                // 6. Ensure tracking remains active (no toggle needed)
+                pendingStartTracking = false
                 userManuallyStoppedTracking = false
-                println("DEBUG: Auto-restarting tracking after dismiss")
+                println("DEBUG: Ensured tracking remains active after dismiss")
                 
                 println("DEBUG: ===== DISMISS CALLBACK COMPLETED =====")
             }
@@ -1899,6 +1905,11 @@ private fun AppRoot() {
                 } else {
                     updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                 }
+            } else if (isTracking && trackedApps.isNotEmpty()) {
+                // If we're tracking but not blocked, still send tracked apps to accessibility service
+                // so it can track time and trigger blocking when time limit is reached
+                println("DEBUG: App startup - Updating accessibility service with tracking state (not blocked yet)")
+                updateAccessibilityServiceBlockedState(false, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
             } else {
                 updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
             }
@@ -2366,6 +2377,23 @@ private fun AppRoot() {
                 timeLimitMinutes = it
                 // Persist time limit immediately
                 coroutineScope.launch { storage.saveTimeLimitMinutes(it) }
+                // If tracking is active, immediately push updated limit to Accessibility Service
+                if (isTracking) {
+                    try {
+                        updateAccessibilityServiceBlockedState(
+                            isBlocked = false,
+                            trackedAppNames = getAllTrackedAppIdentifiers(trackedApps),
+                            timeLimitMinutes = timeLimitMinutes
+                        )
+                        // Keep restart state in sync
+                        saveTrackingStateForRestart(
+                            isTracking,
+                            isBlocked,
+                            trackedApps.map { it.name },
+                            timeLimitMinutes
+                        )
+                    } catch (_: Exception) {}
+                }
             },
             onCompleteSetup = {
                 // Check if we have selected apps from app selection flow
@@ -3029,16 +3057,7 @@ private fun AppRoot() {
     // Congratulatory Dialog
     if (showCongratulationDialog) {
         androidx.compose.ui.window.Dialog(
-            onDismissRequest = { 
-                showCongratulationDialog = false
-                handleQrScanSuccess()
-                // Honor Pause Screen setting
-                pendingStartTracking = restartTrackingOnUnlock
-                if (restartTrackingOnUnlock) {
-                    userManuallyStoppedTracking = false
-                }
-                route = Route.Dashboard
-            },
+            onDismissRequest = { /* disabled */ },
             properties = androidx.compose.ui.window.DialogProperties(
                 dismissOnBackPress = false,
                 dismissOnClickOutside = false,
@@ -3124,6 +3143,41 @@ private fun AppRoot() {
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Back to previous app button
+                    Button(
+                        onClick = {
+                            showCongratulationDialog = false
+                            // Finalize session and auto-restart tracking
+                            handleQrScanSuccess()
+                            pendingStartTracking = true
+                            userManuallyStoppedTracking = false
+                            // Attempt to return to last tracked app
+                            val identifiers = getAllTrackedAppIdentifiers(trackedApps)
+                            openLastTrackedApp(identifiers)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            backgroundColor = Color(0xFF2C2C2C)
+                        ),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text(
+                            "Back to last app",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                    }
+
+                    // Ensure overlay version is shown even if app is backgrounded
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        try { showCongratulationsOverlay() } catch (_: Exception) {}
                     }
                 }
             }
@@ -3331,6 +3385,7 @@ expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
 expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
+expect fun openLastTrackedApp(trackedAppIdentifiers: List<String>)
 expect fun openEmailClient(recipient: String)
 expect fun hasCameraPermission(): Boolean
 expect fun requestCameraPermission(): Boolean

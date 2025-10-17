@@ -19,6 +19,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         @Volatile private var trackedAppNames: List<String> = emptyList()
         @Volatile private var timeLimitMinutes: Int = 0
         
+        // Time tracking variables
+        @Volatile private var appActiveSince: Long = 0L
+        @Volatile private var appUsageTimes: MutableMap<String, Long> = mutableMapOf() // app name -> seconds used
+        
         fun getCurrentForegroundPackage(): String? = currentForegroundPackage
         
         fun setCurrentForegroundPackage(packageName: String?) {
@@ -41,26 +45,32 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         @Volatile private var appContextRef: Context? = null
 
         fun setBlockedState(blocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
-            isBlocked = blocked
-            trackedAppNames = trackedApps
-            timeLimitMinutes = timeLimit
-            println("DEBUG: ForegroundAppAccessibilityService - Set blocked state: blocked=$blocked, apps=$trackedApps, limit=$timeLimit")
+            // Only update state if we're actually setting a blocking state or if we have tracked apps
+            // This prevents the main app from clearing our state when it's killed
+            if (blocked || trackedApps.isNotEmpty() || timeLimit > 0) {
+                isBlocked = blocked
+                trackedAppNames = trackedApps
+                timeLimitMinutes = timeLimit
+                println("DEBUG: ForegroundAppAccessibilityService - Set blocked state: blocked=$blocked, apps=$trackedApps, limit=$timeLimit")
 
-            // Persist the blocking state so it survives app kills
-            appContextRef?.let { context ->
-                try {
-                    val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
-                    prefs.edit().apply {
-                        putBoolean(KEY_BLOCKED, blocked)
-                        putString(KEY_TRACKED_APPS, trackedApps.joinToString(","))
-                        putInt(KEY_TIME_LIMIT, timeLimit)
-                        putLong("blocking_start_time", System.currentTimeMillis())
-                        apply()
+                // Persist the blocking state so it survives app kills
+                appContextRef?.let { context ->
+                    try {
+                        val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                        prefs.edit().apply {
+                            putBoolean(KEY_BLOCKED, blocked)
+                            putString(KEY_TRACKED_APPS, trackedApps.joinToString(","))
+                            putInt(KEY_TIME_LIMIT, timeLimit)
+                            putLong("blocking_start_time", System.currentTimeMillis())
+                            apply()
+                        }
+                        println("DEBUG: ForegroundAppAccessibilityService - Persisted blocking state: blocked=$blocked")
+                    } catch (e: Exception) {
+                        println("DEBUG: ForegroundAppAccessibilityService - Error persisting state: ${e.message}")
                     }
-                    println("DEBUG: ForegroundAppAccessibilityService - Persisted blocking state: blocked=$blocked")
-                } catch (e: Exception) {
-                    println("DEBUG: ForegroundAppAccessibilityService - Error persisting state: ${e.message}")
                 }
+            } else {
+                println("DEBUG: ForegroundAppAccessibilityService - Ignoring state clear attempt (blocked=$blocked, apps=$trackedApps, limit=$timeLimit)")
             }
 
             // If blocking just turned on while user is already in a tracked app,
@@ -188,7 +198,11 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         }
         // Only accept non-ignored packages
         if (!isIgnoredPackage(pkg)) {
+            // Track time for the previous app before switching
+            trackTimeForCurrentApp()
+            
             currentForegroundPackage = pkg
+            appActiveSince = System.currentTimeMillis()
             println("DEBUG: ForegroundAppAccessibilityService - New foreground app: $pkg (event=${event?.eventType})")
             val intent = android.content.Intent("com.luminoprisma.scrollpause.FOREGROUND_APP_CHANGED").apply {
                 putExtra("pkg", pkg)
@@ -202,6 +216,116 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
+    }
+    
+    private fun trackTimeForCurrentApp() {
+        if (currentForegroundPackage == null || appActiveSince == 0L) {
+            println("DEBUG: AccessibilityService.trackTimeForCurrentApp - early return: currentForegroundPackage=$currentForegroundPackage, appActiveSince=$appActiveSince")
+            return
+        }
+        
+        val currentTime = System.currentTimeMillis()
+        val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
+        println("DEBUG: AccessibilityService.trackTimeForCurrentApp - timeSpent=$timeSpent, currentForegroundPackage=$currentForegroundPackage, trackedAppNames=$trackedAppNames")
+        
+        if (timeSpent > 0) {
+            // Find which tracked app was active and add the time
+            for (appName in trackedAppNames) {
+                val expectedPackage = getPackageNameForTrackedApp(appName)
+                println("DEBUG: AccessibilityService.trackTimeForCurrentApp - checking appName=$appName, expectedPackage=$expectedPackage")
+                
+                if (currentForegroundPackage == expectedPackage) {
+                    val currentUsage = appUsageTimes[appName] ?: 0L
+                    val newUsage = currentUsage + timeSpent
+                    appUsageTimes[appName] = newUsage
+                    println("DEBUG: AccessibilityService - Added $timeSpent seconds to $appName (total: $newUsage)")
+                    
+                    // Persist the updated usage time
+                    appContextRef?.let { context ->
+                        try {
+                            val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                            val usageKey = "usage_${appName.replace(" ", "_")}"
+                            prefs.edit().apply {
+                                putLong(usageKey, newUsage)
+                                apply()
+                            }
+                            println("DEBUG: AccessibilityService - Persisted usage for $appName: $newUsage seconds")
+                        } catch (e: Exception) {
+                            println("DEBUG: AccessibilityService - Error persisting usage: ${e.message}")
+                        }
+                    }
+                    
+                    // Check if time limit has been reached
+                    checkTimeLimitForApp(appName, newUsage)
+                    break
+                }
+            }
+        }
+    }
+    
+    private fun getPackageNameForTrackedApp(appName: String): String {
+        val normalized = appName.trim()
+        return when (normalized.lowercase()) {
+            "chrome" -> "com.android.chrome"
+            "youtube" -> "com.google.android.youtube"
+            "messages" -> "com.google.android.apps.messaging"
+            "gmail" -> "com.google.android.gm"
+            "whatsapp" -> "com.whatsapp"
+            "youtube music" -> "com.google.android.apps.youtube.music"
+            "instagram" -> "com.instagram.android"
+            "facebook" -> "com.facebook.katana"
+            "tiktok" -> "com.zhiliaoapp.musically"
+            else -> if (normalized.contains('.')) normalized else ""
+        }
+    }
+    
+    private fun checkTimeLimitForApp(appName: String, totalSeconds: Long) {
+        if (timeLimitMinutes <= 0) {
+            // Sanity reload: tracked apps exist but limit is zero → try reloading once
+            if (trackedAppNames.isNotEmpty()) {
+                println("DEBUG: AccessibilityService - timeLimitMinutes=0 with tracked apps present, reloading prefs (totalSeconds=" + totalSeconds + ")")
+                loadStateFromPreferences()
+            }
+            if (timeLimitMinutes <= 0) {
+                println("DEBUG: AccessibilityService - still no timeLimit after reload, skipping check")
+                return
+            }
+        }
+        val timeLimitSeconds = timeLimitMinutes * 60L
+        println("DEBUG: AccessibilityService - checking time limit: app=" + appName + ", used=" + totalSeconds + "s, limitMinutes=" + timeLimitMinutes + ", limitSeconds=" + timeLimitSeconds)
+        if (totalSeconds >= timeLimitSeconds) {
+            println("DEBUG: AccessibilityService - Time limit reached for $appName: $totalSeconds seconds >= $timeLimitSeconds seconds")
+            
+            // Set blocked state and trigger PauseScreen
+            isBlocked = true
+            
+            // Persist the blocked state
+            appContextRef?.let { context ->
+                try {
+                    val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
+                    prefs.edit().apply {
+                        putBoolean(KEY_BLOCKED, true)
+                        apply()
+                    }
+                    println("DEBUG: AccessibilityService - Persisted blocked state: blocked=true")
+                } catch (e: Exception) {
+                    println("DEBUG: AccessibilityService - Error persisting blocked state: ${e.message}")
+                }
+            }
+            
+            // Launch PauseScreen immediately
+            val message = "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
+            try {
+                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    putExtra("message", message)
+                }
+                startActivity(intent)
+                println("DEBUG: AccessibilityService - Launched PauseScreen for time limit reached")
+            } catch (e: Exception) {
+                println("DEBUG: AccessibilityService - Error launching PauseScreen: ${e.message}")
+            }
+        }
     }
     
     private fun startConnectionMonitoring() {
@@ -221,6 +345,20 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                         if (!isBlocked && trackedAppNames.isEmpty()) {
                             println("DEBUG: startConnectionMonitoring - Service connected but no blocking state, checking SharedPreferences")
                             loadStateFromPreferences()
+                        } else if (!isBlocked && trackedAppNames.isNotEmpty() && timeLimitMinutes <= 0) {
+                            // We have tracked apps but no time limit; reload to get the latest limit
+                            println("DEBUG: startConnectionMonitoring - Tracked apps present but timeLimitMinutes=0, reloading prefs")
+                            loadStateFromPreferences()
+                        }
+                        
+                        // Also track time for the current app if it's been active for a while
+                        if (!isBlocked && currentForegroundPackage != null && appActiveSince > 0) {
+                            val currentTime = System.currentTimeMillis()
+                            val elapsedSeconds = (currentTime - appActiveSince) / 1000L
+                            if (elapsedSeconds >= 5L) { // Track every 5 seconds for apps that stay in foreground
+                                trackTimeForCurrentApp()
+                                appActiveSince = currentTime // Reset the timer
+                            }
                         }
                     }
                 } catch (e: Exception) {
@@ -318,8 +456,47 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             val stateReceiver = object : BroadcastReceiver() {
                 override fun onReceive(context: Context?, intent: Intent?) {
                     println("DEBUG: receiver STATE_CHANGED received - intent=$intent")
-                    // Reload state from SharedPreferences when state changes
-                    loadStateFromPreferences()
+                    try {
+                        // Prefer extras if provided
+                        val extrasAppsCsv = intent?.getStringExtra("trackedApps") ?: ""
+                        val extrasLimit = intent?.getIntExtra("timeLimit", -1) ?: -1
+                        val extrasBlocked = intent?.getBooleanExtra("isBlocked", false) ?: false
+                        if (extrasAppsCsv.isNotBlank() || extrasLimit >= 0) {
+                            val apps = if (extrasAppsCsv.isBlank()) emptyList() else extrasAppsCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                            println("DEBUG: STATE_CHANGED - adopting extras: blocked=" + extrasBlocked + ", apps=" + apps.size + ", limit=" + extrasLimit)
+                            // Update in-memory
+                            if (apps.isNotEmpty()) trackedAppNames = apps
+                            if (extrasLimit >= 0) timeLimitMinutes = extrasLimit
+                            isBlocked = extrasBlocked
+                            // Persist so it survives UI death
+                            val prefs = applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                            prefs.edit().apply {
+                                putBoolean(KEY_BLOCKED, isBlocked)
+                                putString(KEY_TRACKED_APPS, trackedAppNames.joinToString(","))
+                                putInt(KEY_TIME_LIMIT, timeLimitMinutes)
+                                apply()
+                            }
+
+                            // If unblocked, reset usage so user gets full time after dismiss
+                            if (!isBlocked) {
+                                appUsageTimes.clear()
+                                try {
+                                    val editor = prefs.edit()
+                                    for (appName in trackedAppNames) {
+                                        val usageKey = "usage_" + appName.replace(" ", "_")
+                                        editor.remove(usageKey)
+                                    }
+                                    editor.apply()
+                                    println("DEBUG: STATE_CHANGED - cleared usage for tracked apps after unblocking")
+                                } catch (_: Exception) {}
+                            }
+                        } else {
+                            // Fallback to SharedPreferences
+                            loadStateFromPreferences()
+                        }
+                    } catch (_: Exception) {
+                        loadStateFromPreferences()
+                    }
                 }
             }
             if (Build.VERSION.SDK_INT >= 33) {
@@ -356,7 +533,18 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             trackedAppNames = apps
             timeLimitMinutes = timeLimit
             
-            println("DEBUG: loadStateFromPreferences - Updated state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes")
+            // Load app usage times from SharedPreferences
+            appUsageTimes.clear()
+            for (appName in apps) {
+                val usageKey = "usage_${appName.replace(" ", "_")}"
+                val usageSeconds = prefs.getLong(usageKey, 0L)
+                if (usageSeconds > 0) {
+                    appUsageTimes[appName] = usageSeconds
+                    println("DEBUG: loadStateFromPreferences - Loaded usage for $appName: $usageSeconds seconds")
+                }
+            }
+            
+            println("DEBUG: loadStateFromPreferences - Updated state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes, usageTimes=$appUsageTimes")
             
             // If we're restoring a blocked state, check if user is currently in a tracked app
             if (blocked && apps.isNotEmpty()) {

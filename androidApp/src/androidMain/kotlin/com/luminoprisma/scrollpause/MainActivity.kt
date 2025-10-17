@@ -2,10 +2,13 @@ package com.luminoprisma.scrollpause
 
 import MainView
 import android.Manifest
+import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.os.Build
 import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -21,6 +24,21 @@ class MainActivity : AppCompatActivity() {
     private var isDismissing = false // Flag to prevent camera permission requests during dismiss
     private lateinit var appRestartDetector: AppRestartDetector
     private lateinit var notificationManager: BlockingNotificationManager
+    
+    private var dismissCallback: (() -> Unit)? = null
+    
+    private val resetTimerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            println("DEBUG: MainActivity - RESET_TIMER_AND_CONTINUE broadcast received")
+            // Call the dismiss callback to restart tracking
+            dismissCallback?.invoke()
+        }
+    }
+    
+    fun setDismissCallback(callback: (() -> Unit)?) {
+        dismissCallback = callback
+        println("DEBUG: MainActivity - setDismissCallback called")
+    }
     
     private val cameraPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -53,6 +71,20 @@ class MainActivity : AppCompatActivity() {
         appRestartDetector.onAppStart()
 
         registerCurrentActivity(this)
+        
+        // Register broadcast receiver for RESET_TIMER_AND_CONTINUE
+        val filter = IntentFilter("com.luminoprisma.scrollpause.RESET_TIMER_AND_CONTINUE")
+        try {
+            if (Build.VERSION.SDK_INT >= 33) {
+                registerReceiver(resetTimerReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                @Suppress("DEPRECATION")
+                registerReceiver(resetTimerReceiver, filter)
+            }
+            println("DEBUG: MainActivity - registered RESET_TIMER_AND_CONTINUE broadcast receiver")
+        } catch (e: Exception) {
+            println("DEBUG: MainActivity - error registering broadcast receiver: ${e.message}")
+        }
 
         setContent {
             MainView()
@@ -129,6 +161,14 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         appRestartDetector.cleanup()
+        
+        // Unregister broadcast receiver
+        try {
+            unregisterReceiver(resetTimerReceiver)
+            println("DEBUG: MainActivity - unregistered RESET_TIMER_AND_CONTINUE broadcast receiver")
+        } catch (e: Exception) {
+            println("DEBUG: MainActivity - error unregistering broadcast receiver: ${e.message}")
+        }
     }
 
 }
