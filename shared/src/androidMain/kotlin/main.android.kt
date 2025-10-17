@@ -480,7 +480,7 @@ actual fun openLastTrackedApp(trackedAppIdentifiers: List<String>) {
 }
 
 @Suppress("unused")
-fun showCongratulationsOverlay() {
+actual fun showCongratulationsOverlay() {
     try {
         val activity = currentActivityRef?.get()
         val ctx = activity?.applicationContext ?: appContextRef

@@ -1723,8 +1723,9 @@ private fun AppRoot() {
                     println("DEBUG: QR scan callback - doNotShowCongratulationAgain=$doNotShow")
 
                     if (!doNotShow) {
-                        showCongratulationDialog = true
-                        println("DEBUG: QR scan callback - showing congratulations dialog")
+                        // Launch platform overlay immediately so it's visible even outside the app
+                        println("DEBUG: QR scan callback - launching Congratulations overlay")
+                        showCongratulationsOverlay()
                     } else {
                         println("DEBUG: QR scan callback - preference set to skip dialog; auto-restarting tracking")
                         // Always auto-restart after QR scan
@@ -3119,35 +3120,7 @@ private fun AppRoot() {
                     
                     Spacer(Modifier.height(48.dp))
                     
-                    // Back to Dashboard button
-                    Button(
-                        onClick = { 
-                            showCongratulationDialog = false
-                            // Finalize session and auto-restart tracking
-                            handleQrScanSuccess()
-                            pendingStartTracking = true
-                            userManuallyStoppedTracking = false
-                            route = Route.Dashboard
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = Color(0xFF2C4877) // Lighter blue button
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            "Back to Dashboard",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-
-                    // Back to previous app button
+                    // Close button -> back to last tracked app
                     Button(
                         onClick = {
                             showCongratulationDialog = false
@@ -3168,7 +3141,7 @@ private fun AppRoot() {
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text(
-                            "Back to last app",
+                            "Close",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
@@ -3384,6 +3357,7 @@ expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
+expect fun showCongratulationsOverlay()
 expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
 expect fun openLastTrackedApp(trackedAppIdentifiers: List<String>)
 expect fun openEmailClient(recipient: String)
