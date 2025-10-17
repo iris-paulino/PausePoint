@@ -42,10 +42,12 @@ fun PersistentTrackingConsentDialog(
                     )
                     
                     Text(
-                        text = "ScrollPause uses Android's Accessibility Service to provide enhanced digital wellbeing features that continue working even when the main app is closed.",
+                        text = "Enable enhanced tracking that continues working even when ScrollPause is closed.",
                         fontSize = 15.sp,
                         color = Color(0xFFCCCCCC),
-                        lineHeight = 22.sp
+                        lineHeight = 22.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
                     Card(
@@ -57,13 +59,13 @@ fun PersistentTrackingConsentDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Text(
-                                text = "📱 How Accessibility Service is Used:",
+                                text = "📱 What this enables:",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp,
                                 color = Color.White
                             )
                             Text(
-                                text = "• Monitor which apps you're currently using",
+                                text = "• Continue tracking and blocking apps when ScrollPause is closed",
                                 fontSize = 12.sp,
                                 color = Color(0xFFCCCCCC)
                             )
@@ -73,12 +75,7 @@ fun PersistentTrackingConsentDialog(
                                 color = Color(0xFFCCCCCC)
                             )
                             Text(
-                                text = "• Continue blocking apps even when ScrollPause is closed",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• Help you maintain healthy digital habits",
+                                text = "• Auto-resume tracking after app restarts",
                                 fontSize = 12.sp,
                                 color = Color(0xFFCCCCCC)
                             )
@@ -86,96 +83,35 @@ fun PersistentTrackingConsentDialog(
                     }
                     
                     Text(
-                        text = "What this means:",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White
-                    )
-                    
-                    Column(
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "✓ Your app usage continues to be tracked",
-                            fontSize = 14.sp,
-                            color = Color(0xFFCCCCCC)
-                        )
-                        Text(
-                            text = "✓ Blocked apps remain blocked",
-                            fontSize = 14.sp,
-                            color = Color(0xFFCCCCCC)
-                        )
-                        Text(
-                            text = "✓ Receive notifications about blocked apps",
-                            fontSize = 14.sp,
-                            color = Color(0xFFCCCCCC)
-                        )
-                        Text(
-                            text = "✓ Tracking auto-resumes after app restarts",
-                            fontSize = 14.sp,
-                            color = Color(0xFFCCCCCC)
-                        )
-                    }
-                    
-                    Card(
-                        backgroundColor = Color(0xFF2A2A2A),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = "🔒 Privacy & Control",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = Color.White
-                            )
-                            Text(
-                                text = "• All app usage data stays on your device",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• No personal data is collected or transmitted",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• You can disable accessibility service anytime",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• Only monitors app names, not app content",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                        }
-                    }
-                    
-                    Text(
-                        text = "You can disable this feature anytime in Android Settings > Accessibility Services.",
+                        text = "All data stays on your device. You can disable this anytime in Android Settings.",
                         fontSize = 13.sp,
                         color = Color(0xFF999999),
-                        lineHeight = 18.sp
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
                     
                     Spacer(Modifier.height(8.dp))
                     
-                    Button(
-                        onClick = onAllow,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = Color(0xFF6200EE)
-                        )
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            "Enable Accessibility Service",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
+                        Button(
+                            onClick = onAllow,
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = Color(0xFF2196F3)
+                            )
+                        ) {
+                            Text(
+                                "Enable Accessibility Service",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                     
                     Spacer(Modifier.height(3.dp))
