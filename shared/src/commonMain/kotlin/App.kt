@@ -1141,16 +1141,16 @@ private fun AppRoot() {
             try {
                 val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
                 
-                // If the streak is currently 0, set it to 1 on successful scan.
-                // Otherwise, only increment if this is the first QR scan of a new day.
-                if (dayStreakCounter == 0) {
-                    dayStreakCounter = 1
-                    println("DEBUG: handleQrScanSuccess - set day streak to: $dayStreakCounter (was 0)")
-                } else if (lastStreakUpdateDay != todayEpochDay) {
+                // Always increment day streak counter on successful QR scan
+                // This ensures positive feedback even after dismissals
+                if (lastStreakUpdateDay != todayEpochDay) {
+                    // First QR scan of a new day: increment streak
                     dayStreakCounter += 1
-                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter")
+                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter (new day)")
                 } else {
-                    println("DEBUG: handleQrScanSuccess - day streak remains: $dayStreakCounter (same day)")
+                    // Same day: still increment to show progress
+                    dayStreakCounter += 1
+                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter (same day)")
                 }
                 
                 storage.saveTimesUnblockedToday(timesUnblockedToday)
@@ -1158,6 +1158,13 @@ private fun AppRoot() {
                 storage.saveLastStreakUpdateDay(todayEpochDay)
                 println("DEBUG: handleQrScanSuccess - saved times walked to storage: $timesUnblockedToday")
                 println("DEBUG: handleQrScanSuccess - saved day streak to storage: $dayStreakCounter")
+                
+                // Check for milestone achievements
+                when (dayStreakCounter) {
+                    7 -> showStreakMilestone("1 Week Streak!")
+                    30 -> showStreakMilestone("1 Month Streak!")
+                    100 -> showStreakMilestone("100 Days!")
+                }
             } catch (e: Exception) {
                 println("DEBUG: handleQrScanSuccess - error saving counters: ${e.message}")
             }
@@ -1696,16 +1703,16 @@ private fun AppRoot() {
                         runBlocking { withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } } ?: 0L
                     } catch (_: Exception) { 0L }
                     
-                    // If the streak is currently 0, set it to 1 on successful scan.
-                    // Otherwise, only increment if this is the first QR scan of a new day.
-                    if (dayStreakCounter == 0) {
-                        dayStreakCounter = 1
-                        println("DEBUG: QR scan callback - set day streak to: $dayStreakCounter (was 0)")
-                    } else if (lastStreakUpdateDay != todayEpochDay) {
+                    // Always increment day streak counter on successful QR scan
+                    // This ensures positive feedback even after dismissals
+                    if (lastStreakUpdateDay != todayEpochDay) {
+                        // First QR scan of a new day: increment streak
                         dayStreakCounter += 1
-                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter")
+                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter (new day)")
                     } else {
-                        println("DEBUG: QR scan callback - day streak remains: $dayStreakCounter (same day)")
+                        // Same day: still increment to show progress
+                        dayStreakCounter += 1
+                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter (same day)")
                     }
                     
                     try {
@@ -1716,6 +1723,13 @@ private fun AppRoot() {
                         }
                         println("DEBUG: QR scan callback - saved times walked to storage")
                         println("DEBUG: QR scan callback - saved day streak to storage: $dayStreakCounter")
+                        
+                        // Check for milestone achievements
+                        when (dayStreakCounter) {
+                            7 -> showStreakMilestone("1 Week Streak!")
+                            30 -> showStreakMilestone("1 Month Streak!")
+                            100 -> showStreakMilestone("100 Days!")
+                        }
                     } catch (_: Exception) {}
 
                     val doNotShow = try {
@@ -3370,6 +3384,7 @@ expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
 expect fun showCongratulationsOverlay()
+expect fun showStreakMilestone(milestone: String)
 expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
 expect fun openLastTrackedApp(trackedAppIdentifiers: List<String>)
 expect fun openEmailClient(recipient: String)
@@ -4478,6 +4493,17 @@ private fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 Text("Learn how we collect, use, and protect your data", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // Test Milestone Buttons (for development/testing)
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = Color(0xFF2C2C2C),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            TestMilestoneButtons()
         }
 
         
@@ -6309,5 +6335,43 @@ private fun HowToUseScreen(
         }
 
         Spacer(Modifier.height(32.dp))
+    }
+}
+
+// Test function to trigger milestone screens immediately
+@Composable
+private fun TestMilestoneButtons() {
+    Column(
+        modifier = Modifier.padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text("🧪 Test Milestone Screens", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        Text("Tap to see milestone celebrations:", fontSize = 14.sp, color = Color(0xFFD1D5DB))
+        
+        Spacer(Modifier.height(8.dp))
+        
+        Button(
+            onClick = { showStreakMilestone("1 Week Streak!") },
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Test 7-Day Milestone", color = Color.White)
+        }
+        
+        Button(
+            onClick = { showStreakMilestone("1 Month Streak!") },
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Test 30-Day Milestone", color = Color.White)
+        }
+        
+        Button(
+            onClick = { showStreakMilestone("100 Days!") },
+            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF9800)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Test 100-Day Milestone", color = Color.White)
+        }
     }
 }

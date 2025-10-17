@@ -498,6 +498,25 @@ actual fun showCongratulationsOverlay() {
     }
 }
 
+actual fun showStreakMilestone(milestone: String) {
+    try {
+        val activity = currentActivityRef?.get()
+        val ctx = activity?.applicationContext ?: appContextRef
+        val intent = android.content.Intent().apply {
+            setClassName(
+                ctx?.packageName ?: "com.luminoprisma.scrollpause",
+                "com.luminoprisma.scrollpause.StreakMilestoneActivity"
+            )
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            putExtra("milestone", milestone)
+        }
+        ctx?.startActivity(intent)
+        println("DEBUG: showStreakMilestone - launched milestone activity with: $milestone")
+    } catch (e: Exception) {
+        println("DEBUG: showStreakMilestone - error: ${e.message}")
+    }
+}
+
 actual fun openEmailClient(recipient: String) {
     val activity = currentActivityRef?.get() ?: return
     try {

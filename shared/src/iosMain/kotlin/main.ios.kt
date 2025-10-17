@@ -207,3 +207,13 @@ actual fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?) 
     // No-op on iOS - usage access is always available on iOS
     println("DEBUG: setOnUsageAccessStatusChangeCallback - iOS (no-op)")
 }
+
+actual fun showCongratulationsOverlay() {
+    // iOS implementation - could show a native alert or custom overlay
+    println("DEBUG: showCongratulationsOverlay - iOS implementation")
+}
+
+actual fun showStreakMilestone(milestone: String) {
+    // iOS implementation - could show a native alert or custom overlay
+    println("DEBUG: showStreakMilestone - iOS implementation with milestone: $milestone")
+}
