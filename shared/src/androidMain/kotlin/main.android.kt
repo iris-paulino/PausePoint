@@ -303,44 +303,12 @@ fun dismissAndContinueTracking() {
     }
 }
 
+// REMOVED: Cross-app blocking functionality for policy compliance
+// Blocking now happens within the app itself, not by redirecting from other apps
 actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isPaused: Boolean, timeLimitMinutes: Int) {
-    if (!isPaused) return
-    
-    println("DEBUG: checkAndRedirectToPauseIfBlocked called - isPaused: $isPaused, isQrScanningActive: $isQrScanningActive")
-    
-    // Suppress redirect while QR scanner is active to avoid bouncing back to pause screen
-    if (isQrScanningActive) {
-        println("DEBUG: checkAndRedirectToPauseIfBlocked - scanning active, suppressing redirect")
-        return
-    }
-    
-    // Get the current foreground app using the existing expect/actual function
-    val currentForegroundApp = getCurrentForegroundApp()
-    println("DEBUG: checkAndRedirectToPauseIfBlocked - currentForegroundApp: $currentForegroundApp")
-    
-    if (currentForegroundApp != null) {
-        // Check if the current foreground app is one of the tracked apps
-        val isTrackedApp = trackedAppNames.any { appName ->
-            val expectedPackage = when (appName.lowercase()) {
-                "chrome" -> "com.android.chrome"
-                "youtube" -> "com.google.android.youtube"
-                "messages" -> "com.google.android.apps.messaging"
-                "gmail" -> "com.google.android.gm"
-                "whatsapp" -> "com.whatsapp"
-                "youtube music" -> "com.google.android.apps.youtube.music"
-                else -> appName.lowercase().replace(" ", "")
-            }
-            currentForegroundApp == expectedPackage
-        }
-        
-        println("DEBUG: checkAndRedirectToPauseIfBlocked - isTrackedApp: $isTrackedApp")
-        
-        if (isTrackedApp) {
-            // User is trying to use a tracked app while blocked, redirect to our pause screen
-            println("DEBUG: checkAndRedirectToPauseIfBlocked - redirecting to pause screen for blocked tracked app")
-            showPauseScreen("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
-        }
-    }
+    // Policy-compliant: No cross-app blocking or redirection
+    // Users must manually return to the app to see blocking screen
+    println("DEBUG: checkAndRedirectToPauseIfBlocked - policy compliant mode: no cross-app blocking")
 }
 
 private var currentActivityRef: WeakReference<Activity>? = null

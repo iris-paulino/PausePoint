@@ -6,13 +6,7 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.view.Gravity
-import android.view.LayoutInflater
-import android.view.View
-import android.view.WindowManager
-import android.widget.Button
-import android.widget.FrameLayout
-import android.widget.TextView
+// REMOVED: Overlay-related imports for policy compliance
 import android.os.Build
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -129,20 +123,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         println("DEBUG: ForegroundAppAccessibilityService - service connected")
         // Cache a context for static resolver use
         Companion.appContext = applicationContext
-        registerOverlayReceiver()
         registerBlockedStateReceiver()
-        // Apply any pending command
-        val msg = pendingShowMessage
-        if (msg != null) {
-            println("DEBUG: onServiceConnected - applying pending SHOW")
-            showOverlay(msg)
-            pendingShowMessage = null
-        }
-        if (pendingHide) {
-            println("DEBUG: onServiceConnected - applying pending HIDE")
-            hideOverlay()
-            pendingHide = false
-        }
+        // REMOVED: Overlay functionality for policy compliance
     }
     
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -172,31 +154,16 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             }
             applicationContext.sendBroadcast(intent)
             
-            // Check if this app should be blocked and show overlay immediately
-            checkAndShowOverlayForApp(pkg)
+            // REMOVED: App blocking functionality for policy compliance
+            // Now only tracks usage, doesn't block other apps
         }
     }
 
     override fun onInterrupt() {
     }
     
-    private fun checkAndShowOverlayForApp(packageName: String?) {
-        if (!isBlocked || packageName.isNullOrBlank()) return
-        
-        println("DEBUG: checkAndShowOverlayForApp - checking package: $packageName, blocked: $isBlocked")
-        
-        // Check if the current foreground app's package is among resolved tracked packages
-        val isTrackedApp = trackedPackages.contains(packageName)
-        
-        println("DEBUG: checkAndShowOverlayForApp - isTrackedApp: $isTrackedApp for package: $packageName")
-        
-        if (isTrackedApp) {
-            // User is trying to use a tracked app while blocked, show overlay immediately
-            println("DEBUG: checkAndShowOverlayForApp - showing overlay for blocked tracked app: $packageName")
-            val message = "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
-            showOverlay(message)
-        }
-    }
+    // REMOVED: App blocking overlay functionality for policy compliance
+    // Blocking now happens within the app itself
 
     private fun hasUsageAccessPermission(context: Context): Boolean {
         return try {
@@ -243,35 +210,9 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
     // (Helpers moved into companion object; single companion enforced)
 
     // Overlay management
-    private var windowManager: WindowManager? = null
-    private var overlayView: View? = null
-    private var overlayShown: Boolean = false
-    private var lastOverlayShowTimeMs: Long = 0L
-    private val overlayDebounceMs: Long = 1500L
+    // REMOVED: Overlay-related variables for policy compliance
 
-    private fun registerOverlayReceiver() {
-        try {
-            val showFilter = IntentFilter("com.prismappsau.screengo.SHOW_BLOCKING_OVERLAY")
-            val hideFilter = IntentFilter("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY")
-
-            println("DEBUG: registerOverlayReceiver - registering receivers")
-            registerReceiver(object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    println("DEBUG: receiver SHOW_BLOCKING_OVERLAY received - intent=$intent")
-                    val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
-                    showOverlay(message)
-                }
-            }, showFilter)
-
-            registerReceiver(object : BroadcastReceiver() {
-                override fun onReceive(context: Context?, intent: Intent?) {
-                    println("DEBUG: receiver HIDE_BLOCKING_OVERLAY received - intent=$intent")
-                    hideOverlay()
-                }
-            }, hideFilter)
-        } catch (_: Exception) {
-        }
-    }
+    // REMOVED: Overlay receiver registration for policy compliance
 
     private fun registerBlockedStateReceiver() {
         try {
@@ -289,118 +230,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun showOverlay(message: String) {
-        // Grace window after QR success: skip overlay if within cooldown
-        try {
-            val prefs = applicationContext.getSharedPreferences("app_preferences", Context.MODE_PRIVATE)
-            val until = prefs.getLong("qr_success_cooldown_until", 0L)
-            if (System.currentTimeMillis() < until) {
-                println("DEBUG: showOverlay - QR cooldown active, skipping overlay show")
-                return
-            }
-        } catch (_: Exception) {}
-        // Debounce to avoid rapid re-show churn
-        val now = System.currentTimeMillis()
-        if (now - lastOverlayShowTimeMs < overlayDebounceMs) {
-            println("DEBUG: showOverlay - debounced, skipping overlay show")
-            return
-        }
-        if (overlayShown) { println("DEBUG: showOverlay - already shown"); return }
-        try {
-            val wm = windowManager ?: getSystemService(WINDOW_SERVICE) as WindowManager
-            windowManager = wm
+    // REMOVED: System overlay functionality for policy compliance
+    // Blocking now happens within the app itself, not as system overlays
 
-            val overlayType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-
-            val params = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                overlayType,
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-                android.graphics.PixelFormat.TRANSLUCENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-            }
-
-            val container = FrameLayout(this)
-            container.setBackgroundColor(0xCC000000.toInt())
-            val padding = (24 * resources.displayMetrics.density).toInt()
-            container.setPadding(padding, padding * 3, padding, padding)
-            container.isClickable = true
-            container.isFocusable = true
-
-            val title = TextView(this).apply {
-                text = "Pause reached"
-                textSize = 22f
-                setTextColor(android.graphics.Color.WHITE)
-            }
-            val body = TextView(this).apply {
-                text = message
-                textSize = 16f
-                setTextColor(android.graphics.Color.WHITE)
-            }
-            val scanBtn = Button(this).apply {
-                text = "Scan QR to continue"
-                setOnClickListener {
-                    try {
-                        val intent = Intent(this@ForegroundAppAccessibilityService, PauseActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            putExtra("message", message)
-                        }
-                        startActivity(intent)
-                        // Hide the system overlay since we're showing the activity
-                        hideOverlay()
-                    } catch (e: Exception) {
-                        println("DEBUG: showOverlay - error launching PauseActivity: ${e.message}")
-                    }
-                }
-            }
-            val dismissBtn = Button(this).apply {
-                text = "Dismiss"
-                setOnClickListener { 
-                    // Send dismiss broadcast to trigger the dismiss callback
-                    val intent = Intent("com.prismappsau.screengo.RESET_TIMER_AND_CONTINUE").apply {
-                        setPackage(applicationContext.packageName)
-                    }
-                    applicationContext.sendBroadcast(intent)
-                    hideOverlay()
-                }
-            }
-
-            val layout = FrameLayout(this).apply {
-                addView(title)
-                addView(body)
-                addView(scanBtn)
-                addView(dismissBtn)
-            }
-            container.addView(layout)
-
-            println("DEBUG: showOverlay - adding view to window manager")
-            wm.addView(container, params)
-            overlayView = container
-            overlayShown = true
-            lastOverlayShowTimeMs = now
-            println("DEBUG: showOverlay - overlay shown")
-        } catch (_: Exception) {
-            println("DEBUG: showOverlay - error showing overlay")
-        }
-    }
-
-    private fun hideOverlay() {
-        try {
-            val wm = windowManager
-            val view = overlayView
-            if (wm != null && view != null) {
-                println("DEBUG: hideOverlay - removing view")
-                wm.removeView(view)
-            }
-        } catch (_: Exception) {
-        } finally {
-            overlayView = null
-            overlayShown = false
-            println("DEBUG: hideOverlay - overlay hidden")
-        }
-    }
+    // REMOVED: System overlay hide functionality for policy compliance
 }
 
 

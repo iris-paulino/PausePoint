@@ -84,16 +84,7 @@ class PauseActivity : ComponentActivity() {
 
         val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
 
-        // Register receiver to close when HIDE is sent
-        val filter = IntentFilter("com.prismappsau.screengo.HIDE_BLOCKING_OVERLAY")
-        try {
-            if (Build.VERSION.SDK_INT >= 33) {
-                registerReceiver(hideReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-            } else {
-                @Suppress("DEPRECATION")
-                registerReceiver(hideReceiver, filter)
-            }
-        } catch (_: Exception) { }
+        // REMOVED: Overlay receiver registration for policy compliance
 
         setContent {
             PauseActivityContent(

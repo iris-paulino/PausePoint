@@ -1262,16 +1262,8 @@ private fun AppRoot() {
         }
     }
 
-    // Monitor foreground app changes to show overlay when blocked user tries to use tracked apps
-    LaunchedEffect(isPaused, trackedApps, timeLimitMinutes) {
-        if (isPaused) {
-            // Check periodically if user is trying to use a tracked app while blocked
-            while (isPaused) {
-                delay(5000) // Check every 5 seconds for better battery life
-                checkAndRedirectToPauseIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isPaused, timeLimitMinutes)
-            }
-        }
-    }
+    // REMOVED: Cross-app monitoring for policy compliance
+    // Blocking now happens within the app itself when users return to it
 
     
 

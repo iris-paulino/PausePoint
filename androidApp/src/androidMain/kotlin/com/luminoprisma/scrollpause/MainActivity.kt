@@ -143,20 +143,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    fun showBlockingOverlay(message: String) {
-        val intent = Intent("com.luminoprisma.scrollpause.SHOW_BLOCKING_OVERLAY").apply {
-            setPackage(packageName)
-            putExtra("message", message)
-        }
-        sendBroadcast(intent)
-    }
-
-    fun hideBlockingOverlay() {
-        val intent = Intent("com.luminoprisma.scrollpause.HIDE_BLOCKING_OVERLAY").apply {
-            setPackage(packageName)
-        }
-        sendBroadcast(intent)
-    }
+    // REMOVED: Overlay functionality for policy compliance
+    // Blocking now happens within the app itself
     
     override fun onDestroy() {
         super.onDestroy()
