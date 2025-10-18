@@ -38,9 +38,9 @@ Scroll Pause ("we," "our," or "us") is committed to protecting your privacy. Thi
 ## Permissions
 
 • **Usage Access**: Required to track app usage for wellness features
-• **Accessibility Service**: Used to detect app usage and redirect you to our pause screen when time limits are reached
+• **Accessibility Service**: Used to detect app usage and redirect you to our app's pause screen when time limits are reached
 • **Camera**: Used to scan QR codes for pause functionality
-• **Notifications**: Used to alert you when time limits are reached and when services are disabled
+• **Notifications**: Used to alert you when time limits are reached and show time limit reminders
 • **Foreground Service**: Used to maintain persistent monitoring and data synchronization
 • **Internet Access**: Used to display advertisements through Google AdMob
 
@@ -50,19 +50,19 @@ ScrollPause uses Android's Accessibility Service API to provide enhanced digital
 
 **What the Accessibility Service Does:**
 • **App Usage Monitoring**: Detects which apps you're currently using to track your digital habits
-• **Time Limit Enforcement**: Shows pause screens when you reach your set time limits for specific apps
-• **Persistent Blocking**: Continues to block apps even when the main ScrollPause app is closed
+• **Time Limit Enforcement**: Redirects you to our app's pause screen when you reach your set time limits for specific apps
+• **App Redirection**: Redirects you to our app when time limits are reached, allowing you to take a mindful break
 • **Digital Wellbeing Support**: Helps you maintain healthy digital habits and reduce screen time
 
 **What the Accessibility Service Does NOT Do:**
 • **No Content Access**: Does not read, access, or transmit any content from your apps
 • **No Personal Data Collection**: Only monitors app names and usage times, not personal information
-• **No System Control**: Does not control or modify system settings beyond app blocking
+• **No System Control**: Does not control or modify system settings beyond app redirection
 • **No Data Transmission**: All monitoring data stays on your device
 
 **User Control:**
 • You can disable the Accessibility Service at any time through Android Settings > Accessibility Services
-• Disabling the service will stop persistent blocking but standard tracking will continue
+• Disabling the service will stop app redirection but standard tracking will continue
 • You can re-enable the service anytime through the app's settings
 • The service only activates when you explicitly grant permission through our consent dialog
 
@@ -119,6 +119,8 @@ ScrollPause uses Android's Accessibility Service API to provide enhanced digital
 • **Transparency**: This privacy policy clearly explains all data collection and usage practices, including accessibility service usage
 • **No Deceptive Behavior**: Our app does not mimic system notifications or engage in deceptive practices
 • **Digital Wellbeing Focus**: Our app is designed as a digital wellbeing tool to help users manage their screen time and app usage
+• **Compliant App Redirection**: We redirect users to our own app's pause screen rather than overlaying other apps, ensuring compliance with Google Play policies
+• **User Choice**: Users can dismiss the pause screen and continue using their apps if they choose to do so
 
 ## Contact Us
 

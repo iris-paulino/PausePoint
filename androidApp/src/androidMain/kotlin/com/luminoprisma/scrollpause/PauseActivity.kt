@@ -30,7 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import android.view.WindowManager
 
-class PauseOverlayActivity : ComponentActivity() {
+class PauseActivity : ComponentActivity() {
     private val hideReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             finish()
@@ -54,22 +54,22 @@ class PauseOverlayActivity : ComponentActivity() {
                             resetTimerAndContinueTracking()
                             finish()
                         } else {
-                            // QR code is invalid, show error or keep overlay open
-                            // For now, we'll keep the overlay open
+                            // QR code is invalid, show error or keep pause screen open
+                            // For now, we'll keep the pause screen open
                         }
                     } catch (e: Exception) {
-                        // Error validating QR code, keep overlay open
+                        // Error validating QR code, keep pause screen open
                     }
                 }
             }
         }
-        // If result is not OK or QR text is null, keep overlay open
+        // If result is not OK or QR text is null, keep pause screen open
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Ensure this overlay-style activity reliably appears on top
+        // Ensure this activity reliably appears on top
         try {
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
@@ -96,30 +96,30 @@ class PauseOverlayActivity : ComponentActivity() {
         } catch (_: Exception) { }
 
         setContent {
-            PauseOverlayContent(
+            PauseActivityContent(
                 message = message, 
                 onFinish = { 
-                    // Show ad before dismissing overlay
-                    println("DEBUG: PauseOverlayActivity - onFinish called, attempting to show ad")
+                    // Show ad before dismissing pause screen
+                    println("DEBUG: PauseActivity - onFinish called, attempting to show ad")
                     try {
                         val adManager = createAdManager()
-                        println("DEBUG: PauseOverlayActivity - AdManager created successfully")
+                        println("DEBUG: PauseActivity - AdManager created successfully")
                         if (adManager.isAdLoaded()) {
-                            println("DEBUG: Overlay - Ad is loaded, showing interstitial ad")
+                            println("DEBUG: Pause - Ad is loaded, showing interstitial ad")
                             adManager.showInterstitialAd(
                                 onAdClosed = {
-                                    println("DEBUG: Overlay ad completed, dismissing overlay")
+                                    println("DEBUG: Pause ad completed, dismissing pause screen")
                                     performSelfContainedDismiss()
                                     finish()
                                 },
                                 onAdFailedToLoad = {
-                                    println("DEBUG: Overlay ad failed, dismissing anyway")
+                                    println("DEBUG: Pause ad failed, dismissing anyway")
                                     performSelfContainedDismiss()
                                     finish()
                                 }
                             )
                         } else {
-                            println("DEBUG: Overlay - No ad loaded, attempting to load and show...")
+                            println("DEBUG: Pause - No ad loaded, attempting to load and show...")
                             // Try to load an ad first
                             adManager.loadAd()
                             
@@ -127,31 +127,31 @@ class PauseOverlayActivity : ComponentActivity() {
                             CoroutineScope(Dispatchers.Main).launch {
                                 delay(2000) // Wait 2 seconds for ad to load
                                 val isLoadedAfterWait = adManager.isAdLoaded()
-                                println("DEBUG: Overlay - Ad loaded status after wait: $isLoadedAfterWait")
+                                println("DEBUG: Pause - Ad loaded status after wait: $isLoadedAfterWait")
                                 
                                 if (isLoadedAfterWait) {
-                                    println("DEBUG: Overlay - Ad loaded after wait, showing interstitial ad")
+                                    println("DEBUG: Pause - Ad loaded after wait, showing interstitial ad")
                                     adManager.showInterstitialAd(
                                         onAdClosed = {
-                                            println("DEBUG: Overlay ad completed after wait, dismissing overlay")
+                                            println("DEBUG: Pause ad completed after wait, dismissing pause screen")
                                             performSelfContainedDismiss()
                                             finish()
                                         },
                                         onAdFailedToLoad = {
-                                            println("DEBUG: Overlay ad failed after wait, dismissing anyway")
+                                            println("DEBUG: Pause ad failed after wait, dismissing anyway")
                                             performSelfContainedDismiss()
                                             finish()
                                         }
                                     )
                                 } else {
-                                    println("DEBUG: Overlay - Ad still not loaded after wait, dismissing without ad")
+                                    println("DEBUG: Pause - Ad still not loaded after wait, dismissing without ad")
                                     performSelfContainedDismiss()
                                     finish()
                                 }
                             }
                         }
                     } catch (e: Exception) {
-                        println("DEBUG: Error showing overlay ad: ${e.message}, dismissing anyway")
+                        println("DEBUG: Error showing pause ad: ${e.message}, dismissing anyway")
                         performSelfContainedDismiss()
                         finish()
                     }
@@ -162,7 +162,7 @@ class PauseOverlayActivity : ComponentActivity() {
     }
 
     private fun performSelfContainedDismiss() {
-        println("DEBUG: PauseOverlayActivity - performSelfContainedDismiss called")
+        println("DEBUG: PauseActivity - performSelfContainedDismiss called")
         // 1) Increment and persist times dismissed
         CoroutineScope(Dispatchers.Main).launch {
             try {
@@ -170,9 +170,9 @@ class PauseOverlayActivity : ComponentActivity() {
                 val current = try { storage.getTimesDismissedToday() } catch (_: Exception) { 0 }
                 val updated = current + 1
                 try { storage.saveTimesDismissedToday(updated) } catch (_: Exception) {}
-                println("DEBUG: OverlayDismiss - incremented timesDismissedToday to: $updated")
+                println("DEBUG: PauseDismiss - incremented timesDismissedToday to: $updated")
             } catch (e: Exception) {
-                println("DEBUG: OverlayDismiss - error updating timesDismissedToday: ${e.message}")
+                println("DEBUG: PauseDismiss - error updating timesDismissedToday: ${e.message}")
             }
         }
 
@@ -191,7 +191,7 @@ class PauseOverlayActivity : ComponentActivity() {
                 }
                 apply()
             }
-            println("DEBUG: OverlayDismiss - cleared usage for tracked apps")
+            println("DEBUG: PauseDismiss - cleared usage for tracked apps")
 
             val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
                 setPackage(packageName)
@@ -200,15 +200,15 @@ class PauseOverlayActivity : ComponentActivity() {
                 putExtra("timeLimit", limit)
             }
             applicationContext.sendBroadcast(intent)
-            println("DEBUG: OverlayDismiss - sent STATE_CHANGED (blocked=false, limit=$limit)")
+            println("DEBUG: PauseDismiss - sent STATE_CHANGED (blocked=false, limit=$limit)")
         } catch (e: Exception) {
-            println("DEBUG: OverlayDismiss - error during unblock broadcast: ${e.message}")
+            println("DEBUG: PauseDismiss - error during unblock broadcast: ${e.message}")
         }
     }
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        println("DEBUG: PauseOverlayActivity - onNewIntent called")
+        println("DEBUG: PauseActivity - onNewIntent called")
     }
 
     override fun onDestroy() {
@@ -218,27 +218,27 @@ class PauseOverlayActivity : ComponentActivity() {
 }
 
 // Helper to start this activity robustly from any Context (e.g., service)
-internal fun startPauseOverlayActivity(ctx: Context, message: String?) {
+internal fun startPauseActivity(ctx: Context, message: String?) {
     try {
-        val i = Intent(ctx, PauseOverlayActivity::class.java).apply {
+        val i = Intent(ctx, PauseActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             if (!message.isNullOrEmpty()) putExtra("message", message)
         }
         ctx.startActivity(i)
     } catch (e: Exception) {
-        println("DEBUG: startPauseOverlayActivity - error: ${e.message}")
+        println("DEBUG: startPauseActivity - error: ${e.message}")
     }
 }
 
 @Composable
-private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLauncher: androidx.activity.result.ActivityResultLauncher<Intent>) {
+private fun PauseActivityContent(message: String, onFinish: () -> Unit, qrScanLauncher: androidx.activity.result.ActivityResultLauncher<Intent>) {
     val ctx = LocalContext.current
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
     var restartTrackingOnUnlock by remember { mutableStateOf(false) }
     var dayStreakCounter by remember { mutableStateOf(0) }
 
-    // Initialize preference from storage so overlay matches main app
+    // Initialize preference from storage so pause screen matches main app
     LaunchedEffect(Unit) {
         try {
             val storage = createAppStorage()

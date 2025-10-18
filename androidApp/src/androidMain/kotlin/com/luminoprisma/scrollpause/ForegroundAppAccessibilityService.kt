@@ -88,7 +88,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                             } else {
                                 "Take a mindful pause"
                             }
-                            val intent = Intent(ctx, PauseOverlayActivity::class.java).apply {
+                            val intent = Intent(ctx, PauseActivity::class.java).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 putExtra("message", message)
                             }
@@ -165,13 +165,13 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         if (msg != null) {
             println("DEBUG: onServiceConnected - applying pending SHOW")
             try {
-                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                val intent = Intent(this, PauseActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     putExtra("message", msg)
                 }
                 startActivity(intent)
             } catch (e: Exception) {
-                println("DEBUG: onServiceConnected - error launching PauseOverlayActivity: ${e.message}")
+                println("DEBUG: onServiceConnected - error launching PauseActivity: ${e.message}")
             }
             pendingShowMessage = null
         }
@@ -316,7 +316,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             // Launch PauseScreen immediately
             val message = "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
             try {
-                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                val intent = Intent(this, PauseActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     putExtra("message", message)
                 }
@@ -405,7 +405,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         
         if (isTrackedApp) {
             // User is trying to use a tracked app while blocked, redirect them to our Pause screen
-            println("DEBUG: checkAndRedirectToPauseApp - redirecting to PauseOverlayActivity for blocked tracked app: $packageName")
+            println("DEBUG: checkAndRedirectToPauseApp - redirecting to PauseActivity for blocked tracked app: $packageName")
             val message = if (timeLimitMinutes > 0) {
                 "Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes"
             } else {
@@ -413,13 +413,13 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             }
             try {
                 // Redirect to our app's Pause screen instead of showing overlay
-                val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+                val intent = Intent(this, PauseActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                     putExtra("message", message)
                 }
                 startActivity(intent)
             } catch (e: Exception) {
-                println("DEBUG: checkAndRedirectToPauseApp - error redirecting to PauseOverlayActivity: ${e.message}")
+                println("DEBUG: checkAndRedirectToPauseApp - error redirecting to PauseActivity: ${e.message}")
             }
         }
     }
@@ -437,7 +437,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     println("DEBUG: receiver SHOW_PAUSE_SCREEN received - intent=$intent")
                     val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
                     try {
-                        val activityIntent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
+                        val activityIntent = Intent(this@ForegroundAppAccessibilityService, PauseActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             putExtra("message", message)
                         }
@@ -564,7 +564,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                         }
                         
                         try {
-                            val intent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
+                            val intent = Intent(this@ForegroundAppAccessibilityService, PauseActivity::class.java).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                 putExtra("message", message)
                             }

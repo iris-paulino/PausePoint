@@ -122,7 +122,7 @@ class CompliantBlockingService(private val context: Context) {
     private fun showBlockingNotification(trackedApps: List<String>, timeLimit: Int) {
         try {
             // Main intent to launch Pause Screen
-            val pauseIntent = Intent(context, PauseOverlayActivity::class.java).apply {
+            val pauseIntent = Intent(context, PauseActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra("message", "Take a mindful pause - you've reached your time limit of ${timeLimit} minutes")
             }
@@ -180,7 +180,7 @@ class CompliantBlockingService(private val context: Context) {
     
     fun showAppUsageReminder(appName: String) {
         try {
-            val intent = Intent(context, PauseOverlayActivity::class.java).apply {
+            val intent = Intent(context, PauseActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 putExtra("message", "You're trying to use $appName, but it's currently blocked. Take a mindful pause!")
             }

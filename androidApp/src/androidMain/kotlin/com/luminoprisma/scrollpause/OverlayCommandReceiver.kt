@@ -18,8 +18,8 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                 // Always redirect to our pause screen (no more overlays)
                 if (context != null) {
                     try {
-                        println("DEBUG: OverlayCommandReceiver - redirecting to PauseOverlayActivity")
-                        val activityIntent = Intent(context, PauseOverlayActivity::class.java).apply {
+                        println("DEBUG: OverlayCommandReceiver - redirecting to PauseActivity")
+                        val activityIntent = Intent(context, PauseActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                             putExtra("message", message)
                         }

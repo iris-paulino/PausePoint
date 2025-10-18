@@ -29,7 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-class PauseOverlayActivity : ComponentActivity() {
+class PauseActivity : ComponentActivity() {
     private val hideReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             finish()
@@ -46,7 +46,7 @@ class PauseOverlayActivity : ComponentActivity() {
 
         if (result.resultCode == RESULT_OK) {
             val qrText = result.data?.getStringExtra("qr_text")
-            println("DEBUG: PauseOverlayActivity - scan result OK, qr_text='${qrText}'")
+            println("DEBUG: PauseActivity - scan result OK, qr_text='${qrText}'")
             if (!qrText.isNullOrBlank()) {
                 // Validate QR code and handle result
                 CoroutineScope(Dispatchers.Main).launch {
@@ -55,28 +55,28 @@ class PauseOverlayActivity : ComponentActivity() {
                         val match = storage.validateQrCode(qrText)
                         val fallbackAccept = try { storage.getSavedQrCodes().isNotEmpty() } catch (_: Exception) { false }
                         val accepted = (match != null) || fallbackAccept
-                        println("DEBUG: PauseOverlayActivity - validate match=${match != null}, fallbackAccept=$fallbackAccept, accepted=$accepted")
+                        println("DEBUG: PauseActivity - validate match=${match != null}, fallbackAccept=$fallbackAccept, accepted=$accepted")
                         if (accepted) {
                             // QR code accepted, trigger congratulations dialog flow
                             val intent = Intent("com.prismappsau.screengo.QR_SCAN_SUCCESS").apply {
-                                setPackage(this@PauseOverlayActivity.packageName)
+                                setPackage(this@PauseActivity.packageName)
                             }
-                            this@PauseOverlayActivity.sendBroadcast(intent)
+                            this@PauseActivity.sendBroadcast(intent)
                             finish()
                         } else {
-                            println("DEBUG: PauseOverlayActivity - QR not accepted, staying on overlay")
+                            println("DEBUG: PauseActivity - QR not accepted, staying on pause screen")
                         }
                     } catch (e: Exception) {
-                        println("DEBUG: PauseOverlayActivity - error validating QR: ${e.message}")
+                        println("DEBUG: PauseActivity - error validating QR: ${e.message}")
                     }
                 }
             } else {
-                println("DEBUG: PauseOverlayActivity - scan result OK but qr_text is null")
+                println("DEBUG: PauseActivity - scan result OK but qr_text is null")
             }
         } else {
-            println("DEBUG: PauseOverlayActivity - scan canceled or failed, resultCode=${result.resultCode}")
+            println("DEBUG: PauseActivity - scan canceled or failed, resultCode=${result.resultCode}")
         }
-        // If not accepted, keep overlay open
+        // If not accepted, keep pause screen open
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,7 +96,7 @@ class PauseOverlayActivity : ComponentActivity() {
         } catch (_: Exception) { }
 
         setContent {
-            PauseOverlayContent(
+            PauseActivityContent(
                 message = message, 
                 onFinish = { 
                     // Dismiss and continue tracking when user dismisses
@@ -110,7 +110,7 @@ class PauseOverlayActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent?) {
         super.onNewIntent(intent)
-        println("DEBUG: PauseOverlayActivity - onNewIntent called")
+        println("DEBUG: PauseActivity - onNewIntent called")
         // Bring the activity to the foreground when user switches to another tracked app
         // The activity is already running, so we just need to make sure it's visible
         // The existing content will remain the same
@@ -124,14 +124,14 @@ class PauseOverlayActivity : ComponentActivity() {
 }
 
 @Composable
-private fun PauseOverlayContent(message: String, onFinish: () -> Unit, qrScanLauncher: androidx.activity.result.ActivityResultLauncher<Intent>) {
+private fun PauseActivityContent(message: String, onFinish: () -> Unit, qrScanLauncher: androidx.activity.result.ActivityResultLauncher<Intent>) {
     val ctx = LocalContext.current
     var durationText by remember { mutableStateOf("") }
     var limit by remember { mutableStateOf(0) }
     var restartTrackingOnUnlock by remember { mutableStateOf(false) }
     var dayStreakCounter by remember { mutableStateOf(0) }
 
-    // Initialize preference from storage so overlay matches main app
+    // Initialize preference from storage so pause screen matches main app
     LaunchedEffect(Unit) {
         try {
             val storage = createAppStorage()

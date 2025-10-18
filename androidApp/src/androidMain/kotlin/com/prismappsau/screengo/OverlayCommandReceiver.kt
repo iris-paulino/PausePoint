@@ -17,17 +17,17 @@ class OverlayCommandReceiver : BroadcastReceiver() {
                 val message = intent.getStringExtra("message") ?: "Take a mindful pause"
                 println("DEBUG: OverlayCommandReceiver - SHOW received, message='$message'")
                 ForegroundAppAccessibilityService.setPendingShow(message)
-                // Fallback: gently launch PauseOverlayActivity with debounce if service overlay doesn't appear
+                // Fallback: gently launch PauseActivity with debounce if service overlay doesn't appear
                 val now = System.currentTimeMillis()
                 if (now - lastLaunchMs >= launchDebounceMs && context != null) {
                     try {
-                        val activityIntent = Intent(context, PauseOverlayActivity::class.java).apply {
+                        val activityIntent = Intent(context, PauseActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             putExtra("message", message)
                         }
                         context.startActivity(activityIntent)
                         lastLaunchMs = now
-                        println("DEBUG: OverlayCommandReceiver - PauseOverlayActivity launched (debounced)")
+                        println("DEBUG: OverlayCommandReceiver - PauseActivity launched (debounced)")
                     } catch (e: Exception) {
                         println("DEBUG: OverlayCommandReceiver - error launching activity: ${e.message}")
                     }

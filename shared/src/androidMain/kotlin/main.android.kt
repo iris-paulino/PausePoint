@@ -187,14 +187,14 @@ actual fun showBlockingOverlay(message: String) {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
-            // Instead of showing overlay, redirect to our pause screen
+            // Redirect user to our pause screen when time limit is reached
             val intent = Intent().apply {
-                setClassName(activity.packageName, "com.luminoprisma.scrollpause.PauseOverlayActivity")
+                setClassName(activity.packageName, "com.luminoprisma.scrollpause.PauseActivity")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra("message", message)
             }
             activity.startActivity(intent)
-            println("DEBUG: showBlockingOverlay - redirected to PauseOverlayActivity with message: $message")
+            println("DEBUG: showBlockingOverlay - redirected to PauseActivity with message: $message")
         } catch (e: Exception) {
             println("DEBUG: showBlockingOverlay - error redirecting to pause screen: ${e.message}")
         }
@@ -303,20 +303,20 @@ fun dismissAndContinueTracking() {
     }
 }
 
-actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
+actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
     if (!isBlocked) return
     
-    println("DEBUG: checkAndShowOverlayIfBlocked called - isBlocked: $isBlocked, isQrScanningActive: $isQrScanningActive")
+    println("DEBUG: checkAndRedirectToPauseIfBlocked called - isBlocked: $isBlocked, isQrScanningActive: $isQrScanningActive")
     
-    // Suppress overlay while QR scanner is active to avoid bouncing back to pause screen
+    // Suppress redirect while QR scanner is active to avoid bouncing back to pause screen
     if (isQrScanningActive) {
-        println("DEBUG: checkAndShowOverlayIfBlocked - scanning active, suppressing overlay")
+        println("DEBUG: checkAndRedirectToPauseIfBlocked - scanning active, suppressing redirect")
         return
     }
     
     // Get the current foreground app using the existing expect/actual function
     val currentForegroundApp = getCurrentForegroundApp()
-    println("DEBUG: checkAndShowOverlayIfBlocked - currentForegroundApp: $currentForegroundApp")
+    println("DEBUG: checkAndRedirectToPauseIfBlocked - currentForegroundApp: $currentForegroundApp")
     
     if (currentForegroundApp != null) {
         // Check if the current foreground app is one of the tracked apps
@@ -333,11 +333,11 @@ actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked
             currentForegroundApp == expectedPackage
         }
         
-        println("DEBUG: checkAndShowOverlayIfBlocked - isTrackedApp: $isTrackedApp")
+        println("DEBUG: checkAndRedirectToPauseIfBlocked - isTrackedApp: $isTrackedApp")
         
         if (isTrackedApp) {
-            // User is trying to use a tracked app while blocked, show overlay
-            println("DEBUG: checkAndShowOverlayIfBlocked - showing overlay for blocked tracked app")
+            // User is trying to use a tracked app while blocked, redirect to our pause screen
+            println("DEBUG: checkAndRedirectToPauseIfBlocked - redirecting to pause screen for blocked tracked app")
             showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
         }
     }

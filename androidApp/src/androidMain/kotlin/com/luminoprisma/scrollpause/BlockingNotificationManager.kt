@@ -41,7 +41,7 @@ class BlockingNotificationManager(private val context: Context) {
     }
     
     fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int) {
-        val intent = Intent(context, PauseOverlayActivity::class.java).apply {
+        val intent = Intent(context, PauseActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("message", "Take a mindful pause - you've reached your time limit of ${timeLimit} minutes")
         }

@@ -261,7 +261,7 @@ class AppMonitoringForegroundService : Service() {
     
     private fun showPauseScreen(message: String) {
         try {
-            val intent = Intent(this, PauseOverlayActivity::class.java).apply {
+            val intent = Intent(this, PauseActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra("message", message)
             }

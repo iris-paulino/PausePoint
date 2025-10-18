@@ -1268,7 +1268,7 @@ private fun AppRoot() {
             // Check periodically if user is trying to use a tracked app while blocked
             while (isBlocked) {
                 delay(5000) // Check every 5 seconds for better battery life
-                checkAndShowOverlayIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isBlocked, timeLimitMinutes)
+                checkAndRedirectToPauseIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isBlocked, timeLimitMinutes)
             }
         }
     }
@@ -1405,7 +1405,7 @@ private fun AppRoot() {
                     // Show persistent blocking notification
                     showPersistentBlockingNotification(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     route = Route.Pause
-                    // Show the blocking overlay to prevent further app usage
+                    // Redirect user to our pause screen when time limit is reached
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
                 }
             }
@@ -3378,7 +3378,7 @@ expect fun startUsageTracking(
 )
 expect fun showBlockingOverlay(message: String)
 expect fun dismissBlockingOverlay()
-expect fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int)
+expect fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int)
 expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
@@ -4493,17 +4493,6 @@ private fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 Text("Learn how we collect, use, and protect your data", color = Color(0xFFD1D5DB), fontSize = 14.sp)
             }
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        // Test Milestone Buttons (for development/testing)
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            backgroundColor = Color(0xFF2C2C2C),
-            shape = RoundedCornerShape(16.dp)
-        ) {
-            TestMilestoneButtons()
         }
 
         
@@ -6335,43 +6324,5 @@ private fun HowToUseScreen(
         }
 
         Spacer(Modifier.height(32.dp))
-    }
-}
-
-// Test function to trigger milestone screens immediately
-@Composable
-private fun TestMilestoneButtons() {
-    Column(
-        modifier = Modifier.padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text("🧪 Test Milestone Screens", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
-        Text("Tap to see milestone celebrations:", fontSize = 14.sp, color = Color(0xFFD1D5DB))
-        
-        Spacer(Modifier.height(8.dp))
-        
-        Button(
-            onClick = { showStreakMilestone("1 Week Streak!") },
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF4CAF50)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Test 7-Day Milestone", color = Color.White)
-        }
-        
-        Button(
-            onClick = { showStreakMilestone("1 Month Streak!") },
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Test 30-Day Milestone", color = Color.White)
-        }
-        
-        Button(
-            onClick = { showStreakMilestone("100 Days!") },
-            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF9800)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Test 100-Day Milestone", color = Color.White)
-        }
     }
 }

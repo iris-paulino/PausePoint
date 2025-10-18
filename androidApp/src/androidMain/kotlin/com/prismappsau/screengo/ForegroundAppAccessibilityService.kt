@@ -343,7 +343,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 text = "Scan QR to continue"
                 setOnClickListener {
                     try {
-                        val intent = Intent(this@ForegroundAppAccessibilityService, PauseOverlayActivity::class.java).apply {
+                        val intent = Intent(this@ForegroundAppAccessibilityService, PauseActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             putExtra("message", message)
                         }
@@ -351,7 +351,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                         // Hide the system overlay since we're showing the activity
                         hideOverlay()
                     } catch (e: Exception) {
-                        println("DEBUG: showOverlay - error launching PauseOverlayActivity: ${e.message}")
+                        println("DEBUG: showOverlay - error launching PauseActivity: ${e.message}")
                     }
                 }
             }
