@@ -839,7 +839,7 @@ actual fun showAccessibilityDisabledNotification() {
     
     try {
         // Use the new notification manager for better user experience
-        val notificationManager = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val notificationManager = Class.forName("com.luminoprisma.scrollpause.WellbeingNotificationManager")
             .getDeclaredConstructor(Context::class.java)
             .newInstance(activity) as Any
         
@@ -870,7 +870,7 @@ actual fun showUsageAccessDisabledNotification() {
     
     try {
         // Use the new notification manager for better user experience
-        val notificationManager = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val notificationManager = Class.forName("com.luminoprisma.scrollpause.WellbeingNotificationManager")
             .getDeclaredConstructor(Context::class.java)
             .newInstance(activity) as Any
         
@@ -1033,43 +1033,43 @@ actual fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, 
     }
 }
 
-actual fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int) {
+actual fun showPersistentWellbeingNotification(trackedApps: List<String>, timeLimit: Int) {
     val activity = currentActivityRef?.get()
     if (activity == null) {
-        println("DEBUG: showPersistentBlockingNotification - no activity available")
+        println("DEBUG: showPersistentWellbeingNotification - no activity available")
         return
     }
     
     try {
         // Use reflection to call the notification manager
-        val managerClass = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val managerClass = Class.forName("com.luminoprisma.scrollpause.WellbeingNotificationManager")
         val constructor = managerClass.getDeclaredConstructor(Context::class.java)
         val manager = constructor.newInstance(activity)
-        val showMethod = managerClass.getDeclaredMethod("showPersistentBlockingNotification", List::class.java, Int::class.java)
+        val showMethod = managerClass.getDeclaredMethod("showPersistentWellbeingNotification", List::class.java, Int::class.java)
         showMethod.invoke(manager, trackedApps, timeLimit)
-        println("DEBUG: showPersistentBlockingNotification - showed notification for ${trackedApps.size} apps")
+        println("DEBUG: showPersistentWellbeingNotification - showed notification for ${trackedApps.size} apps")
     } catch (e: Exception) {
-        println("DEBUG: showPersistentBlockingNotification - error: ${e.message}")
+        println("DEBUG: showPersistentWellbeingNotification - error: ${e.message}")
     }
 }
 
-actual fun clearPersistentBlockingNotification() {
+actual fun clearPersistentWellbeingNotification() {
     val activity = currentActivityRef?.get()
     if (activity == null) {
-        println("DEBUG: clearPersistentBlockingNotification - no activity available")
+        println("DEBUG: clearPersistentWellbeingNotification - no activity available")
         return
     }
     
     try {
         // Use reflection to call the notification manager
-        val managerClass = Class.forName("com.luminoprisma.scrollpause.BlockingNotificationManager")
+        val managerClass = Class.forName("com.luminoprisma.scrollpause.WellbeingNotificationManager")
         val constructor = managerClass.getDeclaredConstructor(Context::class.java)
         val manager = constructor.newInstance(activity)
-        val clearMethod = managerClass.getDeclaredMethod("clearPersistentBlockingNotification")
+        val clearMethod = managerClass.getDeclaredMethod("clearPersistentWellbeingNotification")
         clearMethod.invoke(manager)
-        println("DEBUG: clearPersistentBlockingNotification - cleared notification")
+        println("DEBUG: clearPersistentWellbeingNotification - cleared notification")
     } catch (e: Exception) {
-        println("DEBUG: clearPersistentBlockingNotification - error: ${e.message}")
+        println("DEBUG: clearPersistentWellbeingNotification - error: ${e.message}")
     }
 }
 

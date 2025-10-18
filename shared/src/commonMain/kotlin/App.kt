@@ -1004,7 +1004,7 @@ private fun AppRoot() {
         isBlocked = false
         updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
         stopCompliantAppBlocking()
-        clearPersistentBlockingNotification()
+        clearPersistentWellbeingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
         sessionAppUsageTimes = emptyMap()
         sessionCreditedMinutes = emptyMap()
@@ -1107,7 +1107,7 @@ private fun AppRoot() {
         // Stop system-level app blocking
         stopCompliantAppBlocking()
         // Clear persistent blocking notification
-        clearPersistentBlockingNotification()
+        clearPersistentWellbeingNotification()
         // Save unblocked state to storage
         coroutineScope.launch {
             storage.saveBlockedState(false)
@@ -1403,7 +1403,7 @@ private fun AppRoot() {
                         storage.saveBlockedState(true)
                     }
                     // Show persistent blocking notification
-                    showPersistentBlockingNotification(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                    showPersistentWellbeingNotification(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     route = Route.Pause
                     // Redirect user to our pause screen when time limit is reached
                     showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
@@ -3401,8 +3401,8 @@ expect fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?)
 expect fun startAppMonitoringForegroundService()
 expect fun stopAppMonitoringForegroundService()
 expect fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int)
-expect fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int)
-expect fun clearPersistentBlockingNotification()
+expect fun showPersistentWellbeingNotification(trackedApps: List<String>, timeLimit: Int)
+expect fun clearPersistentWellbeingNotification()
 expect fun startCompliantAppBlocking(trackedApps: List<String>, timeLimit: Int)
 expect fun stopCompliantAppBlocking()
 expect fun isCompliantAppBlockingEnabled(): Boolean

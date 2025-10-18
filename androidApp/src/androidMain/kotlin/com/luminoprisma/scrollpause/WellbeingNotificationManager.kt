@@ -9,13 +9,13 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
-class BlockingNotificationManager(private val context: Context) {
+class WellbeingNotificationManager(private val context: Context) {
     
     companion object {
         private const val NOTIFICATION_ID = 2001
-        private const val CHANNEL_ID = "blocking_notifications"
-        private const val CHANNEL_NAME = "App Blocking Notifications"
-        private const val CHANNEL_DESCRIPTION = "Notifications when blocked apps are accessed"
+        private const val CHANNEL_ID = "wellbeing_notifications"
+        private const val CHANNEL_NAME = "Digital Wellbeing Notifications"
+        private const val CHANNEL_DESCRIPTION = "Notifications for mindful break reminders and time limits"
     }
     
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -40,7 +40,7 @@ class BlockingNotificationManager(private val context: Context) {
         }
     }
     
-    fun showPersistentBlockingNotification(trackedApps: List<String>, timeLimit: Int) {
+    fun showPersistentWellbeingNotification(trackedApps: List<String>, timeLimit: Int) {
         val intent = Intent(context, PauseActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("message", "Take a mindful pause - you've reached your time limit of ${timeLimit} minutes")
@@ -52,8 +52,8 @@ class BlockingNotificationManager(private val context: Context) {
         )
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("ScrollPause - Apps Blocked")
-            .setContentText("${trackedApps.size} apps are blocked. Tap to take a mindful pause.")
+            .setContentTitle("ScrollPause - Time for a Mindful Break")
+            .setContentText("You've reached your time limit for ${trackedApps.size} apps. Tap to take a mindful pause.")
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentIntent(pendingIntent)
             .setOngoing(true) // Makes it persistent
@@ -64,10 +64,10 @@ class BlockingNotificationManager(private val context: Context) {
             .build()
         
         notificationManager.notify(NOTIFICATION_ID, notification)
-        println("DEBUG: BlockingNotificationManager - Showed persistent blocking notification")
+        println("DEBUG: WellbeingNotificationManager - Showed persistent wellbeing notification")
     }
     
-    fun showBlockedAppNotification(appName: String, timeLimit: Int) {
+    fun showTimeLimitReachedNotification(appName: String, timeLimit: Int) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
             putExtra("action", "show_dashboard")
@@ -81,11 +81,11 @@ class BlockingNotificationManager(private val context: Context) {
         val message = if (timeLimit > 0) {
             "You've reached your ${timeLimit}-minute limit for $appName. Take a mindful break!"
         } else {
-            "$appName is currently blocked. Take a mindful break!"
+            "Time for a mindful break from $appName!"
         }
         
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle("App Blocked")
+            .setContentTitle("Time Limit Reached")
             .setContentText(message)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentIntent(pendingIntent)
@@ -101,7 +101,7 @@ class BlockingNotificationManager(private val context: Context) {
             .build()
         
         notificationManager.notify(NOTIFICATION_ID, notification)
-        println("DEBUG: BlockingNotificationManager - Showed blocked app notification for $appName")
+        println("DEBUG: WellbeingNotificationManager - Showed time limit reached notification for $appName")
     }
     
     fun showAccessibilityDisabledNotification() {
@@ -131,7 +131,7 @@ class BlockingNotificationManager(private val context: Context) {
             .build()
         
         notificationManager.notify(NOTIFICATION_ID + 1, notification)
-        println("DEBUG: BlockingNotificationManager - Showed accessibility disabled notification")
+        println("DEBUG: WellbeingNotificationManager - Showed accessibility disabled notification")
     }
     
     fun showUsageAccessDisabledNotification() {
@@ -161,16 +161,16 @@ class BlockingNotificationManager(private val context: Context) {
             .build()
         
         notificationManager.notify(NOTIFICATION_ID + 2, notification)
-        println("DEBUG: BlockingNotificationManager - Showed usage access disabled notification")
+        println("DEBUG: WellbeingNotificationManager - Showed usage access disabled notification")
     }
     
-    fun clearPersistentBlockingNotification() {
+    fun clearPersistentWellbeingNotification() {
         notificationManager.cancel(NOTIFICATION_ID)
-        println("DEBUG: BlockingNotificationManager - Cleared persistent blocking notification")
+        println("DEBUG: WellbeingNotificationManager - Cleared persistent wellbeing notification")
     }
     
     fun cancelAllNotifications() {
         notificationManager.cancelAll()
-        println("DEBUG: BlockingNotificationManager - Cancelled all notifications")
+        println("DEBUG: WellbeingNotificationManager - Cancelled all notifications")
     }
 }

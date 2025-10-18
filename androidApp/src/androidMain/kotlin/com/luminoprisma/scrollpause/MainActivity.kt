@@ -23,7 +23,7 @@ import initializeAdManager
 class MainActivity : AppCompatActivity() {
     private var isDismissing = false // Flag to prevent camera permission requests during dismiss
     private lateinit var appRestartDetector: AppRestartDetector
-    private lateinit var notificationManager: BlockingNotificationManager
+    private lateinit var notificationManager: WellbeingNotificationManager
     
     private var dismissCallback: (() -> Unit)? = null
     
@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize new monitoring components
         appRestartDetector = AppRestartDetector(this)
-        notificationManager = BlockingNotificationManager(this)
+        notificationManager = WellbeingNotificationManager(this)
         
         // Detect app restart and auto-resume if needed
         appRestartDetector.onAppStart()

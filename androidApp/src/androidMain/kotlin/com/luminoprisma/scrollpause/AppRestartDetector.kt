@@ -87,9 +87,9 @@ class AppRestartDetector(private val context: Context) {
             ForegroundAppAccessibilityService.setBlockedState(wasBlocked, trackedApps, timeLimit)
             
             // Show notification to inform user about auto-resume
-            val notificationManager = BlockingNotificationManager(context)
+            val notificationManager = WellbeingNotificationManager(context)
             if (wasBlocked) {
-                notificationManager.showBlockedAppNotification("tracked apps", timeLimit)
+                notificationManager.showTimeLimitReachedNotification("tracked apps", timeLimit)
             }
             
             println("DEBUG: AppRestartDetector - Auto-resumed tracking: blocked=$wasBlocked, apps=${trackedApps.size}")
