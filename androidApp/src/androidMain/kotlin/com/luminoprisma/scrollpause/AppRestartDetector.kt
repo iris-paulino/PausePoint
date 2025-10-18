@@ -37,15 +37,15 @@ class AppRestartDetector(private val context: Context) {
         }
     }
     
-    fun saveTrackingState(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
+    fun saveTrackingState(isTracking: Boolean, isPaused: Boolean, trackedApps: List<String>, timeLimit: Int) {
         prefs.edit().apply {
             putBoolean(KEY_WAS_TRACKING, isTracking)
-            putBoolean(KEY_WAS_BLOCKED, isBlocked)
+            putBoolean(KEY_WAS_BLOCKED, isPaused)
             putString(KEY_TRACKED_APPS, trackedApps.joinToString(","))
             putInt(KEY_TIME_LIMIT, timeLimit)
             apply()
         }
-        println("DEBUG: AppRestartDetector - Saved tracking state: tracking=$isTracking, blocked=$isBlocked")
+        println("DEBUG: AppRestartDetector - Saved tracking state: tracking=$isTracking, paused=$isPaused")
     }
     
     private fun handleAppRestart() {

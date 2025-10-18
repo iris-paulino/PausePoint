@@ -851,7 +851,7 @@ private fun AppRoot() {
     var isTracking by remember { mutableStateOf(false) }
     var trackingStartTime by remember { mutableStateOf(0L) }
     var appUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
-    var isBlocked by remember { mutableStateOf(false) }
+    var isPaused by remember { mutableStateOf(false) }
     
     // Session tracking variables that reset on dismiss/QR scan
     var sessionStartTime by remember { mutableStateOf(0L) }
@@ -1001,9 +1001,9 @@ private fun AppRoot() {
         userManuallyStoppedTracking = false
         
         // Clear blocked state and overlays ONLY after ad is completed
-        isBlocked = false
-        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
-        stopCompliantAppBlocking()
+        isPaused = false
+        updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
+        stopWellbeingMonitoring()
         clearPersistentWellbeingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
         sessionAppUsageTimes = emptyMap()
@@ -1026,7 +1026,7 @@ private fun AppRoot() {
             }
         }
         
-        dismissBlockingOverlay()
+        dismissPauseScreen()
         
         // Navigate to dashboard
         route = Route.Dashboard
@@ -1101,11 +1101,11 @@ private fun AppRoot() {
         
         // Reset session tracking state and increment unblocked counter
         isTracking = false
-        isBlocked = false
+        isPaused = false
         // Update accessibility service with unblocked state
-        updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+        updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
         // Stop system-level app blocking
-        stopCompliantAppBlocking()
+        stopWellbeingMonitoring()
         // Clear persistent blocking notification
         clearPersistentWellbeingNotification()
         // Save unblocked state to storage
@@ -1172,7 +1172,7 @@ private fun AppRoot() {
         route = Route.Dashboard
         
         // Dismiss any blocking overlays
-        dismissBlockingOverlay()
+        dismissPauseScreen()
     }
 
     
@@ -1241,7 +1241,7 @@ private fun AppRoot() {
                 startAppMonitoringForegroundService()
                 
                 // Save tracking state for restart detection
-                saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
             } else {
                 // Show consent dialog for enhanced tracking
                 showPersistentTrackingConsentDialog = true
@@ -1263,12 +1263,12 @@ private fun AppRoot() {
     }
 
     // Monitor foreground app changes to show overlay when blocked user tries to use tracked apps
-    LaunchedEffect(isBlocked, trackedApps, timeLimitMinutes) {
-        if (isBlocked) {
+    LaunchedEffect(isPaused, trackedApps, timeLimitMinutes) {
+        if (isPaused) {
             // Check periodically if user is trying to use a tracked app while blocked
-            while (isBlocked) {
+            while (isPaused) {
                 delay(5000) // Check every 5 seconds for better battery life
-                checkAndRedirectToPauseIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isBlocked, timeLimitMinutes)
+                checkAndRedirectToPauseIfBlocked(getAllTrackedAppIdentifiers(trackedApps), isPaused, timeLimitMinutes)
             }
         }
     }
@@ -1279,8 +1279,8 @@ private fun AppRoot() {
 
     // Function to update usage for currently active app
     fun updateCurrentAppUsage() {
-        if (!isTracking || route == Route.Pause || isBlocked) {
-            println("DEBUG: updateCurrentAppUsage - not tracking: isTracking=$isTracking, route=$route, isBlocked=$isBlocked")
+        if (!isTracking || route == Route.Pause || isPaused) {
+            println("DEBUG: updateCurrentAppUsage - not tracking: isTracking=$isTracking, route=$route, isPaused=$isPaused")
             return
         }
         if (currentForegroundApp == null || appActiveSince == 0L) {
@@ -1340,7 +1340,7 @@ private fun AppRoot() {
                 println("DEBUG: Time limit check - isTracking: $isTracking")
 
                 // If Pause screen is active or blocking overlay is shown, do not accrue usage for any apps
-                if (route == Route.Pause || isBlocked) {
+                if (route == Route.Pause || isPaused) {
                     continue
                 }
 
@@ -1353,9 +1353,9 @@ private fun AppRoot() {
                     finalizeSessionUsage()
                     // Stop tracking
                     isTracking = false
-                    isBlocked = false
+                    isPaused = false
                     // Update accessibility service with unblocked state
-                    updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                    updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
                     // Save unblocked state to storage
                     coroutineScope.launch {
                         try { 
@@ -1393,11 +1393,11 @@ private fun AppRoot() {
                     // Before pausing, merge the session into lifetime so UI shows correctly on Pause/Dashboard
                     finalizeSessionUsage()
                     isTracking = false
-                    isBlocked = true
+                    isPaused = true
                     // Update accessibility service with blocked state
-                    updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                    updateAccessibilityServiceBlockedState(isPaused, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     // Start compliant app blocking using notifications
-                    startCompliantAppBlocking(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                    startWellbeingMonitoring(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     // Save blocked state to storage
                     coroutineScope.launch {
                         storage.saveBlockedState(true)
@@ -1406,7 +1406,7 @@ private fun AppRoot() {
                     showPersistentWellbeingNotification(getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                     route = Route.Pause
                     // Redirect user to our pause screen when time limit is reached
-                    showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
+                    showPauseScreen("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
                 }
             }
         }
@@ -1423,8 +1423,8 @@ private fun AppRoot() {
             println("DEBUG: handleAppChange - sessionJustStarted: initialized foreground tracking for $newPackageName at $now without attributing past time")
             return
         }
-        println("DEBUG: handleAppChange called - newPackageName: $newPackageName, isTracking: $isTracking, route: $route, isBlocked: $isBlocked")
-        if (!isTracking || route == Route.Pause || isBlocked) return
+        println("DEBUG: handleAppChange called - newPackageName: $newPackageName, isTracking: $isTracking, route: $route, isPaused: $isPaused")
+        if (!isTracking || route == Route.Pause || isPaused) return
         
         val currentTime = getCurrentTimeMillis()
         
@@ -1538,9 +1538,9 @@ private fun AppRoot() {
                 finalizeSessionUsage()
                 // Stop tracking
                 isTracking = false
-                isBlocked = false
+                isPaused = false
                 // Update accessibility service with unblocked state
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -1582,9 +1582,9 @@ private fun AppRoot() {
                 finalizeSessionUsage()
                 // Stop tracking
                 isTracking = false
-                isBlocked = false
+                isPaused = false
                 // Update accessibility service with unblocked state
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -1681,10 +1681,10 @@ private fun AppRoot() {
             setOnTimerResetCallback {
                 println("DEBUG: ===== TIMER RESET CALLBACK CALLED (QR SCAN) =====")
                 // Ensure overlays are dismissed and user is not considered blocked anymore
-                isBlocked = false
+                isPaused = false
                 // Clear blocked state but preserve tracked apps and time limit for continued tracking
-                updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
-                dismissBlockingOverlay()
+                updateAccessibilityServiceBlockedState(isPaused, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                dismissPauseScreen()
                 println("DEBUG: QR scan callback - cleared blocked state and dismissed overlay")
 
                 // Use a different approach since coroutineScope might not be available in this context
@@ -1767,7 +1767,7 @@ private fun AppRoot() {
             // Register timer reset callback for dismiss button
             setOnDismissCallback {
                 println("DEBUG: ===== DISMISS CALLBACK CALLED =====")
-                println("DEBUG: Current state - isBlocked: $isBlocked, isTracking: $isTracking")
+                println("DEBUG: Current state - isPaused: $isPaused, isTracking: $isTracking")
                 println("DEBUG: sessionAppUsageTimes before: $sessionAppUsageTimes")
                 println("DEBUG: timesDismissedToday before: $timesDismissedToday")
                 
@@ -1796,7 +1796,7 @@ private fun AppRoot() {
                 }
                 
                 // 3. Reset session state but keep tracking ON and keep tracked apps/time limit
-                isBlocked = false
+                isPaused = false
                 // Notify accessibility service to continue timing for current tracked apps
                 updateAccessibilityServiceBlockedState(
                     false,
@@ -1832,7 +1832,7 @@ private fun AppRoot() {
                 println("DEBUG: Staying in tracked app after dismiss; no dashboard navigation")
                 
                 // 5. Dismiss any blocking overlays (same as QR scan)
-                dismissBlockingOverlay()
+                dismissPauseScreen()
                 println("DEBUG: Dismissed blocking overlays")
                 
                 // 6. Ensure tracking remains active (no toggle needed)
@@ -1870,11 +1870,11 @@ private fun AppRoot() {
             // If we're blocked but not tracking, this is an inconsistent state
             // that can happen when the app is killed while in Pause screen
             if (savedBlockedState && !savedTrackingState) {
-                println("DEBUG: App startup - Inconsistent state detected: isBlocked=true but isTracking=false")
+                println("DEBUG: App startup - Inconsistent state detected: isPaused=true but isTracking=false")
                 println("DEBUG: App startup - This typically happens when app was killed while in Pause screen")
                 println("DEBUG: App startup - Clearing blocked state and resetting to dashboard")
                 // Clear the inconsistent blocked state
-                isBlocked = false
+                isPaused = false
                 isTracking = false
                 // Save the corrected state
                 withTimeoutOrNull(2000) {
@@ -1885,7 +1885,7 @@ private fun AppRoot() {
                 }
             } else {
                 isTracking = savedTrackingState
-                isBlocked = savedBlockedState
+                isPaused = savedBlockedState
             }
             
             appUsageTimes = savedAppUsageTimes
@@ -1915,13 +1915,13 @@ private fun AppRoot() {
             }
             
             // Update accessibility service with restored blocked state
-            if (isBlocked) {
+            if (isPaused) {
                 // If we're blocked but have no tracked apps, this is an inconsistent state
                 // This can happen when the app was killed while in Pause route
                 if (trackedApps.isEmpty()) {
-                    println("DEBUG: App startup - Inconsistent state detected: isBlocked=true but trackedApps=empty")
+                    println("DEBUG: App startup - Inconsistent state detected: isPaused=true but trackedApps=empty")
                     println("DEBUG: App startup - Clearing blocked state to prevent stuck state")
-                    isBlocked = false
+                    isPaused = false
                     // Save the corrected state
                     withTimeoutOrNull(2000) {
                         try {
@@ -1930,7 +1930,7 @@ private fun AppRoot() {
                     }
                     updateAccessibilityServiceBlockedState(false, emptyList(), 0)
                 } else {
-                    updateAccessibilityServiceBlockedState(isBlocked, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
+                    updateAccessibilityServiceBlockedState(isPaused, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
                 }
             } else if (isTracking && trackedApps.isNotEmpty()) {
                 // If we're tracking but not blocked, still send tracked apps to accessibility service
@@ -1938,7 +1938,7 @@ private fun AppRoot() {
                 println("DEBUG: App startup - Updating accessibility service with tracking state (not blocked yet)")
                 updateAccessibilityServiceBlockedState(false, getAllTrackedAppIdentifiers(trackedApps), timeLimitMinutes)
             } else {
-                updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
             }
 
             // Daily reset if needed (on app startup)
@@ -2218,10 +2218,10 @@ private fun AppRoot() {
                 startAppMonitoringForegroundService()
                 
                 // Save tracking state for restart detection
-                saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
                 
                 // Update accessibility service with current tracking state
-                updateAccessibilityServiceBlockedState(isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                updateAccessibilityServiceBlockedState(isPaused, trackedApps.map { it.name }, timeLimitMinutes)
             }
         }
         println("DEBUG: Tracking state updated to: $isTracking")
@@ -2408,14 +2408,14 @@ private fun AppRoot() {
                 if (isTracking) {
                     try {
                         updateAccessibilityServiceBlockedState(
-                            isBlocked = false,
+                            isPaused = false,
                             trackedAppNames = getAllTrackedAppIdentifiers(trackedApps),
                             timeLimitMinutes = timeLimitMinutes
                         )
                         // Keep restart state in sync
                         saveTrackingStateForRestart(
                             isTracking,
-                            isBlocked,
+                            isPaused,
                             trackedApps.map { it.name },
                             timeLimitMinutes
                         )
@@ -2774,7 +2774,7 @@ private fun AppRoot() {
                     storage.savePersistentTrackingConsent(true)
                     // Now start the enhanced services
                     startAppMonitoringForegroundService()
-                    saveTrackingStateForRestart(isTracking, isBlocked, trackedApps.map { it.name }, timeLimitMinutes)
+                    saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
                 } catch (e: Exception) {
                     println("DEBUG: Error saving persistent tracking consent: ${e.message}")
                 }
@@ -2832,8 +2832,8 @@ private fun AppRoot() {
                             // Stop tracking and clear state in App scope, stay in-app
                             try { finalizeSessionUsage() } catch (_: Exception) {}
                             isTracking = false
-                            isBlocked = false
-                            updateAccessibilityServiceBlockedState(isBlocked, emptyList(), 0)
+                            isPaused = false
+                            updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
                             coroutineScope.launch {
                                 try {
                                     storage.saveBlockedState(false)
@@ -3376,16 +3376,16 @@ expect fun startUsageTracking(
     limitMinutes: Int,
     onLimitReached: () -> Unit
 )
-expect fun showBlockingOverlay(message: String)
-expect fun dismissBlockingOverlay()
-expect fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int)
+expect fun showPauseScreen(message: String)
+expect fun dismissPauseScreen()
+expect fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isPaused: Boolean, timeLimitMinutes: Int)
 expect suspend fun scanQrAndDismiss(expectedMessage: String): Boolean
 expect fun getCurrentTimeMillis(): Long
 expect fun setOnTimerResetCallback(callback: (() -> Unit)?)
 expect fun setOnDismissCallback(callback: (() -> Unit)?)
 expect fun showCongratulationsOverlay()
 expect fun showStreakMilestone(milestone: String)
-expect fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
+expect fun updateAccessibilityServiceBlockedState(isPaused: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int)
 expect fun openLastTrackedApp(trackedAppIdentifiers: List<String>)
 expect fun openEmailClient(recipient: String)
 expect fun hasCameraPermission(): Boolean
@@ -3400,12 +3400,12 @@ expect fun isUsageAccessPermissionGranted(): Boolean
 expect fun setOnUsageAccessStatusChangeCallback(callback: ((Boolean) -> Unit)?)
 expect fun startAppMonitoringForegroundService()
 expect fun stopAppMonitoringForegroundService()
-expect fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int)
+expect fun saveTrackingStateForRestart(isTracking: Boolean, isPaused: Boolean, trackedApps: List<String>, timeLimit: Int)
 expect fun showPersistentWellbeingNotification(trackedApps: List<String>, timeLimit: Int)
 expect fun clearPersistentWellbeingNotification()
-expect fun startCompliantAppBlocking(trackedApps: List<String>, timeLimit: Int)
-expect fun stopCompliantAppBlocking()
-expect fun isCompliantAppBlockingEnabled(): Boolean
+expect fun startWellbeingMonitoring(trackedApps: List<String>, timeLimit: Int)
+expect fun stopWellbeingMonitoring()
+expect fun isWellbeingMonitoringEnabled(): Boolean
 
 // Enhanced QR scanning function that validates against saved QR codes
 suspend fun scanQrAndValidate(storage: AppStorage): Boolean {

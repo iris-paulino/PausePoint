@@ -72,7 +72,7 @@
             android:excludeFromRecents="true" />
 
         <receiver
-            android:name=".OverlayCommandReceiver"
+            android:name=".WellbeingCommandReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.luminoprisma.scrollpause.SHOW_PAUSE_SCREEN" />

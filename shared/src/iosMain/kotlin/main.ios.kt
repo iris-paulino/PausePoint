@@ -63,7 +63,7 @@ actual fun startUsageTracking(
     println("DEBUG: Starting usage tracking for packages: $trackedPackages with limit: $limitMinutes minutes")
 }
 
-actual fun showBlockingOverlay(message: String) {
+actual fun showPauseScreen(message: String) {
     // Could present a full-screen Compose VC from the root.
 }
 
@@ -96,7 +96,7 @@ actual fun setOnDismissCallback(callback: (() -> Unit)?) {
     // No-op on iOS for now
 }
 
-actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
+actual fun updateAccessibilityServiceBlockedState(isPaused: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
     // No-op on iOS for now
 }
 
@@ -119,11 +119,11 @@ actual fun getCurrentForegroundApp(): String? {
     return null
 }
 
-actual fun dismissBlockingOverlay() {
+actual fun dismissPauseScreen() {
     // No-op on iOS for now
 }
 
-actual fun checkAndShowOverlayIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
+actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isPaused: Boolean, timeLimitMinutes: Int) {
     // No-op on iOS for now
 }
 

@@ -182,8 +182,8 @@ actual fun startUsageTracking(
     // 5. Call onLimitReached when limits are exceeded
 }
 
-actual fun showBlockingOverlay(message: String) {
-    println("DEBUG: showBlockingOverlay called with message: $message")
+actual fun showPauseScreen(message: String) {
+    println("DEBUG: showPauseScreen called with message: $message")
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
@@ -194,17 +194,17 @@ actual fun showBlockingOverlay(message: String) {
                 putExtra("message", message)
             }
             activity.startActivity(intent)
-            println("DEBUG: showBlockingOverlay - redirected to PauseActivity with message: $message")
+            println("DEBUG: showPauseScreen - redirected to PauseActivity with message: $message")
         } catch (e: Exception) {
-            println("DEBUG: showBlockingOverlay - error redirecting to pause screen: ${e.message}")
+            println("DEBUG: showPauseScreen - error redirecting to pause screen: ${e.message}")
         }
     } else {
-        println("DEBUG: showBlockingOverlay - no activity available")
+        println("DEBUG: showPauseScreen - no activity available")
     }
 }
 
-actual fun dismissBlockingOverlay() {
-    println("DEBUG: dismissBlockingOverlay called")
+actual fun dismissPauseScreen() {
+    println("DEBUG: dismissPauseScreen called")
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
@@ -213,10 +213,10 @@ actual fun dismissBlockingOverlay() {
                 val method = activity::class.java.methods.firstOrNull { it.name == "setDismissingState" && it.parameterTypes.size == 1 && it.parameterTypes[0] == Boolean::class.java }
                 if (method != null) {
                     method.invoke(activity, true)
-                    println("DEBUG: dismissBlockingOverlay - set dismissing state in MainActivity")
+                    println("DEBUG: dismissPauseScreen - set dismissing state in MainActivity")
                 }
             } catch (e: Exception) {
-                println("DEBUG: dismissBlockingOverlay - error setting dismissing state: ${e.message}")
+                println("DEBUG: dismissPauseScreen - error setting dismissing state: ${e.message}")
             }
             
             // Send broadcast to finish any running QrScanActivity
@@ -224,12 +224,12 @@ actual fun dismissBlockingOverlay() {
                 setPackage(activity.packageName) // Explicitly set the package
             }
             activity.sendBroadcast(qrScanIntent)
-            println("DEBUG: dismissBlockingOverlay - sent FINISH_QR_SCAN_ACTIVITY broadcast with package: ${activity.packageName}")
+            println("DEBUG: dismissPauseScreen - sent FINISH_QR_SCAN_ACTIVITY broadcast with package: ${activity.packageName}")
         } catch (e: Exception) {
-            println("DEBUG: dismissBlockingOverlay - error sending broadcast: ${e.message}")
+            println("DEBUG: dismissPauseScreen - error sending broadcast: ${e.message}")
         }
     } else {
-        println("DEBUG: dismissBlockingOverlay - no activity available")
+        println("DEBUG: dismissPauseScreen - no activity available")
     }
 }
 
@@ -303,10 +303,10 @@ fun dismissAndContinueTracking() {
     }
 }
 
-actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isBlocked: Boolean, timeLimitMinutes: Int) {
-    if (!isBlocked) return
+actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isPaused: Boolean, timeLimitMinutes: Int) {
+    if (!isPaused) return
     
-    println("DEBUG: checkAndRedirectToPauseIfBlocked called - isBlocked: $isBlocked, isQrScanningActive: $isQrScanningActive")
+    println("DEBUG: checkAndRedirectToPauseIfBlocked called - isPaused: $isPaused, isQrScanningActive: $isQrScanningActive")
     
     // Suppress redirect while QR scanner is active to avoid bouncing back to pause screen
     if (isQrScanningActive) {
@@ -338,7 +338,7 @@ actual fun checkAndRedirectToPauseIfBlocked(trackedAppNames: List<String>, isBlo
         if (isTrackedApp) {
             // User is trying to use a tracked app while blocked, redirect to our pause screen
             println("DEBUG: checkAndRedirectToPauseIfBlocked - redirecting to pause screen for blocked tracked app")
-            showBlockingOverlay("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
+            showPauseScreen("Take a mindful pause - you've reached your time limit of ${timeLimitMinutes} minutes")
         }
     }
 }
@@ -411,8 +411,8 @@ actual fun setOnDismissCallback(callback: (() -> Unit)?) {
     }
 }
 
-actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
-    println("DEBUG: updateAccessibilityServiceBlockedState - blocked: $isBlocked, apps: $trackedAppNames, limit: $timeLimitMinutes")
+actual fun updateAccessibilityServiceBlockedState(isPaused: Boolean, trackedAppNames: List<String>, timeLimitMinutes: Int) {
+    println("DEBUG: updateAccessibilityServiceBlockedState - paused: $isPaused, apps: $trackedAppNames, limit: $timeLimitMinutes")
     try {
         // Choose a safe context (application if activity missing)
         val activity = currentActivityRef?.get()
@@ -424,11 +424,11 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
                 val prefs = ctx.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
                 val csv = trackedAppNames.joinToString(",")
                 prefs.edit()
-                    .putBoolean("blocked", isBlocked)
+                    .putBoolean("blocked", isPaused)
                     .putString("tracked_apps_csv", csv)
                     .putInt("time_limit_minutes", timeLimitMinutes)
                     .apply()
-                println("DEBUG: updateAccessibilityServiceBlockedState - persisted to SharedPreferences (app ctx): blocked=$isBlocked, apps=$csv, limit=$timeLimitMinutes")
+                println("DEBUG: updateAccessibilityServiceBlockedState - persisted to SharedPreferences (app ctx): paused=$isPaused, apps=$csv, limit=$timeLimitMinutes")
             } catch (e: Exception) {
                 println("DEBUG: updateAccessibilityServiceBlockedState - prefs persist error: ${e.message}")
             }
@@ -441,7 +441,7 @@ actual fun updateAccessibilityServiceBlockedState(isBlocked: Boolean, trackedApp
             try {
                 val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
                     setPackage(ctx.packageName)
-                    putExtra("isBlocked", isBlocked)
+                    putExtra("isBlocked", isPaused)
                     putExtra("trackedApps", trackedAppNames.joinToString(","))
                     putExtra("timeLimit", timeLimitMinutes)
                 }
@@ -1013,7 +1013,7 @@ actual fun stopAppMonitoringForegroundService() {
     }
 }
 
-actual fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, trackedApps: List<String>, timeLimit: Int) {
+actual fun saveTrackingStateForRestart(isTracking: Boolean, isPaused: Boolean, trackedApps: List<String>, timeLimit: Int) {
     val activity = currentActivityRef?.get()
     if (activity == null) {
         println("DEBUG: saveTrackingStateForRestart - no activity available")
@@ -1026,7 +1026,7 @@ actual fun saveTrackingStateForRestart(isTracking: Boolean, isBlocked: Boolean, 
         val constructor = detectorClass.getDeclaredConstructor(Context::class.java)
         val detector = constructor.newInstance(activity)
         val saveMethod = detectorClass.getDeclaredMethod("saveTrackingState", Boolean::class.java, Boolean::class.java, List::class.java, Int::class.java)
-        saveMethod.invoke(detector, isTracking, isBlocked, trackedApps, timeLimit)
+        saveMethod.invoke(detector, isTracking, isPaused, trackedApps, timeLimit)
         println("DEBUG: saveTrackingStateForRestart - state saved")
     } catch (e: Exception) {
         println("DEBUG: saveTrackingStateForRestart - error: ${e.message}")
@@ -1038,7 +1038,7 @@ actual fun showPersistentWellbeingNotification(trackedApps: List<String>, timeLi
     if (activity == null) {
         println("DEBUG: showPersistentWellbeingNotification - no activity available")
         return
-    }
+    }   
     
     try {
         // Use reflection to call the notification manager
@@ -1073,59 +1073,59 @@ actual fun clearPersistentWellbeingNotification() {
     }
 }
 
-actual fun startCompliantAppBlocking(trackedApps: List<String>, timeLimit: Int) {
+actual fun startWellbeingMonitoring(trackedApps: List<String>, timeLimit: Int) {
     try {
         val activity = currentActivityRef?.get()
         if (activity != null) {
             // Use reflection to call the compliant app blocking service
-            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.WellbeingMonitoringService")
             val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
             val blockingService = getInstanceMethod.invoke(null, activity)
-            val startBlockingMethod = serviceClass.getDeclaredMethod("startBlocking", List::class.java, Int::class.java)
-            startBlockingMethod.invoke(blockingService, trackedApps, timeLimit)
-            println("DEBUG: startCompliantAppBlocking - started blocking ${trackedApps.size} apps")
+            val startMonitoringMethod = serviceClass.getDeclaredMethod("startMonitoring", List::class.java, Int::class.java)
+            startMonitoringMethod.invoke(blockingService, trackedApps, timeLimit)
+            println("DEBUG: startWellbeingMonitoring - started monitoring ${trackedApps.size} apps")
         } else {
-            println("DEBUG: startCompliantAppBlocking - no activity available")
+            println("DEBUG: startWellbeingMonitoring - no activity available")
         }
     } catch (e: Exception) {
-        println("DEBUG: startCompliantAppBlocking - error: ${e.message}")
+        println("DEBUG: startWellbeingMonitoring - error: ${e.message}")
     }
 }
 
-actual fun stopCompliantAppBlocking() {
+actual fun stopWellbeingMonitoring() {
     try {
         val activity = currentActivityRef?.get()
         if (activity != null) {
             // Use reflection to call the compliant app blocking service
-            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.WellbeingMonitoringService")
             val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
             val blockingService = getInstanceMethod.invoke(null, activity)
-            val stopBlockingMethod = serviceClass.getDeclaredMethod("stopBlocking")
-            stopBlockingMethod.invoke(blockingService)
-            println("DEBUG: stopCompliantAppBlocking - stopped blocking")
+            val stopMonitoringMethod = serviceClass.getDeclaredMethod("stopMonitoring")
+            stopMonitoringMethod.invoke(blockingService)
+            println("DEBUG: stopWellbeingMonitoring - stopped monitoring")
         } else {
-            println("DEBUG: stopCompliantAppBlocking - no activity available")
+            println("DEBUG: stopWellbeingMonitoring - no activity available")
         }
     } catch (e: Exception) {
-        println("DEBUG: stopCompliantAppBlocking - error: ${e.message}")
+        println("DEBUG: stopWellbeingMonitoring - error: ${e.message}")
     }
 }
 
-actual fun isCompliantAppBlockingEnabled(): Boolean {
+actual fun isWellbeingMonitoringEnabled(): Boolean {
     return try {
         val activity = currentActivityRef?.get()
         if (activity != null) {
             // Use reflection to call the compliant app blocking service
-            val serviceClass = Class.forName("com.luminoprisma.scrollpause.CompliantBlockingService")
+            val serviceClass = Class.forName("com.luminoprisma.scrollpause.WellbeingMonitoringService")
             val getInstanceMethod = serviceClass.getDeclaredMethod("getInstance", Context::class.java)
             val blockingService = getInstanceMethod.invoke(null, activity)
-            val isBlockingMethod = serviceClass.getDeclaredMethod("isBlocking")
-            isBlockingMethod.invoke(blockingService) as Boolean
+            val isMonitoringMethod = serviceClass.getDeclaredMethod("isMonitoring")
+            isMonitoringMethod.invoke(blockingService) as Boolean
         } else {
             false
         }
     } catch (e: Exception) {
-        println("DEBUG: isCompliantAppBlockingEnabled - error: ${e.message}")
+        println("DEBUG: isWellbeingMonitoringEnabled - error: ${e.message}")
         false
     }
 }
