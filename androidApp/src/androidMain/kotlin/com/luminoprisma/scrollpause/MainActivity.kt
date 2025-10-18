@@ -89,6 +89,9 @@ class MainActivity : AppCompatActivity() {
         setContent {
             MainView()
         }
+        
+        // Handle intent extras for pause screen
+        handleIntentExtras()
     }
     
     fun requestCameraPermissionIfNeeded(): Boolean {
@@ -113,6 +116,21 @@ class MainActivity : AppCompatActivity() {
     fun setDismissingState(dismissing: Boolean) {
         isDismissing = dismissing
         println("DEBUG: MainActivity - setDismissingState: $dismissing")
+    }
+    
+    private fun handleIntentExtras() {
+        val message = intent?.getStringExtra("message")
+        if (message != null) {
+            println("DEBUG: MainActivity - received message from intent: $message")
+            // The MainView will automatically show PauseScreen when route = Route.Pause
+            // This happens when the time limit is reached in the main app logic
+        }
+    }
+    
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras()
     }
     
     fun resetDismissingStateIfNeeded() {

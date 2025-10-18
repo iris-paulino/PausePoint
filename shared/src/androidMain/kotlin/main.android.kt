@@ -187,16 +187,17 @@ actual fun showPauseScreen(message: String) {
     val activity = currentActivityRef?.get()
     if (activity != null) {
         try {
-            // Redirect user to our pause screen when time limit is reached
+            // Policy-compliant: Bring the main app to foreground to show PauseScreen
+            // This ensures the blocking screen appears when time limit is reached
             val intent = Intent().apply {
-                setClassName(activity.packageName, "com.luminoprisma.scrollpause.PauseActivity")
+                setClassName(activity.packageName, "com.luminoprisma.scrollpause.MainActivity")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                 putExtra("message", message)
             }
             activity.startActivity(intent)
-            println("DEBUG: showPauseScreen - redirected to PauseActivity with message: $message")
+            println("DEBUG: showPauseScreen - brought main app to foreground for PauseScreen")
         } catch (e: Exception) {
-            println("DEBUG: showPauseScreen - error redirecting to pause screen: ${e.message}")
+            println("DEBUG: showPauseScreen - error bringing main app to foreground: ${e.message}")
         }
     } else {
         println("DEBUG: showPauseScreen - no activity available")
