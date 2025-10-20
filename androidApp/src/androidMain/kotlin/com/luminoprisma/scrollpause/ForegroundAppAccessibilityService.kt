@@ -204,20 +204,34 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         }
         // Only accept non-ignored packages
         if (!isIgnoredPackage(pkg)) {
-            // Track time for the previous app before switching
-            trackTimeForCurrentApp()
-            
-            currentForegroundPackage = pkg
-            appActiveSince = System.currentTimeMillis()
-            println("DEBUG: ForegroundAppAccessibilityService - New foreground app: $pkg (event=${event?.eventType})")
-            val intent = android.content.Intent("com.luminoprisma.scrollpause.FOREGROUND_APP_CHANGED").apply {
-                putExtra("pkg", pkg)
-                setPackage(applicationContext.packageName)
+            val previousPkg = currentForegroundPackage
+            // Only flush and reset if the foreground package actually changed
+            if (previousPkg != pkg) {
+                // Track time for the previous app before switching
+                trackTimeForCurrentApp()
+
+                currentForegroundPackage = pkg
+                appActiveSince = System.currentTimeMillis()
+                println("DEBUG: ForegroundAppAccessibilityService - New foreground app: $pkg (event=${event?.eventType})")
+                val intent = android.content.Intent("com.luminoprisma.scrollpause.FOREGROUND_APP_CHANGED").apply {
+                    putExtra("pkg", pkg)
+                    setPackage(applicationContext.packageName)
+                }
+                applicationContext.sendBroadcast(intent)
+
+                // Check if this app should be blocked and redirect to pause screen
+                checkAndRedirectToPauseApp(pkg)
+            } else {
+                // Same app; do not reset appActiveSince here. Periodic accrual will handle time tracking.
+                // However, if periodic monitor hasn't run yet, flush on event when >=5s elapsed.
+                val now = System.currentTimeMillis()
+                val elapsedSeconds = if (appActiveSince > 0L) (now - appActiveSince) / 1000L else 0L
+                if (elapsedSeconds >= 5L && !isBlocked) {
+                    println("DEBUG: onAccessibilityEvent - same app elapsed=$elapsedSeconds s; flushing via trackTimeForCurrentApp()")
+                    trackTimeForCurrentApp()
+                    appActiveSince = now
+                }
             }
-            applicationContext.sendBroadcast(intent)
-            
-            // Check if this app should be blocked and redirect to pause screen
-            checkAndRedirectToPauseApp(pkg)
         }
     }
 
@@ -241,10 +255,12 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 println("DEBUG: AccessibilityService.trackTimeForCurrentApp - checking appName=$appName, expectedPackage=$expectedPackage")
                 
                 if (currentForegroundPackage == expectedPackage) {
-                    val currentUsage = appUsageTimes[appName] ?: 0L
+                    // Always store by package ID to avoid alias mismatches (e.g., IG/Insta)
+                    val key = expectedPackage
+                    val currentUsage = appUsageTimes[key] ?: 0L
                     val newUsage = currentUsage + timeSpent
-                    appUsageTimes[appName] = newUsage
-                    println("DEBUG: AccessibilityService - Added $timeSpent seconds to $appName (total: $newUsage)")
+                    appUsageTimes[key] = newUsage
+                    println("DEBUG: AccessibilityService - Added $timeSpent seconds to $key (total: $newUsage)")
                     
                     // Persist the updated usage time using shared AppStorage so main app can rehydrate
                     try {
@@ -253,15 +269,15 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                             try {
                                 // Save with both human-readable names and package IDs as keys for robustness
                                 val toSave = mutableMapOf<String, Long>()
-                                for ((name, secs) in appUsageTimes) {
-                                    toSave[name] = secs
-                                    val pkg = getPackageNameForTrackedApp(name)
+                                for ((nameOrPkg, secs) in appUsageTimes) {
+                                    toSave[nameOrPkg] = secs
+                                    val pkg = getPackageNameForTrackedApp(nameOrPkg)
                                     if (pkg.isNotEmpty()) toSave[pkg] = secs
                                 }
                                 storage.saveAppUsageTimes(toSave)
                                 val epochDay = System.currentTimeMillis() / 86_400_000L
                                 storage.saveUsageDayEpoch(epochDay)
-                                println("DEBUG: AccessibilityService - Persisted usage via AppStorage (keys: name+pkg), last=$appName=$newUsage (epochDay=$epochDay)")
+                                println("DEBUG: AccessibilityService - Persisted usage via AppStorage (pkg keys), last=$key=$newUsage (epochDay=$epochDay)")
                             } catch (e: Exception) {
                                 println("DEBUG: AccessibilityService - Error persisting usage via AppStorage (coroutine): ${e.message}")
                             }
@@ -271,7 +287,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     }
                     
                     // Check if time limit has been reached
-                    checkTimeLimitForApp(appName, newUsage)
+                    checkTimeLimitForApp(key, newUsage)
                     break
                 }
             }
@@ -294,7 +310,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         }
     }
     
-    private fun checkTimeLimitForApp(appName: String, totalSeconds: Long) {
+    private fun checkTimeLimitForApp(appNameOrPkgKey: String, totalSeconds: Long) {
         if (timeLimitMinutes <= 0) {
             // Sanity reload: tracked apps exist but limit is zero → try reloading once
             if (trackedAppNames.isNotEmpty()) {
@@ -307,9 +323,35 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             }
         }
         val timeLimitSeconds = timeLimitMinutes * 60L
-        println("DEBUG: AccessibilityService - checking time limit: app=" + appName + ", used=" + totalSeconds + "s, limitMinutes=" + timeLimitMinutes + ", limitSeconds=" + timeLimitSeconds)
+        println("DEBUG: AccessibilityService - checking time limit: app=" + appNameOrPkgKey + ", used=" + totalSeconds + "s, limitMinutes=" + timeLimitMinutes + ", limitSeconds=" + timeLimitSeconds)
         if (totalSeconds >= timeLimitSeconds) {
-            println("DEBUG: AccessibilityService - Time limit reached for $appName: $totalSeconds seconds >= $timeLimitSeconds seconds")
+            println("DEBUG: AccessibilityService - Time limit reached for $appNameOrPkgKey: $totalSeconds seconds >= $timeLimitSeconds seconds")
+            
+            // Ensure persisted usage reflects at least the full limit duration for this app
+            try {
+                val current = appUsageTimes[appNameOrPkgKey] ?: 0L
+                val normalized = kotlin.math.max(current, timeLimitSeconds)
+                appUsageTimes[appNameOrPkgKey] = normalized
+                val storage = createAppStorage()
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                    try {
+                        val toSave = mutableMapOf<String, Long>()
+                        for ((nameOrPkg, secs) in appUsageTimes) {
+                            toSave[nameOrPkg] = secs
+                            val pkg = getPackageNameForTrackedApp(nameOrPkg)
+                            if (pkg.isNotEmpty()) toSave[pkg] = secs
+                        }
+                        storage.saveAppUsageTimes(toSave)
+                        val epochDay = System.currentTimeMillis() / 86_400_000L
+                        storage.saveUsageDayEpoch(epochDay)
+                        println("DEBUG: AccessibilityService - Normalized persisted usage for limit: $appNameOrPkgKey=$normalized")
+                    } catch (e: Exception) {
+                        println("DEBUG: AccessibilityService - Error normalizing persisted usage: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                println("DEBUG: AccessibilityService - Error ensuring minimum persisted usage: ${e.message}")
+            }
             
             // Set blocked state and trigger PauseScreen
             isBlocked = true

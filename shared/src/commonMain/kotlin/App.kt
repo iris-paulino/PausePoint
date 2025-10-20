@@ -2008,7 +2008,7 @@ private fun AppRoot() {
                             val secondsByName = appUsageTimes[app.name] ?: 0L
                             val secondsByPkg = appUsageTimes[getPackageNameForTrackedApp(app)] ?: 0L
                             val seconds = maxOf(secondsByName, secondsByPkg)
-                            val minutes = (seconds / 60L).toInt() // Remove the cap - show actual usage
+                            val minutes = kotlin.math.ceil(seconds / 60.0).toInt() // Round up so 1s = 1m
                             println("DEBUG: App ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                             app.copy(minutesUsed = minutes)
                         }
@@ -2036,7 +2036,7 @@ private fun AppRoot() {
                     println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                     trackedApps = trackedApps.map { app ->
                         val seconds = appUsageTimes[app.name] ?: 0L
-                        val minutes = (seconds / 60L).toInt() // Remove the cap - show actual usage
+                        val minutes = kotlin.math.ceil(seconds / 60.0).toInt() // Round up so 1s = 1m
                         println("DEBUG: Default app ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                         app.copy(minutesUsed = minutes)
                     }
