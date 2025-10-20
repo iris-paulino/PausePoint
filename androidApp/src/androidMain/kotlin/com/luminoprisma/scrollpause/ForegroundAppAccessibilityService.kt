@@ -8,6 +8,12 @@ import android.content.Context
 import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
 import android.content.SharedPreferences
+import createAppStorage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 class ForegroundAppAccessibilityService : AccessibilityService() {
     companion object {
@@ -240,19 +246,28 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     appUsageTimes[appName] = newUsage
                     println("DEBUG: AccessibilityService - Added $timeSpent seconds to $appName (total: $newUsage)")
                     
-                    // Persist the updated usage time
-                    appContextRef?.let { context ->
-                        try {
-                            val prefs = context.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
-                            val usageKey = "usage_${appName.replace(" ", "_")}"
-                            prefs.edit().apply {
-                                putLong(usageKey, newUsage)
-                                apply()
+                    // Persist the updated usage time using shared AppStorage so main app can rehydrate
+                    try {
+                        val storage = createAppStorage()
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                            try {
+                                // Save with both human-readable names and package IDs as keys for robustness
+                                val toSave = mutableMapOf<String, Long>()
+                                for ((name, secs) in appUsageTimes) {
+                                    toSave[name] = secs
+                                    val pkg = getPackageNameForTrackedApp(name)
+                                    if (pkg.isNotEmpty()) toSave[pkg] = secs
+                                }
+                                storage.saveAppUsageTimes(toSave)
+                                val epochDay = System.currentTimeMillis() / 86_400_000L
+                                storage.saveUsageDayEpoch(epochDay)
+                                println("DEBUG: AccessibilityService - Persisted usage via AppStorage (keys: name+pkg), last=$appName=$newUsage (epochDay=$epochDay)")
+                            } catch (e: Exception) {
+                                println("DEBUG: AccessibilityService - Error persisting usage via AppStorage (coroutine): ${e.message}")
                             }
-                            println("DEBUG: AccessibilityService - Persisted usage for $appName: $newUsage seconds")
-                        } catch (e: Exception) {
-                            println("DEBUG: AccessibilityService - Error persisting usage: ${e.message}")
                         }
+                    } catch (e: Exception) {
+                        println("DEBUG: AccessibilityService - Error scheduling persist via AppStorage: ${e.message}")
                     }
                     
                     // Check if time limit has been reached
@@ -477,18 +492,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                                 apply()
                             }
 
-                            // If unblocked, reset usage so user gets full time after dismiss
+                            // If unblocked, do NOT clear persisted usage; only reset in-memory counters
                             if (!isBlocked) {
                                 appUsageTimes.clear()
-                                try {
-                                    val editor = prefs.edit()
-                                    for (appName in trackedAppNames) {
-                                        val usageKey = "usage_" + appName.replace(" ", "_")
-                                        editor.remove(usageKey)
-                                    }
-                                    editor.apply()
-                                    println("DEBUG: STATE_CHANGED - cleared usage for tracked apps after unblocking")
-                                } catch (_: Exception) {}
+                                println("DEBUG: STATE_CHANGED - unblocked; cleared in-memory usage only (persisted totals kept)")
                             }
                         } else {
                             // Fallback to SharedPreferences
@@ -533,15 +540,24 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             trackedAppNames = apps
             timeLimitMinutes = timeLimit
             
-            // Load app usage times from SharedPreferences
+            // Load app usage times from shared AppStorage so it survives UI death and service restarts
             appUsageTimes.clear()
-            for (appName in apps) {
-                val usageKey = "usage_${appName.replace(" ", "_")}"
-                val usageSeconds = prefs.getLong(usageKey, 0L)
-                if (usageSeconds > 0) {
-                    appUsageTimes[appName] = usageSeconds
-                    println("DEBUG: loadStateFromPreferences - Loaded usage for $appName: $usageSeconds seconds")
+            try {
+                val storage = createAppStorage()
+                val savedMap = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
                 }
+                if (savedMap.isNotEmpty()) {
+                    for (appName in apps) {
+                        val seconds = savedMap[appName] ?: 0L
+                        if (seconds > 0L) {
+                            appUsageTimes[appName] = seconds
+                            println("DEBUG: loadStateFromPreferences - Loaded usage from AppStorage for $appName: $seconds seconds")
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                println("DEBUG: loadStateFromPreferences - Error loading usage from AppStorage: ${e.message}")
             }
             
             println("DEBUG: loadStateFromPreferences - Updated state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes, usageTimes=$appUsageTimes")

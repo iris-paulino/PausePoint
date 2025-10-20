@@ -176,22 +176,18 @@ class PauseActivity : ComponentActivity() {
             }
         }
 
-        // 2) Persist blocked=false, clear usage for tracked apps, broadcast STATE_CHANGED
+        // 2) Persist blocked=false, clear usage for tracked apps via AppStorage, broadcast STATE_CHANGED
         try {
             val prefs = applicationContext.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
             val csv = prefs.getString("tracked_apps_csv", "") ?: ""
             val limit = prefs.getInt("time_limit_minutes", 0)
+            // Persist blocked=false in prefs (service relies on this flag)
             prefs.edit().apply {
                 putBoolean("blocked", false)
-                if (csv.isNotBlank()) {
-                    csv.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { name ->
-                        val usageKey = "usage_" + name.replace(" ", "_")
-                        remove(usageKey)
-                    }
-                }
                 apply()
             }
-            println("DEBUG: PauseDismiss - cleared usage for tracked apps")
+            // Do NOT clear persisted usage here – keep today's totals for UI rehydration
+            println("DEBUG: PauseDismiss - not clearing persisted usage; only unblocking")
 
             val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
                 setPackage(packageName)
@@ -282,5 +278,6 @@ private fun PauseActivityContent(message: String, onFinish: () -> Unit, qrScanLa
         onClose = onFinish
     )
 }
+
 
 

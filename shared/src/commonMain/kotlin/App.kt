@@ -985,6 +985,18 @@ private fun AppRoot() {
         
         println("DEBUG: appUsageTimes after: $appUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
+
+        // Persist lifetime seconds so UI can rehydrate after app kill
+        coroutineScope.launch {
+            try {
+                storage.saveAppUsageTimes(appUsageTimes)
+                // Stamp usage day to support daily reset logic on cold start
+                storage.saveUsageDayEpoch(currentEpochDayUtc())
+                println("DEBUG: finalizeSessionUsage - persisted appUsageTimes and usage day")
+            } catch (e: Exception) {
+                println("DEBUG: finalizeSessionUsage - error persisting usage: ${e.message}")
+            }
+        }
     }
 
     // Helper function to proceed with dismiss logic after ad
@@ -1992,7 +2004,10 @@ private fun AppRoot() {
                         println("DEBUG: Rehydrating tracked apps - appUsageTimes: $appUsageTimes")
                         println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                         trackedApps = trackedApps.map { app ->
-                            val seconds = appUsageTimes[app.name] ?: 0L
+                            // Accept either human-readable app name or package ID as key
+                            val secondsByName = appUsageTimes[app.name] ?: 0L
+                            val secondsByPkg = appUsageTimes[getPackageNameForTrackedApp(app)] ?: 0L
+                            val seconds = maxOf(secondsByName, secondsByPkg)
                             val minutes = (seconds / 60L).toInt() // Remove the cap - show actual usage
                             println("DEBUG: App ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                             app.copy(minutesUsed = minutes)
