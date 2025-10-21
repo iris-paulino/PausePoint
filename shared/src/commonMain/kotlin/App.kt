@@ -1901,6 +1901,22 @@ private fun AppRoot() {
                 userManuallyStoppedTracking = false
             }
             
+            // Check if accessibility is disabled and stop tracking if so
+            if (isTracking && !isAccessibilityServiceEnabled()) {
+                println("DEBUG: App startup - Accessibility disabled, stopping tracking")
+                finalizeSessionUsage()
+                isTracking = false
+                isPaused = false
+                userManuallyStoppedTracking = false
+                // Save the corrected state
+                withTimeoutOrNull(2000) {
+                    try {
+                        storage.saveBlockedState(false)
+                        storage.saveTrackingState(false)
+                    } catch (_: Exception) {}
+                }
+            }
+            
             // Restore dashboard counters
             timesUnblockedToday = savedTimesUnblockedToday
             timesDismissedToday = savedTimesDismissedToday
@@ -2134,6 +2150,26 @@ private fun AppRoot() {
         if (route == Route.Dashboard && !hasCheckedPermissionsOnDashboardThisLaunch) {
             val accessibilityAllowed = isAccessibilityServiceEnabled()
             val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+            
+            // If accessibility is disabled but we think we're tracking, stop tracking immediately
+            if (!accessibilityAllowed && isTracking) {
+                println("DEBUG: Accessibility disabled on dashboard - stopping tracking immediately")
+                finalizeSessionUsage()
+                isTracking = false
+                isPaused = false
+                userManuallyStoppedTracking = false
+                // Update accessibility service with unblocked state
+                updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
+                // Save unblocked state to storage
+                coroutineScope.launch {
+                    try { 
+                        storage.saveBlockedState(false)
+                        storage.saveTrackingState(false)
+                    } catch (e: Exception) {
+                        println("DEBUG: Error saving state after accessibility disabled: ${e.message}")
+                    }
+                }
+            }
             
             // Check if both permissions are already granted and auto-start tracking
             if (accessibilityAllowed && usagePrefAllowed && !isTracking && !userManuallyStoppedTracking && trackedApps.isNotEmpty()) {
@@ -3956,8 +3992,8 @@ private fun DashboardContent(
         
         Spacer(Modifier.height(16.dp))
         
-        // Tracking State Label
-        if (isTracking) {
+        // Tracking State Label - only show if actually tracking AND accessibility is enabled
+        if (isTracking && isAccessibilityServiceEnabled()) {
             var animationScale by remember { mutableStateOf(1f) }
             val infiniteTransition = rememberInfiniteTransition(label = "tracking_pulse")
             val scale by infiniteTransition.animateFloat(

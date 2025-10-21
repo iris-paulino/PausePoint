@@ -28,6 +28,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         // Time tracking variables
         @Volatile private var appActiveSince: Long = 0L
         @Volatile private var appUsageTimes: MutableMap<String, Long> = mutableMapOf() // app name -> seconds used
+        @Volatile private var hasLoadedExistingUsage: Boolean = false // Flag to prevent multiple loads
         
         fun getCurrentForegroundPackage(): String? = currentForegroundPackage
         
@@ -37,6 +38,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         }
         
         fun isBlocked(): Boolean = isBlocked
+        
+        fun getCurrentUsageTimes(): Map<String, Long> = appUsageTimes.toMap()
 
         fun setPendingShow(message: String) {
             pendingShowMessage = message
@@ -152,6 +155,30 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         registerRedirectReceiver()
         loadStateFromPreferences()
         
+        // Load existing usage from storage to restore accumulated usage
+        try {
+            val storage = createAppStorage()
+            val existingUsage = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
+            }
+            println("DEBUG: ForegroundAppAccessibilityService - Loading existing usage on service start: $existingUsage")
+            if (existingUsage.isNotEmpty()) {
+                // Load existing usage into in-memory map (replace, don't add, since this is the source of truth)
+                appUsageTimes.clear()
+                for ((key, seconds) in existingUsage) {
+                    appUsageTimes[key] = seconds
+                }
+                println("DEBUG: ForegroundAppAccessibilityService - Loaded existing usage on service start: $existingUsage")
+                println("DEBUG: ForegroundAppAccessibilityService - Updated in-memory usage: $appUsageTimes")
+            } else {
+                println("DEBUG: ForegroundAppAccessibilityService - No existing usage found in storage")
+            }
+            // Mark as loaded to prevent multiple loads
+            hasLoadedExistingUsage = true
+        } catch (e: Exception) {
+            println("DEBUG: ForegroundAppAccessibilityService - Error loading existing usage on service start: ${e.message}")
+        }
+        
         // Additional debugging for persistent blocking
         println("DEBUG: ForegroundAppAccessibilityService - Service connected, checking if we should restore blocking")
         println("DEBUG: ForegroundAppAccessibilityService - Current state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes")
@@ -244,6 +271,31 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             return
         }
         
+        // Load existing usage from storage only once when service starts tracking
+        if (!hasLoadedExistingUsage) {
+            try {
+                val storage = createAppStorage()
+                val existingUsage = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
+                }
+                println("DEBUG: AccessibilityService - Loading existing usage from storage: $existingUsage")
+                if (existingUsage.isNotEmpty()) {
+                    // Load existing usage into in-memory map
+                    for ((key, seconds) in existingUsage) {
+                        appUsageTimes[key] = seconds
+                    }
+                    println("DEBUG: AccessibilityService - Loaded existing usage: $appUsageTimes")
+                } else {
+                    println("DEBUG: AccessibilityService - No existing usage found in storage")
+                }
+                hasLoadedExistingUsage = true
+            } catch (e: Exception) {
+                println("DEBUG: AccessibilityService - Error loading existing usage: ${e.message}")
+            }
+        } else {
+            println("DEBUG: AccessibilityService - Usage already loaded, skipping reload: $appUsageTimes")
+        }
+        
         val currentTime = System.currentTimeMillis()
         val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
         println("DEBUG: AccessibilityService.trackTimeForCurrentApp - timeSpent=$timeSpent, currentForegroundPackage=$currentForegroundPackage, trackedAppNames=$trackedAppNames")
@@ -262,24 +314,32 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                     appUsageTimes[key] = newUsage
                     println("DEBUG: AccessibilityService - Added $timeSpent seconds to $key (total: $newUsage)")
                     
-                    // Persist the updated usage time using shared AppStorage so main app can rehydrate
+                    // Persist the updated usage time using shared AppStorage
                     try {
                         val storage = createAppStorage()
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        // Use runBlocking to ensure synchronous save
+                        kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
                             try {
-                                // Save with both human-readable names and package IDs as keys for robustness
-                                val toSave = mutableMapOf<String, Long>()
+                                // Load existing usage from storage to avoid overwriting other apps' data
+                                val existingUsage = storage.getAppUsageTimes()
+                                println("DEBUG: AccessibilityService - Existing usage from storage: $existingUsage")
+                                
+                                // Merge current session usage with existing usage
+                                val mergedUsage = existingUsage.toMutableMap()
                                 for ((nameOrPkg, secs) in appUsageTimes) {
-                                    toSave[nameOrPkg] = secs
+                                    // Only save by package ID to avoid double counting
                                     val pkg = getPackageNameForTrackedApp(nameOrPkg)
-                                    if (pkg.isNotEmpty()) toSave[pkg] = secs
+                                    if (pkg.isNotEmpty()) {
+                                        mergedUsage[pkg] = secs
+                                    }
                                 }
-                                storage.saveAppUsageTimes(toSave)
+                                
+                                storage.saveAppUsageTimes(mergedUsage)
                                 val epochDay = System.currentTimeMillis() / 86_400_000L
                                 storage.saveUsageDayEpoch(epochDay)
-                                println("DEBUG: AccessibilityService - Persisted usage via AppStorage (pkg keys), last=$key=$newUsage (epochDay=$epochDay)")
+                                println("DEBUG: AccessibilityService - Merged and persisted usage: $mergedUsage (updated $key=$newUsage)")
                             } catch (e: Exception) {
-                                println("DEBUG: AccessibilityService - Error persisting usage via AppStorage (coroutine): ${e.message}")
+                                println("DEBUG: AccessibilityService - Error persisting usage via AppStorage (sync): ${e.message}")
                             }
                         }
                     } catch (e: Exception) {
@@ -534,10 +594,42 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                                 apply()
                             }
 
-                            // If unblocked, do NOT clear persisted usage; only reset in-memory counters
+                            // If unblocked, persist current in-memory usage before clearing to avoid losing accumulated time
                             if (!isBlocked) {
+                                // Reset the flag so we reload usage data on next tracking
+                                hasLoadedExistingUsage = false
+                                println("DEBUG: STATE_CHANGED - Reset hasLoadedExistingUsage flag to reload usage on next tracking")
+                                
+                                // Persist current in-memory usage before clearing
+                                if (appUsageTimes.isNotEmpty()) {
+                                    try {
+                                        val storage = createAppStorage()
+                                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                            try {
+                                                // Load existing usage from storage to avoid overwriting other apps' data
+                                                val existingUsage = storage.getAppUsageTimes()
+                                                println("DEBUG: STATE_CHANGED - Loading existing usage from storage: $existingUsage")
+                                                val toSave = existingUsage.toMutableMap()
+                                                for ((nameOrPkg, secs) in appUsageTimes) {
+                                                    // Update usage for this app (replace, not add, since appUsageTimes contains cumulative session data)
+                                                    toSave[nameOrPkg] = secs
+                                                    val pkg = getPackageNameForTrackedApp(nameOrPkg)
+                                                    if (pkg.isNotEmpty()) toSave[pkg] = secs
+                                                }
+                                                storage.saveAppUsageTimes(toSave)
+                                                val epochDay = System.currentTimeMillis() / 86_400_000L
+                                                storage.saveUsageDayEpoch(epochDay)
+                                                println("DEBUG: STATE_CHANGED - persisted merged usage before clearing: $toSave (from in-memory: $appUsageTimes)")
+                                            } catch (e: Exception) {
+                                                println("DEBUG: STATE_CHANGED - Error persisting usage before clearing: ${e.message}")
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        println("DEBUG: STATE_CHANGED - Error scheduling persist before clearing: ${e.message}")
+                                    }
+                                }
                                 appUsageTimes.clear()
-                                println("DEBUG: STATE_CHANGED - unblocked; cleared in-memory usage only (persisted totals kept)")
+                                println("DEBUG: STATE_CHANGED - unblocked; persisted and cleared in-memory usage")
                             }
                         } else {
                             // Fallback to SharedPreferences
@@ -577,30 +669,25 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             println("DEBUG: loadStateFromPreferences - Parsed apps: $apps")
             println("DEBUG: loadStateFromPreferences - All preferences: ${prefs.all}")
             
+            // Debug: Check what's in storage before loading
+            try {
+                val storage = createAppStorage()
+                val debugSavedMap = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                    kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
+                }
+                println("DEBUG: loadStateFromPreferences - Storage contains: $debugSavedMap")
+            } catch (e: Exception) {
+                println("DEBUG: loadStateFromPreferences - Error checking storage: ${e.message}")
+            }
+            
             // Always update the state, even if it's the same
             isBlocked = blocked
             trackedAppNames = apps
             timeLimitMinutes = timeLimit
             
-            // Load app usage times from shared AppStorage so it survives UI death and service restarts
-            appUsageTimes.clear()
-            try {
-                val storage = createAppStorage()
-                val savedMap = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                    kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
-                }
-                if (savedMap.isNotEmpty()) {
-                    for (appName in apps) {
-                        val seconds = savedMap[appName] ?: 0L
-                        if (seconds > 0L) {
-                            appUsageTimes[appName] = seconds
-                            println("DEBUG: loadStateFromPreferences - Loaded usage from AppStorage for $appName: $seconds seconds")
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                println("DEBUG: loadStateFromPreferences - Error loading usage from AppStorage: ${e.message}")
-            }
+            // Usage data is already loaded in onServiceConnected, no need to reload here
+            // This prevents clearing the usage data that was loaded on service start
+            println("DEBUG: loadStateFromPreferences - Using existing appUsageTimes: $appUsageTimes")
             
             println("DEBUG: loadStateFromPreferences - Updated state: isBlocked=$isBlocked, trackedApps=$trackedAppNames, timeLimit=$timeLimitMinutes, usageTimes=$appUsageTimes")
             
