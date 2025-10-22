@@ -1008,13 +1008,30 @@ private fun AppRoot() {
         timesDismissedToday += 1
         coroutineScope.launch { try { storage.saveTimesDismissedToday(timesDismissedToday) } catch (_: Exception) {} }
 
+        // Reset lifetime usage for tracked apps to prevent immediate re-blocking
+        // This allows the user to start fresh after dismissing
+        trackedApps = trackedApps.map { app ->
+            app.copy(minutesUsed = 0)
+        }
+        appUsageTimes = emptyMap()
+        println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
+        
+        // Persist the reset usage to storage
+        coroutineScope.launch {
+            try {
+                storage.saveAppUsageTimes(emptyMap())
+                println("DEBUG: Persisted reset lifetime usage to storage")
+            } catch (e: Exception) {
+                println("DEBUG: Error persisting reset lifetime usage: ${e.message}")
+            }
+        }
+
         // Auto-restart tracking after dismiss (always restart to allow continued monitoring)
         pendingStartTracking = true
         userManuallyStoppedTracking = false
         
         // Clear blocked state and overlays ONLY after ad is completed
         isPaused = false
-        updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
         stopWellbeingMonitoring()
         clearPersistentWellbeingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
@@ -1787,21 +1804,31 @@ private fun AppRoot() {
                 dayStreakCounter = 0
                 println("DEBUG: Reset day streak counter to: $dayStreakCounter")
                 
-                // Persist the updated counters
+                // 2.6. Reset lifetime usage for tracked apps to prevent immediate re-blocking
+                // This allows the user to start fresh after dismissing
+                trackedApps = trackedApps.map { app ->
+                    app.copy(minutesUsed = 0)
+                }
+                appUsageTimes = emptyMap()
+                println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
+                
+                // Persist the updated counters and reset usage
                 coroutineScope.launch {
                     try { 
                         storage.saveTimesDismissedToday(timesDismissedToday)
                         storage.saveDayStreakCounter(dayStreakCounter)
+                        storage.saveAppUsageTimes(emptyMap())
                         println("DEBUG: Saved times dismissed counter to storage")
                         println("DEBUG: Saved reset day streak counter to storage")
+                        println("DEBUG: Persisted reset lifetime usage to storage")
                     } catch (e: Exception) {
-                        println("DEBUG: Error saving counters: ${e.message}")
+                        println("DEBUG: Error saving counters and usage: ${e.message}")
                     }
                 }
                 
-                // 3. Reset session state but keep tracking ON and keep tracked apps/time limit
+                // 3. Reset session state and restart tracking with fresh time limit
                 isPaused = false
-                // Notify accessibility service to continue timing for current tracked apps
+                // Restart accessibility service with fresh time limit to prevent immediate re-blocking
                 updateAccessibilityServiceBlockedState(
                     false,
                     getAllTrackedAppIdentifiers(trackedApps),

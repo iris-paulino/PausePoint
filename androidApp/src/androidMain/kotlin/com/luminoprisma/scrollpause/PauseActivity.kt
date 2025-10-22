@@ -163,42 +163,12 @@ class PauseActivity : ComponentActivity() {
 
     private fun performSelfContainedDismiss() {
         println("DEBUG: PauseActivity - performSelfContainedDismiss called")
-        // 1) Increment and persist times dismissed
-        CoroutineScope(Dispatchers.Main).launch {
-            try {
-                val storage = createAppStorage()
-                val current = try { storage.getTimesDismissedToday() } catch (_: Exception) { 0 }
-                val updated = current + 1
-                try { storage.saveTimesDismissedToday(updated) } catch (_: Exception) {}
-                println("DEBUG: PauseDismiss - incremented timesDismissedToday to: $updated")
-            } catch (e: Exception) {
-                println("DEBUG: PauseDismiss - error updating timesDismissedToday: ${e.message}")
-            }
-        }
-
-        // 2) Persist blocked=false, clear usage for tracked apps via AppStorage, broadcast STATE_CHANGED
+        // Use the main app's dismiss callback instead of duplicating logic
         try {
-            val prefs = applicationContext.getSharedPreferences("scrollpause_prefs", Context.MODE_PRIVATE)
-            val csv = prefs.getString("tracked_apps_csv", "") ?: ""
-            val limit = prefs.getInt("time_limit_minutes", 0)
-            // Persist blocked=false in prefs (service relies on this flag)
-            prefs.edit().apply {
-                putBoolean("blocked", false)
-                apply()
-            }
-            // Do NOT clear persisted usage here – keep today's totals for UI rehydration
-            println("DEBUG: PauseDismiss - not clearing persisted usage; only unblocking")
-
-            val intent = Intent("com.luminoprisma.scrollpause.STATE_CHANGED").apply {
-                setPackage(packageName)
-                putExtra("isBlocked", false)
-                putExtra("trackedApps", csv)
-                putExtra("timeLimit", limit)
-            }
-            applicationContext.sendBroadcast(intent)
-            println("DEBUG: PauseDismiss - sent STATE_CHANGED (blocked=false, limit=$limit)")
+            dismissAndContinueTracking()
+            println("DEBUG: PauseActivity - called dismissAndContinueTracking()")
         } catch (e: Exception) {
-            println("DEBUG: PauseDismiss - error during unblock broadcast: ${e.message}")
+            println("DEBUG: PauseActivity - error calling dismissAndContinueTracking: ${e.message}")
         }
     }
 

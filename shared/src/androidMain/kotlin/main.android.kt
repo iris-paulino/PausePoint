@@ -413,6 +413,7 @@ actual fun updateAccessibilityServiceBlockedState(isPaused: Boolean, trackedAppN
                     putExtra("isBlocked", isPaused)
                     putExtra("trackedApps", trackedAppNames.joinToString(","))
                     putExtra("timeLimit", timeLimitMinutes)
+                    putExtra("resetUsage", isPaused == false) // Reset usage when unblocking
                 }
                 ctx.sendBroadcast(intent)
                 println("DEBUG: updateAccessibilityServiceBlockedState - sent STATE_CHANGED broadcast (app ctx)")

@@ -578,9 +578,10 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                         val extrasAppsCsv = intent?.getStringExtra("trackedApps") ?: ""
                         val extrasLimit = intent?.getIntExtra("timeLimit", -1) ?: -1
                         val extrasBlocked = intent?.getBooleanExtra("isBlocked", false) ?: false
+                        val extrasResetUsage = intent?.getBooleanExtra("resetUsage", false) ?: false
                         if (extrasAppsCsv.isNotBlank() || extrasLimit >= 0) {
                             val apps = if (extrasAppsCsv.isBlank()) emptyList() else extrasAppsCsv.split(',').map { it.trim() }.filter { it.isNotEmpty() }
-                            println("DEBUG: STATE_CHANGED - adopting extras: blocked=" + extrasBlocked + ", apps=" + apps.size + ", limit=" + extrasLimit)
+                            println("DEBUG: STATE_CHANGED - adopting extras: blocked=" + extrasBlocked + ", apps=" + apps.size + ", limit=" + extrasLimit + ", resetUsage=" + extrasResetUsage)
                             // Update in-memory
                             if (apps.isNotEmpty()) trackedAppNames = apps
                             if (extrasLimit >= 0) timeLimitMinutes = extrasLimit
@@ -594,42 +595,63 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                                 apply()
                             }
 
-                            // If unblocked, persist current in-memory usage before clearing to avoid losing accumulated time
+                            // If unblocked, handle usage reset based on resetUsage flag
                             if (!isBlocked) {
                                 // Reset the flag so we reload usage data on next tracking
                                 hasLoadedExistingUsage = false
                                 println("DEBUG: STATE_CHANGED - Reset hasLoadedExistingUsage flag to reload usage on next tracking")
                                 
-                                // Persist current in-memory usage before clearing
-                                if (appUsageTimes.isNotEmpty()) {
+                                if (extrasResetUsage) {
+                                    // Main app has already reset usage, clear in-memory and also clear storage to be safe
+                                    appUsageTimes.clear()
                                     try {
                                         val storage = createAppStorage()
                                         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                                             try {
-                                                // Load existing usage from storage to avoid overwriting other apps' data
-                                                val existingUsage = storage.getAppUsageTimes()
-                                                println("DEBUG: STATE_CHANGED - Loading existing usage from storage: $existingUsage")
-                                                val toSave = existingUsage.toMutableMap()
-                                                for ((nameOrPkg, secs) in appUsageTimes) {
-                                                    // Update usage for this app (replace, not add, since appUsageTimes contains cumulative session data)
-                                                    toSave[nameOrPkg] = secs
-                                                    val pkg = getPackageNameForTrackedApp(nameOrPkg)
-                                                    if (pkg.isNotEmpty()) toSave[pkg] = secs
-                                                }
-                                                storage.saveAppUsageTimes(toSave)
-                                                val epochDay = System.currentTimeMillis() / 86_400_000L
-                                                storage.saveUsageDayEpoch(epochDay)
-                                                println("DEBUG: STATE_CHANGED - persisted merged usage before clearing: $toSave (from in-memory: $appUsageTimes)")
+                                                storage.saveAppUsageTimes(emptyMap())
+                                                println("DEBUG: STATE_CHANGED - resetUsage=true, cleared both in-memory and storage usage")
                                             } catch (e: Exception) {
-                                                println("DEBUG: STATE_CHANGED - Error persisting usage before clearing: ${e.message}")
+                                                println("DEBUG: STATE_CHANGED - Error clearing storage usage: ${e.message}")
                                             }
                                         }
                                     } catch (e: Exception) {
-                                        println("DEBUG: STATE_CHANGED - Error scheduling persist before clearing: ${e.message}")
+                                        println("DEBUG: STATE_CHANGED - Error scheduling storage clear: ${e.message}")
                                     }
+                                    // Force reload usage data on next tracking to ensure clean start
+                                    hasLoadedExistingUsage = false
+                                    println("DEBUG: STATE_CHANGED - resetUsage=true, cleared in-memory usage and storage, reset hasLoadedExistingUsage")
+                                } else {
+                                    // Legacy behavior: persist current in-memory usage before clearing
+                                    if (appUsageTimes.isNotEmpty()) {
+                                        try {
+                                            val storage = createAppStorage()
+                                            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                                try {
+                                                    // Load existing usage from storage to avoid overwriting other apps' data
+                                                    val existingUsage = storage.getAppUsageTimes()
+                                                    println("DEBUG: STATE_CHANGED - Loading existing usage from storage: $existingUsage")
+                                                    val toSave = existingUsage.toMutableMap()
+                                                    for ((nameOrPkg, secs) in appUsageTimes) {
+                                                        // Update usage for this app (replace, not add, since appUsageTimes contains cumulative session data)
+                                                        toSave[nameOrPkg] = secs
+                                                        val pkg = getPackageNameForTrackedApp(nameOrPkg)
+                                                        if (pkg.isNotEmpty()) toSave[pkg] = secs
+                                                    }
+                                                    storage.saveAppUsageTimes(toSave)
+                                                    val epochDay = System.currentTimeMillis() / 86_400_000L
+                                                    storage.saveUsageDayEpoch(epochDay)
+                                                    println("DEBUG: STATE_CHANGED - persisted merged usage before clearing: $toSave (from in-memory: $appUsageTimes)")
+                                                } catch (e: Exception) {
+                                                    println("DEBUG: STATE_CHANGED - Error persisting usage before clearing: ${e.message}")
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            println("DEBUG: STATE_CHANGED - Error scheduling persist before clearing: ${e.message}")
+                                        }
+                                    }
+                                    appUsageTimes.clear()
+                                    println("DEBUG: STATE_CHANGED - unblocked; persisted and cleared in-memory usage")
                                 }
-                                appUsageTimes.clear()
-                                println("DEBUG: STATE_CHANGED - unblocked; persisted and cleared in-memory usage")
                             }
                         } else {
                             // Fallback to SharedPreferences
