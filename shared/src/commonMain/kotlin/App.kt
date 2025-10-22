@@ -1813,17 +1813,20 @@ private fun AppRoot() {
                 println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
                 
                 // Persist the updated counters and reset usage
-                coroutineScope.launch {
-                    try { 
+                println("DEBUG: About to save counters - timesDismissedToday: $timesDismissedToday, dayStreakCounter: $dayStreakCounter")
+                try {
+                    println("DEBUG: Starting to save counters to storage")
+                    // Use runBlocking to ensure the save operations complete
+                    runBlocking {
                         storage.saveTimesDismissedToday(timesDismissedToday)
+                        println("DEBUG: Saved times dismissed counter to storage: $timesDismissedToday")
                         storage.saveDayStreakCounter(dayStreakCounter)
+                        println("DEBUG: Saved reset day streak counter to storage: $dayStreakCounter")
                         storage.saveAppUsageTimes(emptyMap())
-                        println("DEBUG: Saved times dismissed counter to storage")
-                        println("DEBUG: Saved reset day streak counter to storage")
                         println("DEBUG: Persisted reset lifetime usage to storage")
-                    } catch (e: Exception) {
-                        println("DEBUG: Error saving counters and usage: ${e.message}")
                     }
+                } catch (e: Exception) {
+                    println("DEBUG: Error saving counters and usage: ${e.message}")
                 }
                 
                 // 3. Reset session state and restart tracking with fresh time limit
@@ -1888,6 +1891,7 @@ private fun AppRoot() {
             val savedTimesUnblockedToday = withTimeoutOrNull(3000) { storage.getTimesUnblockedToday() } ?: 0
             val savedTimesDismissedToday = withTimeoutOrNull(3000) { storage.getTimesDismissedToday() } ?: 0
             val savedDayStreakCounter = withTimeoutOrNull(3000) { storage.getDayStreakCounter() } ?: 0
+            println("DEBUG: App startup - loaded timesDismissedToday from storage: $savedTimesDismissedToday")
             val savedLastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
             val savedSessionAppUsageTimes = withTimeoutOrNull(3000) { storage.getSessionAppUsageTimes() } ?: emptyMap()
             val savedSessionStartTime = withTimeoutOrNull(3000) { storage.getSessionStartTime() } ?: 0L
@@ -1947,6 +1951,7 @@ private fun AppRoot() {
             // Restore dashboard counters
             timesUnblockedToday = savedTimesUnblockedToday
             timesDismissedToday = savedTimesDismissedToday
+            println("DEBUG: App startup - set timesDismissedToday to: $timesDismissedToday")
             dayStreakCounter = savedDayStreakCounter
 
             // IMPORTANT: Never reuse prior session usage when app restarts.
