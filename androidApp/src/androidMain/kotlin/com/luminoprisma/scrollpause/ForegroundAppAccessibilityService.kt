@@ -602,24 +602,27 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                                 println("DEBUG: STATE_CHANGED - Reset hasLoadedExistingUsage flag to reload usage on next tracking")
                                 
                                 if (extrasResetUsage) {
-                                    // Main app has already reset usage, clear in-memory and also clear storage to be safe
-                                    appUsageTimes.clear()
-                                    try {
-                                        val storage = createAppStorage()
-                                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                                            try {
-                                                storage.saveAppUsageTimes(emptyMap())
-                                                println("DEBUG: STATE_CHANGED - resetUsage=true, cleared both in-memory and storage usage")
-                                            } catch (e: Exception) {
-                                                println("DEBUG: STATE_CHANGED - Error clearing storage usage: ${e.message}")
-                                            }
+                                    // Main app has already reset tracked apps minutes and cleared tracked apps from appUsageTimes
+                                    // Clear in-memory usage for tracked apps to prevent PauseScreen reappearing
+                                    val trackedAppIdentifiers = apps.map { appName ->
+                                        // Convert app names to package identifiers
+                                        when (appName.lowercase()) {
+                                            "chrome", "google chrome", "chrome browser" -> "com.android.chrome"
+                                            "youtube", "yt", "you tube" -> "com.google.android.youtube"
+                                            "youtube music", "yt music" -> "com.google.android.apps.youtube.music"
+                                            else -> appName
                                         }
-                                    } catch (e: Exception) {
-                                        println("DEBUG: STATE_CHANGED - Error scheduling storage clear: ${e.message}")
                                     }
+                                    
+                                    // Clear only tracked apps from in-memory usage (prevents PauseScreen reappearing)
+                                    trackedAppIdentifiers.forEach { appId ->
+                                        appUsageTimes.remove(appId)
+                                    }
+                                    println("DEBUG: STATE_CHANGED - resetUsage=true, cleared tracked apps from in-memory usage: $trackedAppIdentifiers")
+                                    
                                     // Force reload usage data on next tracking to ensure clean start
                                     hasLoadedExistingUsage = false
-                                    println("DEBUG: STATE_CHANGED - resetUsage=true, cleared in-memory usage and storage, reset hasLoadedExistingUsage")
+                                    println("DEBUG: STATE_CHANGED - resetUsage=true, reset hasLoadedExistingUsage flag")
                                 } else {
                                     // Legacy behavior: persist current in-memory usage before clearing
                                     if (appUsageTimes.isNotEmpty()) {

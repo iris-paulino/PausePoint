@@ -1013,16 +1013,20 @@ private fun AppRoot() {
         trackedApps = trackedApps.map { app ->
             app.copy(minutesUsed = 0)
         }
-        appUsageTimes = emptyMap()
+        // Clear tracked apps from appUsageTimes to prevent accessibility service from seeing old usage
+        val trackedAppIdentifiers = getAllTrackedAppIdentifiers(trackedApps)
+        appUsageTimes = appUsageTimes.filterKeys { appId -> 
+            !trackedAppIdentifiers.contains(appId) 
+        }
         println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
         
-        // Persist the reset usage to storage
+        // Persist the cleared usage to storage so accessibility service gets clean data
         coroutineScope.launch {
             try {
-                storage.saveAppUsageTimes(emptyMap())
-                println("DEBUG: Persisted reset lifetime usage to storage")
+                storage.saveAppUsageTimes(appUsageTimes)
+                println("DEBUG: Persisted cleared tracked apps usage to storage")
             } catch (e: Exception) {
-                println("DEBUG: Error persisting reset lifetime usage: ${e.message}")
+                println("DEBUG: Error persisting cleared usage: ${e.message}")
             }
         }
 
@@ -1032,6 +1036,12 @@ private fun AppRoot() {
         
         // Clear blocked state and overlays ONLY after ad is completed
         isPaused = false
+        // Stop accessibility service tracking entirely to prevent PauseScreen reappearing
+        updateAccessibilityServiceBlockedState(
+            false,
+            emptyList(), // Stop tracking all apps
+            0 // No time limit
+        )
         stopWellbeingMonitoring()
         clearPersistentWellbeingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
@@ -1809,10 +1819,24 @@ private fun AppRoot() {
                 trackedApps = trackedApps.map { app ->
                     app.copy(minutesUsed = 0)
                 }
-                appUsageTimes = emptyMap()
+                // Clear tracked apps from appUsageTimes to prevent accessibility service from seeing old usage
+                val trackedAppIdentifiers = getAllTrackedAppIdentifiers(trackedApps)
+                appUsageTimes = appUsageTimes.filterKeys { appId -> 
+                    !trackedAppIdentifiers.contains(appId) 
+                }
                 println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
                 
-                // Persist the updated counters and reset usage
+                // Persist the cleared usage to storage so accessibility service gets clean data
+                coroutineScope.launch {
+                    try {
+                        storage.saveAppUsageTimes(appUsageTimes)
+                        println("DEBUG: Persisted cleared tracked apps usage to storage")
+                    } catch (e: Exception) {
+                        println("DEBUG: Error persisting cleared usage: ${e.message}")
+                    }
+                }
+                
+                // Persist the updated counters
                 println("DEBUG: About to save counters - timesDismissedToday: $timesDismissedToday, dayStreakCounter: $dayStreakCounter")
                 try {
                     println("DEBUG: Starting to save counters to storage")
@@ -1822,20 +1846,18 @@ private fun AppRoot() {
                         println("DEBUG: Saved times dismissed counter to storage: $timesDismissedToday")
                         storage.saveDayStreakCounter(dayStreakCounter)
                         println("DEBUG: Saved reset day streak counter to storage: $dayStreakCounter")
-                        storage.saveAppUsageTimes(emptyMap())
-                        println("DEBUG: Persisted reset lifetime usage to storage")
                     }
                 } catch (e: Exception) {
-                    println("DEBUG: Error saving counters and usage: ${e.message}")
+                    println("DEBUG: Error saving counters: ${e.message}")
                 }
                 
                 // 3. Reset session state and restart tracking with fresh time limit
                 isPaused = false
-                // Restart accessibility service with fresh time limit to prevent immediate re-blocking
+                // Stop accessibility service tracking entirely to prevent PauseScreen reappearing
                 updateAccessibilityServiceBlockedState(
                     false,
-                    getAllTrackedAppIdentifiers(trackedApps),
-                    timeLimitMinutes
+                    emptyList(), // Stop tracking all apps
+                    0 // No time limit
                 )
                 // Save unblocked state to storage
                 coroutineScope.launch {
