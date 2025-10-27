@@ -266,8 +266,8 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 println("DEBUG: AccessibilityService.trackTimeForCurrentApp - checking appName=$appName, expectedPackage=$expectedPackage")
                 
                 if (currentForegroundPackage == expectedPackage) {
-                    // Always store by package ID to avoid alias mismatches (e.g., IG/Insta)
-                    val key = expectedPackage
+                    // Store by app name to match main app's expectations
+                    val key = appName
                     val currentUsage = appUsageTimes[key] ?: 0L
                     val newUsage = currentUsage + timeSpent
                     appUsageTimes[key] = newUsage
@@ -354,16 +354,26 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                 val storage = createAppStorage()
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
                     try {
-                        val toSave = mutableMapOf<String, Long>()
-                        for ((nameOrPkg, secs) in appUsageTimes) {
-                            toSave[nameOrPkg] = secs
-                            val pkg = getPackageNameForTrackedApp(nameOrPkg)
-                            if (pkg.isNotEmpty()) toSave[pkg] = secs
+                        // Load existing usage from storage to accumulate with current session
+                        val existingUsage = storage.getAppUsageTimes()
+                        println("DEBUG: AccessibilityService - Existing usage from storage: $existingUsage")
+                        
+                        val toSave = existingUsage.toMutableMap()
+                        for ((appName, secs) in appUsageTimes) {
+                            val current = toSave[appName] ?: 0L
+                            toSave[appName] = current + secs
+                            println("DEBUG: AccessibilityService - Accumulated usage for $appName: $current + $secs = ${current + secs}")
                         }
                         storage.saveAppUsageTimes(toSave)
                         val epochDay = System.currentTimeMillis() / 86_400_000L
                         storage.saveUsageDayEpoch(epochDay)
                         println("DEBUG: AccessibilityService - Normalized persisted usage for limit: $appNameOrPkgKey=$normalized")
+                        println("DEBUG: AccessibilityService - Saved to storage: $toSave")
+                        
+                        // Clear in-memory usage after saving to storage
+                        // This prevents double counting when main app processes the data
+                        appUsageTimes.clear()
+                        println("DEBUG: AccessibilityService - Cleared in-memory usage after saving to storage")
                     } catch (e: Exception) {
                         println("DEBUG: AccessibilityService - Error normalizing persisted usage: ${e.message}")
                     }

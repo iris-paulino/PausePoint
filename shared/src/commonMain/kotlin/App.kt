@@ -949,20 +949,35 @@ private fun AppRoot() {
         println("DEBUG: sessionAppUsageTimes: $sessionAppUsageTimes")
         println("DEBUG: trackedApps before: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
         
-        if (sessionAppUsageTimes.isEmpty()) {
-            println("DEBUG: sessionAppUsageTimes is empty, returning")
+        // Load accessibility service's usage data from storage
+        val accessibilityUsage = try {
+            runBlocking {
+                storage.getAppUsageTimes()
+            }
+        } catch (e: Exception) {
+            println("DEBUG: Error loading accessibility service usage: ${e.message}")
+            emptyMap()
+        }
+        println("DEBUG: Accessibility service usage from storage: $accessibilityUsage")
+        println("DEBUG: Current lifetimeAppUsageTimes before merge: $lifetimeAppUsageTimes")
+        
+        if (sessionAppUsageTimes.isEmpty() && accessibilityUsage.isEmpty()) {
+            println("DEBUG: Both sessionAppUsageTimes and accessibilityUsage are empty, returning")
             return
         }
         
         // Credit remaining uncredited minutes for all apps with any usage this session
         trackedApps = trackedApps.map { app ->
             val sessionSeconds = sessionAppUsageTimes[app.name] ?: 0L
-            if (sessionSeconds > 0) {
-                val totalSessionMinutes = (sessionSeconds / 60L).toInt()
+            val accessibilitySeconds = accessibilityUsage[app.name] ?: 0L
+            val totalSeconds = maxOf(sessionSeconds, accessibilitySeconds) // Use the higher value
+            
+            if (totalSeconds > 0) {
+                val totalSessionMinutes = (totalSeconds / 60L).toInt()
                 val creditedSoFar = sessionCreditedMinutes[app.name] ?: 0
                 val remaining = (totalSessionMinutes - creditedSoFar).coerceAtLeast(0)
                 if (remaining > 0) {
-                    println("DEBUG: Finalize crediting remaining $remaining min to ${app.name}")
+                    println("DEBUG: Finalize crediting remaining $remaining min to ${app.name} (session: ${sessionSeconds}s, accessibility: ${accessibilitySeconds}s)")
                 }
                 app.copy(minutesUsed = app.minutesUsed + remaining)
             } else app
@@ -972,19 +987,36 @@ private fun AppRoot() {
         
         // Update lifetime seconds for all apps that recorded seconds this session
         val updatedLifetimeSeconds = lifetimeAppUsageTimes.toMutableMap()
+        
+        // Merge session usage
         sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
             if (sessionSeconds > 0) {
                 val current = updatedLifetimeSeconds[appName] ?: 0L
                 updatedLifetimeSeconds[appName] = current + sessionSeconds
             }
         }
+        
+        // Merge accessibility service usage
+        accessibilityUsage.forEach { (appName, accessibilitySeconds) ->
+            if (accessibilitySeconds > 0) {
+                val current = updatedLifetimeSeconds[appName] ?: 0L
+                val sessionSeconds = sessionAppUsageTimes[appName] ?: 0L
+                // Only add if accessibility service has more usage than session
+                if (accessibilitySeconds > sessionSeconds) {
+                    val additionalSeconds = accessibilitySeconds - sessionSeconds
+                    updatedLifetimeSeconds[appName] = current + additionalSeconds
+                    println("DEBUG: Added accessibility service usage for $appName: +${additionalSeconds}s")
+                }
+            }
+        }
+        
         lifetimeAppUsageTimes = updatedLifetimeSeconds
         
         // Clear session usage after finalizing to prevent double counting
         sessionAppUsageTimes = emptyMap()
         sessionCreditedMinutes = emptyMap()
         
-        println("DEBUG: lifetimeAppUsageTimes after: $lifetimeAppUsageTimes")
+        println("DEBUG: lifetimeAppUsageTimes after merge: $lifetimeAppUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
 
         // Persist lifetime seconds so UI can rehydrate after app kill
@@ -2356,6 +2388,7 @@ private fun AppRoot() {
             isTracking = isTracking,
             timeLimitMinutes = timeLimitMinutes,
             sessionAppUsageTimes = sessionAppUsageTimes,
+            lifetimeAppUsageTimes = lifetimeAppUsageTimes,
             timesUnblockedToday = timesUnblockedToday,
             timesDismissedToday = timesDismissedToday,
             dayStreakCounter = dayStreakCounter,
@@ -3409,6 +3442,7 @@ private fun DashboardScreen(
     isTracking: Boolean,
     timeLimitMinutes: Int,
     sessionAppUsageTimes: Map<String, Long>,
+    lifetimeAppUsageTimes: Map<String, Long>,
     timesUnblockedToday: Int,
     timesDismissedToday: Int,
     dayStreakCounter: Int,
@@ -3429,6 +3463,7 @@ private fun DashboardScreen(
         isTracking = isTracking,
         timeLimitMinutes = timeLimitMinutes,
         sessionAppUsageTimes = sessionAppUsageTimes,
+        lifetimeAppUsageTimes = lifetimeAppUsageTimes,
         timesUnblockedToday = timesUnblockedToday,
         timesDismissedToday = timesDismissedToday,
         sessionElapsedSeconds = sessionElapsedSeconds,
@@ -3977,6 +4012,7 @@ private fun DashboardContent(
     isTracking: Boolean,
     timeLimitMinutes: Int,
     sessionAppUsageTimes: Map<String, Long>,
+    lifetimeAppUsageTimes: Map<String, Long>,
     timesUnblockedToday: Int,
     timesDismissedToday: Int,
     sessionElapsedSeconds: Long,
@@ -4360,9 +4396,10 @@ private fun DashboardContent(
                             Text(app.name, fontWeight = FontWeight.SemiBold, color = Color.White)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
-                                val liveMinutes = app.minutesUsed + sessionMinutes
+                                val liveMinutes = ((lifetimeAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
                                 // Debug logging
                                 println("DEBUG: App ${app.name} - sessionMinutes: $sessionMinutes, app.minutesUsed: ${app.minutesUsed}, liveMinutes: $liveMinutes")
+                                println("DEBUG: App ${app.name} - lifetimeAppUsageTimes[${app.name}]: ${lifetimeAppUsageTimes[app.name]}")
                                 println("DEBUG: App ${app.name} - sessionAppUsageTimes[${app.name}]: ${sessionAppUsageTimes[app.name]}")
                                 Text("${liveMinutes}m today", color = Color(0xFFD1D5DB), fontSize = 12.sp)
                                 Spacer(Modifier.width(8.dp))
