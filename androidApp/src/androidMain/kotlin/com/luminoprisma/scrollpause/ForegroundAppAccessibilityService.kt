@@ -28,7 +28,7 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         // Time tracking variables
         @Volatile private var appActiveSince: Long = 0L
         @Volatile private var appUsageTimes: MutableMap<String, Long> = mutableMapOf() // app name -> seconds used
-        @Volatile private var hasLoadedExistingUsage: Boolean = false // Flag to prevent multiple loads
+        // Removed // hasLoadedExistingUsage removed - using session-only tracking
         
         fun getCurrentForegroundPackage(): String? = currentForegroundPackage
         
@@ -155,29 +155,9 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
         registerRedirectReceiver()
         loadStateFromPreferences()
         
-        // Load existing usage from storage to restore accumulated usage
-        try {
-            val storage = createAppStorage()
-            val existingUsage = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
-            }
-            println("DEBUG: ForegroundAppAccessibilityService - Loading existing usage on service start: $existingUsage")
-            if (existingUsage.isNotEmpty()) {
-                // Load existing usage into in-memory map (replace, don't add, since this is the source of truth)
-                appUsageTimes.clear()
-                for ((key, seconds) in existingUsage) {
-                    appUsageTimes[key] = seconds
-                }
-                println("DEBUG: ForegroundAppAccessibilityService - Loaded existing usage on service start: $existingUsage")
-                println("DEBUG: ForegroundAppAccessibilityService - Updated in-memory usage: $appUsageTimes")
-            } else {
-                println("DEBUG: ForegroundAppAccessibilityService - No existing usage found in storage")
-            }
-            // Mark as loaded to prevent multiple loads
-            hasLoadedExistingUsage = true
-        } catch (e: Exception) {
-            println("DEBUG: ForegroundAppAccessibilityService - Error loading existing usage on service start: ${e.message}")
-        }
+        // Don't load usage data from storage - use only session tracking
+        // This prevents conflicts with main app's lifetime usage management
+        println("DEBUG: ForegroundAppAccessibilityService - Using session-only tracking, not loading from storage")
         
         // Additional debugging for persistent blocking
         println("DEBUG: ForegroundAppAccessibilityService - Service connected, checking if we should restore blocking")
@@ -271,30 +251,9 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
             return
         }
         
-        // Load existing usage from storage only once when service starts tracking
-        if (!hasLoadedExistingUsage) {
-            try {
-                val storage = createAppStorage()
-                val existingUsage = kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
-                    kotlinx.coroutines.withTimeoutOrNull(2000) { storage.getAppUsageTimes() } ?: emptyMap()
-                }
-                println("DEBUG: AccessibilityService - Loading existing usage from storage: $existingUsage")
-                if (existingUsage.isNotEmpty()) {
-                    // Load existing usage into in-memory map
-                    for ((key, seconds) in existingUsage) {
-                        appUsageTimes[key] = seconds
-                    }
-                    println("DEBUG: AccessibilityService - Loaded existing usage: $appUsageTimes")
-                } else {
-                    println("DEBUG: AccessibilityService - No existing usage found in storage")
-                }
-                hasLoadedExistingUsage = true
-            } catch (e: Exception) {
-                println("DEBUG: AccessibilityService - Error loading existing usage: ${e.message}")
-            }
-        } else {
-            println("DEBUG: AccessibilityService - Usage already loaded, skipping reload: $appUsageTimes")
-        }
+        // Don't load usage data from storage - use only session tracking
+        // This prevents conflicts with main app's lifetime usage management
+        println("DEBUG: AccessibilityService - Using session-only tracking, not loading from storage")
         
         val currentTime = System.currentTimeMillis()
         val timeSpent = (currentTime - appActiveSince) / 1000L // Convert to seconds
@@ -598,12 +557,12 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                             // If unblocked, handle usage reset based on resetUsage flag
                             if (!isBlocked) {
                                 // Reset the flag so we reload usage data on next tracking
-                                hasLoadedExistingUsage = false
-                                println("DEBUG: STATE_CHANGED - Reset hasLoadedExistingUsage flag to reload usage on next tracking")
+                                // hasLoadedExistingUsage removed = false
+                                println("DEBUG: STATE_CHANGED - Reset // hasLoadedExistingUsage removed flag to reload usage on next tracking")
                                 
                                 if (extrasResetUsage) {
-                                    // Main app has already reset tracked apps minutes and cleared tracked apps from appUsageTimes
-                                    // Clear in-memory usage for tracked apps to prevent PauseScreen reappearing
+                                    // Main app has already reset tracked apps minutes and preserved lifetime usage
+                                    // Reset session usage for tracked apps to start fresh time limit checking
                                     val trackedAppIdentifiers = apps.map { appName ->
                                         // Convert app names to package identifiers
                                         when (appName.lowercase()) {
@@ -614,15 +573,16 @@ class ForegroundAppAccessibilityService : AccessibilityService() {
                                         }
                                     }
                                     
-                                    // Clear only tracked apps from in-memory usage (prevents PauseScreen reappearing)
+                                    // Reset session usage for tracked apps (starts fresh time limit checking)
                                     trackedAppIdentifiers.forEach { appId ->
                                         appUsageTimes.remove(appId)
                                     }
-                                    println("DEBUG: STATE_CHANGED - resetUsage=true, cleared tracked apps from in-memory usage: $trackedAppIdentifiers")
+                                    println("DEBUG: STATE_CHANGED - resetUsage=true, reset session usage for tracked apps: $trackedAppIdentifiers")
                                     
-                                    // Force reload usage data on next tracking to ensure clean start
-                                    hasLoadedExistingUsage = false
-                                    println("DEBUG: STATE_CHANGED - resetUsage=true, reset hasLoadedExistingUsage flag")
+                                    // Reset // hasLoadedExistingUsage removed flag to start fresh tracking
+                                    // This ensures the accessibility service starts with cleared session usage
+                                    // hasLoadedExistingUsage removed = false
+                                    println("DEBUG: STATE_CHANGED - resetUsage=true, reset // hasLoadedExistingUsage removed flag to start fresh tracking")
                                 } else {
                                     // Legacy behavior: persist current in-memory usage before clearing
                                     if (appUsageTimes.isNotEmpty()) {

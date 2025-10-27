@@ -850,7 +850,8 @@ private fun AppRoot() {
     
     var isTracking by remember { mutableStateOf(false) }
     var trackingStartTime by remember { mutableStateOf(0L) }
-    var appUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
+    // Lifetime usage for liveMinutes display (preserved on dismiss)
+    var lifetimeAppUsageTimes by remember { mutableStateOf<Map<String, Long>>(emptyMap()) }
     var isPaused by remember { mutableStateOf(false) }
     
     // Session tracking variables that reset on dismiss/QR scan
@@ -879,7 +880,7 @@ private fun AppRoot() {
         // Reset all daily counters
         timesUnblockedToday = 0
         timesDismissedToday = 0
-        appUsageTimes = emptyMap()
+        lifetimeAppUsageTimes = emptyMap()
         sessionAppUsageTimes = emptyMap()
         sessionStartTime = 0L
         sessionCreditedMinutes = emptyMap()
@@ -942,7 +943,7 @@ private fun AppRoot() {
         // No need to sync with system permissions - app works with internal preference only
     }
 
-    // Merge session usage into lifetime usage (minutesUsed and appUsageTimes)
+    // Merge session usage into lifetime usage (minutesUsed and lifetimeAppUsageTimes)
     fun finalizeSessionUsage() {
         println("DEBUG: finalizeSessionUsage() called")
         println("DEBUG: sessionAppUsageTimes: $sessionAppUsageTimes")
@@ -970,29 +971,29 @@ private fun AppRoot() {
         println("DEBUG: trackedApps after: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
         
         // Update lifetime seconds for all apps that recorded seconds this session
-        val updatedLifetimeSeconds = appUsageTimes.toMutableMap()
+        val updatedLifetimeSeconds = lifetimeAppUsageTimes.toMutableMap()
         sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
             if (sessionSeconds > 0) {
                 val current = updatedLifetimeSeconds[appName] ?: 0L
                 updatedLifetimeSeconds[appName] = current + sessionSeconds
             }
         }
-        appUsageTimes = updatedLifetimeSeconds
+        lifetimeAppUsageTimes = updatedLifetimeSeconds
         
         // Clear session usage after finalizing to prevent double counting
         sessionAppUsageTimes = emptyMap()
         sessionCreditedMinutes = emptyMap()
         
-        println("DEBUG: appUsageTimes after: $appUsageTimes")
+        println("DEBUG: lifetimeAppUsageTimes after: $lifetimeAppUsageTimes")
         println("DEBUG: Cleared sessionAppUsageTimes to prevent double counting")
 
         // Persist lifetime seconds so UI can rehydrate after app kill
         coroutineScope.launch {
             try {
-                storage.saveAppUsageTimes(appUsageTimes)
+                storage.saveAppUsageTimes(lifetimeAppUsageTimes)
                 // Stamp usage day to support daily reset logic on cold start
                 storage.saveUsageDayEpoch(currentEpochDayUtc())
-                println("DEBUG: finalizeSessionUsage - persisted appUsageTimes and usage day")
+                println("DEBUG: finalizeSessionUsage - persisted lifetimeAppUsageTimes and usage day")
             } catch (e: Exception) {
                 println("DEBUG: finalizeSessionUsage - error persisting usage: ${e.message}")
             }
@@ -1013,22 +1014,8 @@ private fun AppRoot() {
         trackedApps = trackedApps.map { app ->
             app.copy(minutesUsed = 0)
         }
-        // Clear tracked apps from appUsageTimes to prevent accessibility service from seeing old usage
-        val trackedAppIdentifiers = getAllTrackedAppIdentifiers(trackedApps)
-        appUsageTimes = appUsageTimes.filterKeys { appId -> 
-            !trackedAppIdentifiers.contains(appId) 
-        }
-        println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
-        
-        // Persist the cleared usage to storage so accessibility service gets clean data
-        coroutineScope.launch {
-            try {
-                storage.saveAppUsageTimes(appUsageTimes)
-                println("DEBUG: Persisted cleared tracked apps usage to storage")
-            } catch (e: Exception) {
-                println("DEBUG: Error persisting cleared usage: ${e.message}")
-            }
-        }
+        // Preserve lifetimeAppUsageTimes for liveMinutes display (as per flowchart)
+        println("DEBUG: Preserving lifetimeAppUsageTimes for liveMinutes display")
 
         // Auto-restart tracking after dismiss (always restart to allow continued monitoring)
         pendingStartTracking = true
@@ -1036,12 +1023,15 @@ private fun AppRoot() {
         
         // Clear blocked state and overlays ONLY after ad is completed
         isPaused = false
-        // Stop accessibility service tracking entirely to prevent PauseScreen reappearing
+        // Update accessibility service with fresh time limit to prevent PauseScreen reappearing
+        // but allow continued liveMinutes recording
+        println("DEBUG: About to update accessibility service - timeLimitMinutes: $timeLimitMinutes, trackedApps: ${getAllTrackedAppIdentifiers(trackedApps)}")
         updateAccessibilityServiceBlockedState(
             false,
-            emptyList(), // Stop tracking all apps
-            0 // No time limit
+            getAllTrackedAppIdentifiers(trackedApps), // Restart tracking with tracked apps
+            timeLimitMinutes // Fresh time limit
         )
+        println("DEBUG: Updated accessibility service tracking after dismiss")
         stopWellbeingMonitoring()
         clearPersistentWellbeingNotification()
         coroutineScope.launch { try { storage.saveBlockedState(false) } catch (_: Exception) {} }
@@ -1291,7 +1281,7 @@ private fun AppRoot() {
             if (trackingStartTime > 0) {
                 // Save updated usage times and tracking state to storage
                 coroutineScope.launch {
-                    storage.saveAppUsageTimes(appUsageTimes)
+                    storage.saveAppUsageTimes(lifetimeAppUsageTimes)
                     storage.saveTrackingState(false)
                 }
             }
@@ -1819,22 +1809,8 @@ private fun AppRoot() {
                 trackedApps = trackedApps.map { app ->
                     app.copy(minutesUsed = 0)
                 }
-                // Clear tracked apps from appUsageTimes to prevent accessibility service from seeing old usage
-                val trackedAppIdentifiers = getAllTrackedAppIdentifiers(trackedApps)
-                appUsageTimes = appUsageTimes.filterKeys { appId -> 
-                    !trackedAppIdentifiers.contains(appId) 
-                }
-                println("DEBUG: Reset lifetime usage for tracked apps to prevent immediate re-blocking")
-                
-                // Persist the cleared usage to storage so accessibility service gets clean data
-                coroutineScope.launch {
-                    try {
-                        storage.saveAppUsageTimes(appUsageTimes)
-                        println("DEBUG: Persisted cleared tracked apps usage to storage")
-                    } catch (e: Exception) {
-                        println("DEBUG: Error persisting cleared usage: ${e.message}")
-                    }
-                }
+                // Preserve lifetimeAppUsageTimes for liveMinutes display (as per flowchart)
+                println("DEBUG: Preserving lifetimeAppUsageTimes for liveMinutes display")
                 
                 // Persist the updated counters
                 println("DEBUG: About to save counters - timesDismissedToday: $timesDismissedToday, dayStreakCounter: $dayStreakCounter")
@@ -1853,12 +1829,15 @@ private fun AppRoot() {
                 
                 // 3. Reset session state and restart tracking with fresh time limit
                 isPaused = false
-                // Stop accessibility service tracking entirely to prevent PauseScreen reappearing
+                // Update accessibility service with fresh time limit to prevent PauseScreen reappearing
+                // but allow continued liveMinutes recording
+                println("DEBUG: About to update accessibility service - timeLimitMinutes: $timeLimitMinutes, trackedApps: ${getAllTrackedAppIdentifiers(trackedApps)}")
                 updateAccessibilityServiceBlockedState(
                     false,
-                    emptyList(), // Stop tracking all apps
-                    0 // No time limit
+                    getAllTrackedAppIdentifiers(trackedApps), // Restart tracking with tracked apps
+                    timeLimitMinutes // Fresh time limit
                 )
+                println("DEBUG: Updated accessibility service tracking after dismiss")
                 // Save unblocked state to storage
                 coroutineScope.launch {
                     try { 
@@ -1945,7 +1924,7 @@ private fun AppRoot() {
                 isPaused = savedBlockedState
             }
             
-            appUsageTimes = savedAppUsageTimes
+            lifetimeAppUsageTimes = savedAppUsageTimes
             trackingStartTime = savedTrackingStartTime
             
             // If we're restoring a tracking state, reset the manual stop flag
@@ -2024,7 +2003,7 @@ private fun AppRoot() {
                 // New day detected on app startup: reset today's counters
                 println("DEBUG: App startup - new day detected, resetting daily statistics")
                 trackedApps = trackedApps.map { it.copy(minutesUsed = 0) }
-                appUsageTimes = emptyMap()
+                lifetimeAppUsageTimes = emptyMap()
                 timesUnblockedToday = 0
                 timesDismissedToday = 0
                 sessionAppUsageTimes = emptyMap()
@@ -2043,7 +2022,7 @@ private fun AppRoot() {
                 }
                 
                 withTimeoutOrNull(2000) {
-                    storage.saveAppUsageTimes(appUsageTimes)
+                    storage.saveAppUsageTimes(lifetimeAppUsageTimes)
                     storage.saveUsageDayEpoch(todayEpochDay)
                     storage.saveTimesUnblockedToday(0)
                     storage.saveTimesDismissedToday(0)
@@ -2071,12 +2050,12 @@ private fun AppRoot() {
                         val selected = installed.filter { it.packageName in savedPackages.toSet() }
                         trackedApps = selected.map { TrackedApp(it.appName, 0, timeLimitMinutes) }
                         // Rehydrate minutes used for today from persisted seconds
-                        println("DEBUG: Rehydrating tracked apps - appUsageTimes: $appUsageTimes")
+                        println("DEBUG: Rehydrating tracked apps - lifetimeAppUsageTimes: $lifetimeAppUsageTimes")
                         println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                         trackedApps = trackedApps.map { app ->
                             // Accept either human-readable app name or package ID as key
-                            val secondsByName = appUsageTimes[app.name] ?: 0L
-                            val secondsByPkg = appUsageTimes[getPackageNameForTrackedApp(app)] ?: 0L
+                            val secondsByName = lifetimeAppUsageTimes[app.name] ?: 0L
+                            val secondsByPkg = lifetimeAppUsageTimes[getPackageNameForTrackedApp(app)] ?: 0L
                             val seconds = maxOf(secondsByName, secondsByPkg)
                             val minutes = kotlin.math.ceil(seconds / 60.0).toInt() // Round up so 1s = 1m
                             println("DEBUG: App ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
@@ -2102,10 +2081,10 @@ private fun AppRoot() {
                     // No saved selection: set up defaults
                     setupDefaultApps()
                     // Rehydrate minutes used for today from persisted seconds
-                    println("DEBUG: Rehydrating default tracked apps - appUsageTimes: $appUsageTimes")
+                    println("DEBUG: Rehydrating default tracked apps - lifetimeAppUsageTimes: $lifetimeAppUsageTimes")
                     println("DEBUG: Current timeLimitMinutes: $timeLimitMinutes")
                     trackedApps = trackedApps.map { app ->
-                        val seconds = appUsageTimes[app.name] ?: 0L
+                        val seconds = lifetimeAppUsageTimes[app.name] ?: 0L
                         val minutes = kotlin.math.ceil(seconds / 60.0).toInt() // Round up so 1s = 1m
                         println("DEBUG: Default app ${app.name} - seconds: $seconds, minutes: $minutes, limit: ${app.limitMinutes}")
                         app.copy(minutesUsed = minutes)
