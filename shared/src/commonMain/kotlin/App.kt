@@ -907,17 +907,7 @@ private fun AppRoot() {
         }
     }
     
-    // Background timer to check for midnight reset every minute
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(60_000) // Check every minute
-            val currentDay = currentEpochDayUtc()
-            if (currentDay != lastKnownDay) {
-                println("DEBUG: Day change detected - from $lastKnownDay to $currentDay")
-                resetDailyStatistics()
-            }
-        }
-    }
+    // Removed periodic midnight check; rely on day-change reset at app launch only
 
     // Load persisted preferences on first composition
     LaunchedEffect(Unit) {
@@ -4353,8 +4343,7 @@ private fun DashboardContent(
                         Spacer(Modifier.width(8.dp))
                         Column(horizontalAlignment = Alignment.Start) {
                             val totalTodayMinutesUsed = trackedApps.sumOf { app ->
-                                val sessionMinutes = ((sessionAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
-                                app.minutesUsed + sessionMinutes
+                                ((lifetimeAppUsageTimes[app.name] ?: 0L) / 60L).toInt()
                             }
                             val hours = totalTodayMinutesUsed / 60
                             val minutes = totalTodayMinutesUsed % 60
