@@ -1153,8 +1153,16 @@ private fun AppRoot() {
         // Reset session tracking state and increment unblocked counter
         isTracking = false
         isPaused = false
-        // Update accessibility service with unblocked state
-        updateAccessibilityServiceBlockedState(isPaused, emptyList(), 0)
+        // Auto-restart tracking after QR success (same behavior as Dismiss)
+        pendingStartTracking = true
+        userManuallyStoppedTracking = false
+        // Update accessibility service: unblocked with active tracked apps and current limit
+        // so the service can immediately resume tracking and re-trigger on next limit
+        updateAccessibilityServiceBlockedState(
+            false,
+            getAllTrackedAppIdentifiers(trackedApps),
+            timeLimitMinutes
+        )
         // Stop system-level app blocking
         stopWellbeingMonitoring()
         // Clear persistent blocking notification
