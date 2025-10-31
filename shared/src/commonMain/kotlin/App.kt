@@ -1039,6 +1039,10 @@ private fun AppRoot() {
         // Preserve lifetimeAppUsageTimes for liveMinutes display (as per flowchart)
         println("DEBUG: Preserving lifetimeAppUsageTimes for liveMinutes display")
 
+        // Reset day streak on manual dismiss per product rules
+        dayStreakCounter = 0
+        coroutineScope.launch { try { storage.saveDayStreakCounter(0) } catch (_: Exception) {} }
+
         // Auto-restart tracking after dismiss (always restart to allow continued monitoring)
         pendingStartTracking = true
         userManuallyStoppedTracking = false
@@ -1192,24 +1196,19 @@ private fun AppRoot() {
             }
         }
         
-        // Update day streak counter logic
+        // Update day streak counter logic (increment only on new calendar day or from 0)
         val todayEpochDay = currentEpochDayUtc()
-        
+
         // Save the incremented times walked counter to storage and update day streak
         coroutineScope.launch {
             try {
                 val lastStreakUpdateDay = withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } ?: 0L
-                
-                // Always increment day streak counter on successful QR scan
-                // This ensures positive feedback even after dismissals
-                if (lastStreakUpdateDay != todayEpochDay) {
-                    // First QR scan of a new day: increment streak
+                val shouldIncrement = (dayStreakCounter == 0) || (lastStreakUpdateDay < todayEpochDay)
+                if (shouldIncrement) {
                     dayStreakCounter += 1
-                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter (new day)")
+                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter (reason: ${if (dayStreakCounter == 1) "initial" else "new day"})")
                 } else {
-                    // Same day: still increment to show progress
-                    dayStreakCounter += 1
-                    println("DEBUG: handleQrScanSuccess - incremented day streak to: $dayStreakCounter (same day)")
+                    println("DEBUG: handleQrScanSuccess - not incrementing day streak (same day)")
                 }
                 
                 storage.saveTimesUnblockedToday(timesUnblockedToday)
@@ -1748,22 +1747,18 @@ private fun AppRoot() {
                     timesUnblockedToday += 1
                     println("DEBUG: QR scan callback - incremented times walked to: $timesUnblockedToday")
                     
-                    // 2.5) Update day streak counter logic
+                    // 2.5) Update day streak counter logic (increment only on new calendar day or from 0)
                     val todayEpochDay = currentEpochDayUtc()
                     val lastStreakUpdateDay = try {
                         runBlocking { withTimeoutOrNull(3000) { storage.getLastStreakUpdateDay() } } ?: 0L
                     } catch (_: Exception) { 0L }
-                    
-                    // Always increment day streak counter on successful QR scan
-                    // This ensures positive feedback even after dismissals
-                    if (lastStreakUpdateDay != todayEpochDay) {
-                        // First QR scan of a new day: increment streak
+
+                    val shouldIncrement = (dayStreakCounter == 0) || (lastStreakUpdateDay < todayEpochDay)
+                    if (shouldIncrement) {
                         dayStreakCounter += 1
-                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter (new day)")
+                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter (reason: ${if (dayStreakCounter == 1) "initial" else "new day"})")
                     } else {
-                        // Same day: still increment to show progress
-                        dayStreakCounter += 1
-                        println("DEBUG: QR scan callback - incremented day streak to: $dayStreakCounter (same day)")
+                        println("DEBUG: QR scan callback - not incrementing day streak (same day)")
                     }
                     
                     try {
