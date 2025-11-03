@@ -9,6 +9,7 @@ import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
@@ -83,6 +84,14 @@ class PauseActivity : ComponentActivity() {
         } catch (_: Exception) {}
 
         val message = intent?.getStringExtra("message") ?: "Take a mindful pause"
+
+        // Override back button to prevent navigation away from Pause Screen
+        onBackPressedDispatcher.addCallback(object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // Consume the back button press - do nothing
+                // User stays on the Pause Screen
+            }
+        })
 
         // Register receiver to close when HIDE is sent
         val filter = IntentFilter("com.luminoprisma.scrollpause.HIDE_PAUSE_SCREEN")
