@@ -157,41 +157,41 @@ fun getRandomCongratulationMessage(): String {
 fun getRandomPauseMessage(): String {
     val messages = listOf(
         "Did you know that doomscrolling is linked to higher levels of anxiety and stress? Step away and let yourself recharge.",
-        "Pause for a moment — your mind will thank you.",
+        "Pause for a moment —\n your mind will thank you.",
         "Did you know? Studies show that spending too long scrolling can disrupt your sleep and mood. Stretch your body and give your mind a break.",
-        "Too much scrolling floods your brain with stress hormones — take a breather!",
+        "Too much scrolling floods your brain with stress hormones —\n take a breather!",
         "Research shows that cutting down screen time can boost happiness and focus.",
         "Even a 5-minute pause can reset your mood and reduce tension.",
-        "Your brain needs breaks, too — give it some quiet time to recharge.",
-        "You deserve calm, not chaos. Take a short pause.",
+        "Your brain needs breaks, too —\n give it some quiet time to recharge.",
+        "You deserve calm,\n not chaos.\n Take a short pause.",
         "A quick scroll break can help you feel more grounded and present.",
         "Stepping away now means you'll feel better later.",
-        "Less scrolling, more serenity — you've got this.",
+        "Less scrolling,\n more serenity —\n you've got this.",
         "Research links doomscrolling to higher cortisol (the stress hormone). A pause helps lower it.",
         "People who limit social media use report better focus and less loneliness. Go enjoy something screen-free — your brain will love it.",
-        "Scrolling too long keeps your brain in alert mode — breaks help you relax.",
+        "Scrolling too long keeps your brain in alert mode —\n breaks help you relax.",
         "Pausing from screens helps your brain process emotions more clearly.",
         "Reducing doomscrolling can improve your sleep quality within days.",
-        "Take a breath. Step away. You're choosing peace over panic.",
-        "You're in control — not the algorithm.",
+        "Take a breath. \nStep away. \nYou're choosing peace over doomscrolling.",
+        "You're in control —\n not the algorithm.",
         "Your time matters more than endless feeds.",
-        "One pause at a time — your mind will thank you.",
-        "You've broken the scroll once before — you can do it again.",
-        "Go enjoy something screen-free — your brain will love it.",
-        "Look up, move, and take in the world around you.",
+        "One pause at a time —\n your mind will thank you.",
+        "You've broken the scroll once before —\n you can do it again.",
+        "Go enjoy something screen-free —\n your brain will love it.",
+        "Look up, move,\n and take in the world around you.",
         "Refocus your energy on something that fills you up.",
         "A few minutes away can lift your mood instantly.",
         "Reconnect with what makes you feel alive.",
-        "Take control back — your attention is powerful.",
+        "Take control back —\n your attention is powerful.",
         "Log off for a bit and see how much clearer you feel.",
-        "You’ve got this — put the phone down and breathe.",
-        "Do something real — even one small action counts.",
-        "Turn off the feed, turn on your focus.",
-        "Try a short break — your mind will thank you.",
+        "You’ve got this —\n put the phone down and breathe.",
+        "Do something real —\n even one small action counts.",
+        "Turn off the feed,\n turn on your focus.",
+        "Try a short break —\n your mind will thank you.",
         "Take a moment offline and feel the difference.",
         "Give yourself five minutes of peace right now.",
         "Pause and reconnect with yourself — you deserve it.",
-        "Step away for a bit — your focus will follow."
+        "Step away for a bit —\n your focus will follow."
     )
     return messages[Random.nextInt(messages.size)]
 }
@@ -4939,7 +4939,7 @@ fun PauseScreen(
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Card-like container
+            // Card-like container - Message as focal point
             Card(
                 backgroundColor = Color(0xFF1E3A5F),
                 shape = RoundedCornerShape(16.dp)
@@ -4947,9 +4947,31 @@ fun PauseScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    // Main pause message - large and prominent
+                    Text(
+                        text = getRandomPauseMessage(),
+                        color = Color.White,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 36.sp,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+                    
+                    Spacer(Modifier.height(16.dp))
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(Color.White.copy(alpha = 0.2f))
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    
+                    // Secondary information
                     Box(
                         modifier = Modifier
                             .size(28.dp)
@@ -4976,27 +4998,21 @@ fun PauseScreen(
                     Text(
                         text = "Time for a Pause",
                         color = Color.White,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium
                     )
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(12.dp))
                     Text(
                         text = "You have used your tracked apps for",
-                        color = Color.White
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 14.sp
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = durationText,
                         color = Color.White,
-                        fontSize = 40.sp,
+                        fontSize = 32.sp,
                         fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = getRandomPauseMessage(),
-                        color = Color.White,
-                        fontSize = 14.sp,
-                        textAlign = TextAlign.Center
                     )
                 }
             }
@@ -5010,10 +5026,9 @@ fun PauseScreen(
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 16.dp)
             ) {
-                Text("▣", color = Color.White)
                 Spacer(Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Scan My QR Code", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Scan my QR Code", color = Color.White, fontWeight = FontWeight.Bold)
                     Text("Walk to your QR code to unlock your apps", color = Color.White, fontSize = 12.sp)
                 }
             }

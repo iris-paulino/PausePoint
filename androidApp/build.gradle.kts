@@ -35,8 +35,8 @@ android {
         applicationId = "com.luminoprisma.scrollpause"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 9
-        versionName = "1.3"
+        versionCode = 3
+        versionName = "3.1.0"
     }
     
     signingConfigs {
@@ -55,6 +55,9 @@ android {
     }
     
     buildTypes {
+        getByName("debug") {
+            isDebuggable = true
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
