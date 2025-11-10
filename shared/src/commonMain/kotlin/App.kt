@@ -975,27 +975,57 @@ private fun AppRoot() {
         println("DEBUG: trackedApps after: ${trackedApps.map { "${it.name}: ${it.minutesUsed}m" }}")
         
         // Update lifetime seconds for all apps that recorded seconds this session
-        val updatedLifetimeSeconds = lifetimeAppUsageTimes.toMutableMap()
+        // The accessibilityUsage from storage already contains the accumulated lifetime usage
+        // (the accessibility service adds its session usage to what's in storage when time limit is reached).
+        // 
+        // The key insight: when tracking is paused (not at time limit), the accessibility service
+        // hasn't saved its current session usage yet. So we need to add sessionAppUsageTimes to
+        // what's in storage. But if the accessibility service already saved (at time limit),
+        // then sessionAppUsageTimes might be redundant.
+        //
+        // Solution: Use storage as the base (it's the accumulated lifetime), and add session
+        // usage only if it's greater than what's in storage (meaning it's new usage not yet saved).
+        val updatedLifetimeSeconds = accessibilityUsage.toMutableMap()
         
-        // Merge session usage
+        // The key insight: sessionAppUsageTimes contains the usage for the CURRENT session only
+        // (it starts at 0 when tracking begins). accessibilityUsage from storage contains the
+        // accumulated lifetime usage from ALL previous sessions.
+        //
+        // When the accessibility service reaches the time limit, it saves its session usage to storage
+        // and clears its in-memory usage. So if we're pausing manually (not at time limit), the
+        // accessibility service hasn't saved the current session yet.
+        //
+        // Solution: Always add sessionAppUsageTimes to what's in storage to get the total lifetime usage.
+        // However, we need to avoid double-counting if the accessibility service already saved.
+        // Since the accessibility service only saves at time limit (and clears after), if we're
+        // manually pausing, it hasn't saved yet. So we can safely add session to storage.
+        //
+        // But wait: if the time limit was reached and then user manually paused, the accessibility
+        // service already saved. In that case, storage already includes the session usage, so we
+        // shouldn't add it again. We can detect this by checking if session <= storage (meaning
+        // it's already included).
         sessionAppUsageTimes.forEach { (appName, sessionSeconds) ->
             if (sessionSeconds > 0) {
                 val current = updatedLifetimeSeconds[appName] ?: 0L
-                updatedLifetimeSeconds[appName] = current + sessionSeconds
+                if (sessionSeconds > current) {
+                    // Session usage is new (not yet saved by accessibility service)
+                    // Add it to storage to get total lifetime usage
+                    updatedLifetimeSeconds[appName] = current + sessionSeconds
+                    println("DEBUG: Added new session usage for $appName: +$sessionSeconds (storage=$current, total=${updatedLifetimeSeconds[appName]})")
+                } else {
+                    // Session usage is already included in storage (accessibility service already saved)
+                    // Use storage value as-is
+                    println("DEBUG: Session usage for $appName already in storage: $sessionSeconds <= $current")
+                }
             }
         }
         
-        // Merge accessibility service usage
-        accessibilityUsage.forEach { (appName, accessibilitySeconds) ->
-            if (accessibilitySeconds > 0) {
-                val current = updatedLifetimeSeconds[appName] ?: 0L
-                val sessionSeconds = sessionAppUsageTimes[appName] ?: 0L
-                // Only add if accessibility service has more usage than session
-                if (accessibilitySeconds > sessionSeconds) {
-                    val additionalSeconds = accessibilitySeconds - sessionSeconds
-                    updatedLifetimeSeconds[appName] = current + additionalSeconds
-                    println("DEBUG: Added accessibility service usage for $appName: +${additionalSeconds}s")
-                }
+        // Also check lifetimeAppUsageTimes in memory in case it has newer data not yet in storage
+        lifetimeAppUsageTimes.forEach { (appName, lifetimeSeconds) ->
+            val current = updatedLifetimeSeconds[appName] ?: 0L
+            if (lifetimeSeconds > current) {
+                updatedLifetimeSeconds[appName] = lifetimeSeconds
+                println("DEBUG: Updated $appName from memory: $lifetimeSeconds (was $current)")
             }
         }
         
