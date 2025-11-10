@@ -65,19 +65,10 @@ fun PersistentTrackingConsentDialog(
                                 color = Color.White
                             )
                             Text(
-                                text = "• Continue tracking and blocking apps when ScrollPause is closed",
+                                text = "Continue tracking and showing pause screens when time limits are reached, even when ScrollPause is closed.",
                                 fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• Show pause screens when time limits are reached",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                text = "• Auto-resume tracking after app restarts",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
+                                color = Color(0xFFCCCCCC),
+                                lineHeight = 18.sp
                             )
                         }
                     }

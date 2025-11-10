@@ -2870,45 +2870,13 @@ private fun AppRoot() {
                     )
                     
                     Text(
-                        "We use accessibility to detect which app is in the foreground for accurate tracking. Enable enhanced tracking that continues working even when ScrollPause is closed.",
+                        "Enable enhanced tracking that continues working even when ScrollPause is closed. This service is used exclusively for digital wellness purposes.",
                         color = Color(0xFFCCCCCC),
                         fontSize = 15.sp,
                         lineHeight = 22.sp,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
-                    
-                    Card(
-                        backgroundColor = Color(0xFF2A2A2A),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(12.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                "📱 What this enables:",
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 14.sp,
-                                color = Color.White
-                            )
-                            Text(
-                                "• Continue tracking and blocking apps when ScrollPause is closed",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                "• Show pause screens when time limits are reached",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                            Text(
-                                "• Auto-resume tracking after app restarts",
-                                fontSize = 12.sp,
-                                color = Color(0xFFCCCCCC)
-                            )
-                        }
-                    }
                     
                     Text(
                         "All data stays on your device. You can disable this anytime in Android Settings.",
@@ -2921,30 +2889,32 @@ private fun AppRoot() {
                     
                     Spacer(Modifier.height(8.dp))
                     
-                    // Buttons with custom 3dp spacing
-                    Button(
-                        onClick = {
-                            openAccessibilitySettings()
-                            showAccessibilityConsentDialog = false 
-                            if (pendingStartTracking) {
-                                // Continue Start Tracking flow
-                                pendingStartTracking = true
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
-                        shape = RoundedCornerShape(24.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) { 
-                        Text("Allow", color = Color.White, fontWeight = FontWeight.Bold)
-                    }
-                    
-                    Spacer(Modifier.height(3.dp))
-                    
-                    TextButton(
-                        onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { 
-                        Text("Not now", color = Color.White, textAlign = TextAlign.Center) 
+                    // Buttons with minimal spacing
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                openAccessibilitySettings()
+                                showAccessibilityConsentDialog = false 
+                                if (pendingStartTracking) {
+                                    // Continue Start Tracking flow
+                                    pendingStartTracking = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) { 
+                            Text("Allow", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+                        
+                        TextButton(
+                            onClick = { showAccessibilityConsentDialog = false; pendingStartTracking = false },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { 
+                            Text("Not now", color = Color.White, textAlign = TextAlign.Center) 
+                        }
                     }
                 }
             }
