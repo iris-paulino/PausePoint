@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="white">#FFFFFFFF</color>
+    <!-- Splash screen colors matching app theme -->
+    <color name="splash_background">#1A1A1A</color>
+    <color name="splash_icon_background">#1A1A1A</color>
 </resources>

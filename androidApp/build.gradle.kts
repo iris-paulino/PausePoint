@@ -17,6 +17,8 @@ kotlin {
                 implementation("com.journeyapps:zxing-android-embedded:4.3.0")
                 implementation("com.google.zxing:core:3.5.2")
                 implementation("androidx.work:work-runtime-ktx:2.9.0")
+                // Splash screen API for Android 12+
+                implementation("androidx.core:core-splashscreen:1.0.1")
                 // Compose UI used by CongratulationsOverlayActivity
                 implementation(compose.material)
                 implementation(compose.foundation)
@@ -35,8 +37,8 @@ android {
         applicationId = "com.luminoprisma.scrollpause"
         minSdk = (findProperty("android.minSdk") as String).toInt()
         targetSdk = (findProperty("android.targetSdk") as String).toInt()
-        versionCode = 3
-        versionName = "3.1.0"
+        versionCode = 11
+        versionName = "6.2.5"
     }
     
     signingConfigs {

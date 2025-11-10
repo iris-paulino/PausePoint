@@ -821,7 +821,6 @@ private fun AppRoot() {
     var showAccessibilityConsentDialog by remember { mutableStateOf(false) }
     var showUsageAccessDisableConfirmationDialog by remember { mutableStateOf(false) }
     var showAccessibilityDisableConfirmationDialog by remember { mutableStateOf(false) }
-    var showPersistentTrackingConsentDialog by remember { mutableStateOf(false) }
     var persistentTrackingConsent by remember { mutableStateOf(false) }
     var pendingStartTracking by remember { mutableStateOf(false) }
     var userManuallyStoppedTracking by remember { mutableStateOf(false) }
@@ -1294,16 +1293,17 @@ private fun AppRoot() {
             )
             
         // Start enhanced services only if user has given consent
+            // Note: If persistentTrackingConsent is false, it will be automatically set to true
+            // when accessibility is enabled (via setOnAccessibilityStatusChangeCallback)
             if (persistentTrackingConsent) {
                 // Start foreground service for persistent monitoring
                 startAppMonitoringForegroundService()
                 
                 // Save tracking state for restart detection
                 saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
-            } else {
-                // Show consent dialog for enhanced tracking
-                showPersistentTrackingConsentDialog = true
             }
+            // If persistentTrackingConsent is false, the foreground service will be started
+            // automatically when the user enables accessibility in settings
         } else {
             // Stop tracking and save final state
             println("DEBUG: *** TRACKING STOPPED *** isTracking: $isTracking, trackingStartTime: $trackingStartTime")
@@ -1602,21 +1602,42 @@ private fun AppRoot() {
                 }
                 // Show notification to user
                 showAccessibilityDisabledNotification()
-            } else if (isEnabled && !isTracking && !userManuallyStoppedTracking) {
-                // Check if both permissions are now granted and auto-start tracking
+            } else if (isEnabled) {
+                // Accessibility was just enabled - automatically enable persistent tracking
                 coroutineScope.launch {
-                    val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
-                    println("DEBUG: Accessibility enabled - checking for auto-start. Usage pref allowed: $usagePrefAllowed")
-                    
-                    if (usagePrefAllowed && trackedApps.isNotEmpty()) {
-                        // Check if we have QR codes (either current or saved)
-                        val hasAnySavedQr = withTimeoutOrNull(2000) {
-                            storage.getSavedQrCodes().isNotEmpty()
-                        } ?: false
+                    try {
+                        // Automatically set persistent tracking consent to true
+                        persistentTrackingConsent = true
+                        storage.savePersistentTrackingConsent(true)
+                        println("DEBUG: Accessibility enabled - automatically enabled persistent tracking consent")
                         
-                        if (!qrId.isNullOrBlank() || hasAnySavedQr) {
-                            println("DEBUG: Both permissions granted and prerequisites met - auto-starting tracking")
-                            pendingStartTracking = true
+                        // If tracking is active, start the foreground service
+                        if (isTracking) {
+                            startAppMonitoringForegroundService()
+                            saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
+                            println("DEBUG: Accessibility enabled - started foreground service for active tracking")
+                        }
+                    } catch (e: Exception) {
+                        println("DEBUG: Error enabling persistent tracking after accessibility enabled: ${e.message}")
+                    }
+                }
+                
+                // Check if both permissions are now granted and auto-start tracking
+                if (!isTracking && !userManuallyStoppedTracking) {
+                    coroutineScope.launch {
+                        val usagePrefAllowed = withTimeoutOrNull(2000) { storage.getUsageAccessAllowed() } ?: false
+                        println("DEBUG: Accessibility enabled - checking for auto-start. Usage pref allowed: $usagePrefAllowed")
+                        
+                        if (usagePrefAllowed && trackedApps.isNotEmpty()) {
+                            // Check if we have QR codes (either current or saved)
+                            val hasAnySavedQr = withTimeoutOrNull(2000) {
+                                storage.getSavedQrCodes().isNotEmpty()
+                            } ?: false
+                            
+                            if (!qrId.isNullOrBlank() || hasAnySavedQr) {
+                                println("DEBUG: Both permissions granted and prerequisites met - auto-starting tracking")
+                                pendingStartTracking = true
+                            }
                         }
                     }
                 }
@@ -2795,7 +2816,10 @@ private fun AppRoot() {
                 modifier = Modifier.padding(16.dp)
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp)
+                    modifier = Modifier
+                        .padding(24.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
                         "\uD83D\uDC20",
@@ -2807,7 +2831,7 @@ private fun AppRoot() {
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Enable Accessibility?",
+                        "Enable Accessibility Service",
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
                         fontSize = 24.sp,
@@ -2815,25 +2839,57 @@ private fun AppRoot() {
                         textAlign = TextAlign.Center
                     )
                     
-                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "We use accessibility to detect which app is in the foreground for accurate tracking. Enable enhanced tracking that continues working even when ScrollPause is closed.",
+                        color = Color(0xFFCCCCCC),
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     
-                    Column {
-                        Text(
-                            "We use accessibility to detect which app is in the foreground for accurate tracking.",
-                            color = Color.White,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            "You can turn this off anytime in Settings.",
-                            color = Color(0xFFD1D5DB),
-                            fontSize = 12.sp,
-                            textAlign = TextAlign.Center
-                        )
+                    Card(
+                        backgroundColor = Color(0xFF2A2A2A),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                "📱 What this enables:",
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                            Text(
+                                "• Continue tracking and blocking apps when ScrollPause is closed",
+                                fontSize = 12.sp,
+                                color = Color(0xFFCCCCCC)
+                            )
+                            Text(
+                                "• Show pause screens when time limits are reached",
+                                fontSize = 12.sp,
+                                color = Color(0xFFCCCCCC)
+                            )
+                            Text(
+                                "• Auto-resume tracking after app restarts",
+                                fontSize = 12.sp,
+                                color = Color(0xFFCCCCCC)
+                            )
+                        }
                     }
                     
-                    Spacer(Modifier.height(24.dp))
+                    Text(
+                        "All data stays on your device. You can disable this anytime in Android Settings.",
+                        fontSize = 13.sp,
+                        color = Color(0xFF999999),
+                        lineHeight = 18.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
                     
                     // Buttons with custom 3dp spacing
                     Button(
@@ -2845,7 +2901,7 @@ private fun AppRoot() {
                                 pendingStartTracking = true
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2C4877)),
+                        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF2196F3)),
                         shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) { 
@@ -2865,38 +2921,9 @@ private fun AppRoot() {
         }
     }
 
-    // Persistent Tracking Consent Dialog
-    PersistentTrackingConsentDialog(
-        isVisible = showPersistentTrackingConsentDialog,
-        onAllow = {
-            persistentTrackingConsent = true
-            showPersistentTrackingConsentDialog = false
-            coroutineScope.launch {
-                try {
-                    storage.savePersistentTrackingConsent(true)
-                    // Now start the enhanced services
-                    startAppMonitoringForegroundService()
-                    saveTrackingStateForRestart(isTracking, isPaused, trackedApps.map { it.name }, timeLimitMinutes)
-                } catch (e: Exception) {
-                    println("DEBUG: Error saving persistent tracking consent: ${e.message}")
-                }
-            }
-        },
-        onDeny = {
-            persistentTrackingConsent = false
-            showPersistentTrackingConsentDialog = false
-            coroutineScope.launch {
-                try {
-                    storage.savePersistentTrackingConsent(false)
-                } catch (e: Exception) {
-                    println("DEBUG: Error saving persistent tracking consent: ${e.message}")
-                }
-            }
-        },
-        onDismiss = {
-            showPersistentTrackingConsentDialog = false
-        }
-    )
+    // Persistent Tracking Consent Dialog - REMOVED
+    // Consent is now automatically granted when user enables accessibility in settings
+    // (see setOnAccessibilityStatusChangeCallback above)
 
     // Usage Access Disable Confirmation Dialog
     if (showUsageAccessDisableConfirmationDialog) {
@@ -3563,8 +3590,8 @@ private fun OnboardingFlow(
                 imagePath = "images/onboarding/walking_onboarding.png"
             ),
             OnboardingPage(
-                title = "Pause Partners",
-                description = "Invite trusted friends to hold your QR codes and keep you accountable. They’ll hold your QR codes and help you stay mindful when unlocking apps.",
+                title = "Set Time Limits",
+                description = "Choose which apps to track and set custom time limits. Get notified when you're approaching your limits and take control of your screen time.",
                 imagePath = "images/onboarding/two_people.png"
             ),
             OnboardingPage(
